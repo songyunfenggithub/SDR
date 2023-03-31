@@ -1,0 +1,35 @@
+!include <ntwin32.MAK>
+
+!IF "$(NODEBUG)" != ""
+cdebug = $(cdebug)
+!ELSE
+cdebug = $(cdebug) -DDEBUG
+!ENDIF
+
+cflags=$(cflags) -I..\include
+
+my_lib = shell32.lib winmm.lib
+
+all: myWave.exe
+
+
+# Update the resource if necessary
+mywave.res: mywave.rc mywave.ico
+    $(rc) $(rcvars) -I..\include -r mywave.rc
+
+# Update the object files if necessary
+
+mywave.obj: mywave.cpp mywave.h
+    $(cc) $(scall) $(cflags) $(cvars) $(cdebug) mywave.cpp
+
+winmain.obj: winmain.cpp winmain.h
+    $(cc) $(scall) $(cflags) $(cvars) $(cdebug) winmain.cpp
+
+wave.obj: wave.cpp wave.h
+    $(cc) $(scall) $(cflags) $(cvars) $(cdebug) wave.cpp
+
+mydebug.obj: mydebug.cpp mydebug.h
+    $(cc) $(scall) $(cflags) $(cvars) $(cdebug) mydebug.cpp
+
+myWave.exe: mywave.obj mywave.res winmain.obj wave.obj mydebug.obj 
+    $(link) $(linkdebug) $(guilflags) mywave.obj mywave.res winmain.obj wave.obj mydebug.obj $(my_lib) $(guilibs) -out:acmapp.exe

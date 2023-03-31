@@ -1,0 +1,559 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#define APSTUDIO_HIDDEN_SYMBOLS
+#include "windows.h"
+#undef APSTUDIO_HIDDEN_SYMBOLS
+#include "resource.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// 中文(简体，中国) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+#pragma code_page(936)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_MYWAVE              ICON                    "myWave.ICO"
+
+IDI_SMALL               ICON                    "SMALL.ICO"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDC_MENU_MAIN MENU
+BEGIN
+    POPUP "文件"
+    BEGIN
+        MENUITEM "&New",                        IDM_FILENEW
+        MENUITEM "&Open",                       IDM_FILEOPEN
+        MENUITEM "&Close",                      IDM_FILECLOSE
+        MENUITEM SEPARATOR
+        MENUITEM "&Save",                       IDM_FILESAVE
+        MENUITEM "Save &As ...",                IDM_FILESAVEAS
+        MENUITEM SEPARATOR
+        MENUITEM "&Properties",                 IDM_FILEPROPERTIES
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                       IDM_EXIT
+    END
+    POPUP "编辑"
+    BEGIN
+        MENUITEM "设置剪切位置...\tF8",               IDM_EDIT_SET_CUT_POS
+    END
+    POPUP "回放"
+    BEGIN
+        MENUITEM "播放\tCtrl + P",                IDM_STARTPLAY
+        MENUITEM "暂停",                          IDM_PAUSEPLAY
+        MENUITEM "停止\tF7",                      IDM_STOPPLAY
+        MENUITEM SEPARATOR
+        MENUITEM "指定开始播放位置...\tF6",             IDM_FROMPOSPLAY
+        MENUITEM "指定停止播放位置...",                 IDM_PLAY_STOP_POSITION
+    END
+    POPUP "录音"
+    BEGIN
+        MENUITEM "&开始\tF11",                    IDM_STARTRECORD
+        MENUITEM "停止\tF12",                     IDM_STOPRECORD
+        MENUITEM SEPARATOR
+        MENUITEM "选择录音格式...",                   IDM_RECORDFORMAT
+    END
+    POPUP "音频设备"
+    BEGIN
+        MENUITEM "List WaveInDevices",          IDM_LISTWAVEINDEVICES
+        MENUITEM "List WaveOutDevices",         IDM_LISTWAVEOUTDEVICES
+    END
+    POPUP "帮助"
+    BEGIN
+        MENUITEM "&About ...",                  IDM_ABOUT
+    END
+    POPUP "分析工具"
+    BEGIN
+        MENUITEM "&Analyze Wave",               IDM_ANALYZEWAVE
+        MENUITEM "&Clear Noise",                IDM_ANALYZECLEARNOISE
+        MENUITEM "&Goto",                       IDM_ANALYZEGOTO
+        MENUITEM "Wave Value",                  IDM_ANALYZE_SHOW_WAVE_VALUE
+    END
+    POPUP "波形工具"
+    BEGIN
+        MENUITEM "Generator Wave",              IDM_GENERATORWAVE
+    END
+    POPUP "信号缩放"
+    BEGIN
+        MENUITEM "H Zoom +\tCtrl+1",            IDM_WAVEHZOOMINCREASE
+        MENUITEM "H Zoom - \tCtrl+2",           IDM_WAVEHZOOMDECREASE
+        MENUITEM "H Zoom \tCtrl+3",             IDM_WAVEHZOOMRESET
+        MENUITEM SEPARATOR
+        MENUITEM "V Zoom +\tCtrl+4",            IDM_WAVEVZOOMINCREASE
+        MENUITEM "V Zoom - \tCtrl+5",           IDM_WAVEVZOOMDECREASE
+        MENUITEM "V Zoom\tCtrl+6",              IDM_WAVEVZOOMRESET
+        MENUITEM SEPARATOR
+        MENUITEM "Auto Scroll\tCtrl+7",         IDM_WAVEAUTOSCROLL
+    END
+    POPUP "频谱"
+    BEGIN
+        MENUITEM "频谱...",                       IDM_SPECTRUMWINDOW
+    END
+    POPUP "滤波器"
+    BEGIN
+        MENUITEM "滤波器设置...",                    IDM_FILTERWINDOW
+    END
+    POPUP "波形"
+    BEGIN
+        MENUITEM "适合缩放",                        IDM_WAVE_AUTO_FIT
+        MENUITEM "耦合直流信号",                      IDM_WAVE_DC
+        MENUITEM "耦合交流信号",                      IDM_WAVE_AC
+        MENUITEM SEPARATOR
+        MENUITEM "原信号 偏移 滤波信号",                 IDM_WAVE_SIGNALS_OFFSET
+        MENUITEM "显示原信号",                       IDM_WAVE_ORIGNAL_SIGNAL_SHOW
+        MENUITEM "显示滤波信号",                      IDM_WAVE_FILTTED_SIGNAL_SHOW
+    END
+    POPUP "光电倍增管"
+    BEGIN
+        MENUITEM "倍增管计数...",                    IDM_PMT_WINDOW
+    END
+    POPUP "SDR"
+    BEGIN
+        MENUITEM "SDR...",                      IDM_SDR_WINDOW
+    END
+END
+
+IDC_MENU_SPECTRUM MENU
+BEGIN
+    POPUP "频谱"
+    BEGIN
+        MENUITEM "水平放大\tCtrl+1",                IDM_SPECTRUM_HORZ_ZOOM_INCREASE
+        MENUITEM "水平缩小\tCtrl+2",                IDM_SPECTRUM_HORZ_ZOOM_DECREASE
+        MENUITEM "水平还原\tCtrl+3",                IDM_SPECTRUM_HORZ_ZOOM_HOME
+        MENUITEM SEPARATOR
+        MENUITEM "纵向放大\tCtrl+4",                IDM_SPECTRUM_VERT_ZOOM_INCREASE
+        MENUITEM "纵向缩小\tCtrl+5",                IDM_SPECTRUM_VERT_ZOOM_DECREASE
+        MENUITEM "纵向还原\tCtrl+6",                IDM_SPECTRUM_VERT_ZOOM_HOME
+        MENUITEM SEPARATOR
+        MENUITEM "跟随运动",                        IDM_SPECTRUM_FOLLOW
+    END
+    POPUP "FFT"
+    BEGIN
+        MENUITEM "水平放大\tAlt+1",                 IDM_FFT_HORZ_ZOOM_INCREASE
+        MENUITEM "水平缩小\tAlt+2",                 IDM_FFT_HORZ_ZOOM_DECREASE
+        MENUITEM "水平还原\tAlt+3",                 IDM_FFT_HORZ_ZOOM_HOME
+        MENUITEM SEPARATOR
+        MENUITEM "纵向放大\tAlt+4",                 IDM_FFT_VERT_ZOOM_INCREASE
+        MENUITEM "纵向缩小\tAlt+5",                 IDM_FFT_VERT_ZOOM_DECREASE
+        MENUITEM "纵向还原\tAlt+6",                 IDM_FFT_VERT_ZOOM_HOME
+        MENUITEM SEPARATOR
+        MENUITEM "显示原信号 FFT",                   IDM_FFT_ORIGNAL_SHOW
+        MENUITEM "显示原信号 FFT LOG",               IDM_FFT_ORIGNAL_LOG_SHOW
+        MENUITEM "显示滤波信号 FFT",                  IDM_FFT_FILTTED_SHOW
+        MENUITEM "显示滤波信号 FFT LOG",              IDM_FFT_FILTTED_LOG_SHOW
+        MENUITEM SEPARATOR
+        MENUITEM "定格",                          IDM_FFT_HOLD
+    END
+    POPUP "图谱"
+    BEGIN
+        MENUITEM "显示原信号图谱",                     IDM_SPECTRUM_ORIGNAL_SHOW
+        MENUITEM "显示原信号图谱Log",                  IDM_SPECTRUM_ORIGNAL_LOG_SHOW
+        MENUITEM "显示滤波后信号图谱",                   IDM_SPECTRUM_FILTTED_SHOW
+        MENUITEM "显示滤波后信号图谱Log",                IDM_SPECTRUM_FILTTED_LOG_SHOW
+        MENUITEM SEPARATOR
+        MENUITEM "显示缩放后图谱",                     IDM_SPECTRUM_ZOOMED_SHOW
+    END
+    POPUP "工具"
+    BEGIN
+        MENUITEM "设置...",                       IDM_FFT_SET
+        MENUITEM "继续/暂停\tCtrl+Pause Break",     IDM_SPECTRUM_PAUSE_BREAK
+    END
+END
+
+IDC_MENU_FILTER MENU
+BEGIN
+    POPUP "显示"
+    BEGIN
+        MENUITEM "放大\tCtrl + 1",                IDM_FILTER_ZOOM_INC
+        MENUITEM "缩小\t Ctrl + 2",               IDM_FILTER_ZOOM_DEC
+        MENUITEM SEPARATOR
+        MENUITEM "原始大小\t Ctrl Home",            IDM_FILTER_ZOOM_HOME
+        MENUITEM SEPARATOR
+        MENUITEM "显示核数据",                       IDM_FILTER_CORE_SHOW
+        MENUITEM "显示原频谱",                       IDM_FILTER_CORE_SPECTRUM_SHOW
+        MENUITEM "显示Log频谱",                     IDM_FILTER_CORE_SPECTRUM_LOG_SHOW
+    END
+    POPUP "设置滤波器核"
+    BEGIN
+        MENUITEM "设置...",                       32867
+    END
+END
+
+IDC_MENU_SDR MENU
+BEGIN
+    POPUP "FFT"
+    BEGIN
+        MENUITEM "1 Hz FFT",                    IDM_SDR_FFT_1HZFFT
+        MENUITEM "1k Hz FFT",                   IDM_SDR_FFT_1KHZFFT
+        MENUITEM "1M Hz FFT",                   IDM_FFT_1MHZFFT
+        MENUITEM SEPARATOR
+        MENUITEM "设置...",                       IDM_SDR_SET
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Accelerator
+//
+
+IDC_MYWAVE ACCELERATORS
+BEGIN
+    "/",            IDM_ABOUT,              ASCII,  ALT, NOINVERT
+    "?",            IDM_ABOUT,              ASCII,  ALT, NOINVERT
+    VK_F8,          IDM_EDIT_SET_CUT_POS,   VIRTKEY, NOINVERT
+    VK_F6,          IDM_FROMPOSPLAY,        VIRTKEY, NOINVERT
+    VK_PAUSE,       IDM_SPECTRUM_PAUSE_BREAK, VIRTKEY, CONTROL, NOINVERT
+    "P",            IDM_STARTPLAY,          VIRTKEY, CONTROL, NOINVERT
+    VK_F11,         IDM_STARTRECORD,        VIRTKEY, NOINVERT
+    VK_F7,          IDM_STOPPLAY,           VIRTKEY, NOINVERT
+    VK_F12,         IDM_STOPRECORD,         VIRTKEY, NOINVERT
+    "7",            IDM_WAVEAUTOSCROLL,     VIRTKEY, CONTROL, NOINVERT
+    "2",            IDM_WAVEHZOOMDECREASE,  VIRTKEY, CONTROL, NOINVERT
+    "1",            IDM_WAVEHZOOMINCREASE,  VIRTKEY, CONTROL, NOINVERT
+    "3",            IDM_WAVEHZOOMRESET,     VIRTKEY, CONTROL, NOINVERT
+    "5",            IDM_WAVEVZOOMDECREASE,  VIRTKEY, CONTROL, NOINVERT
+    "4",            IDM_WAVEVZOOMINCREASE,  VIRTKEY, CONTROL, NOINVERT
+    "6",            IDM_WAVEVZOOMRESET,     VIRTKEY, CONTROL, NOINVERT
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+DLG_WAVEDEVICE DIALOG 10, 20, 260, 185
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Wave Device Selection"
+FONT 9, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&Device:",-1,2,8,30,8
+    COMBOBOX        IDD_WAVEDEVICE_COMBO_DEVICE,41,5,165,68,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,213,4,43,15
+    LTEXT           "&Capabilities:",-1,2,27,77,8
+    EDITTEXT        IDD_WAVEDEVICE_EDIT_CAPABILITIES,2,38,256,144,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL
+END
+
+IDD_ABOUTBOX DIALOGEX 22, 17, 230, 75
+STYLE DS_SETFONT | DS_MODALFRAME | WS_CAPTION | WS_SYSMENU
+CAPTION "About"
+FONT 8, "System", 0, 0, 0x0
+BEGIN
+    ICON            IDI_MYWAVE,IDC_MYICON,14,9,20,20
+    LTEXT           "myWave Version 1.0",IDC_STATIC,49,10,119,8,SS_NOPREFIX
+    LTEXT           "Copyright (C) 2017",IDC_STATIC,49,20,119,8
+    DEFPUSHBUTTON   "OK",IDOK,195,6,30,11,WS_GROUP
+END
+
+IDD_DLGGOTO DIALOGEX 0, 0, 187, 94
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Goto Position"
+FONT 10, "System", 0, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,130,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,130,24,50,14
+    LTEXT           "Goto",IDC_STATIC,13,16,25,12
+    EDITTEXT        IDC_EDITGOTO,47,13,40,14,ES_AUTOHSCROLL | ES_NUMBER,WS_EX_STATICEDGE
+END
+
+IDD_DLGSAVELENGTH DIALOG 0, 0, 187, 88
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Select cut of position"
+FONT 10, "System"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,143,7,37,13
+    PUSHBUTTON      "Cancel",IDCANCEL,144,24,37,13
+    CONTROL         "Start Position",IDC_STATIC_START_POS,"Static",SS_SIMPLE | SS_NOTIFY | WS_BORDER | WS_GROUP,9,21,45,10
+    LTEXT           "End Position",IDC_STATIC_END_POS,9,43,42,10,SS_NOTIFY | WS_BORDER | NOT WS_GROUP
+    EDITTEXT        IDC_EDITSAVESTART,59,19,61,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDITSAVEEND,59,41,61,12,ES_AUTOHSCROLL
+    CONTROL         "Use Buffer Length",IDC_CHECK_USE_BUF_LEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,59,63,75,10
+END
+
+IDD_DLGPROPERTIES DIALOG 0, 0, 198, 79
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Properties"
+FONT 10, "System"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,152,7,39,14
+    PUSHBUTTON      "Cancel",IDCANCEL,152,24,39,14
+    LTEXT           "Static",IDC_STATICINFO,7,7,141,65
+END
+
+IDD_DLG_SHOW_WAVE_VALUE DIALOG 0, 0, 283, 160
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Wave Value"
+FONT 10, "System"
+BEGIN
+    PUSHBUTTON      "Show",IDC_BUTTON_SHOW,226,139,50,14
+END
+
+IDD_DLG_PLAY_STOP_POSITION DIALOG 0, 0, 187, 94
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Set play stop position"
+FONT 10, "System"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,130,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,130,24,50,14
+    LTEXT           "Stop Position",IDC_STATIC_PLAY_STOP_POSITION,7,21,44,10,SS_NOTIFY | WS_BORDER
+    EDITTEXT        IDC_EDIT_PLAY_STOP_POSITION,56,20,64,12,ES_AUTOHSCROLL
+END
+
+IDD_DLGSPECTRUMSETTING DIALOGEX 0, 0, 347, 267
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "频谱设置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "确定",IDOK,7,246,50,14
+    PUSHBUTTON      "取消",IDCANCEL,290,246,50,14
+    LTEXT           "Static",IDC_STATIC,21,23,19,8
+    GROUPBOX        "Static",IDC_STATIC,7,7,333,234
+    EDITTEXT        IDC_EDIT1,50,18,110,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT2,50,39,110,14,ES_AUTOHSCROLL
+    LTEXT           "Static",IDC_STATIC,21,42,19,8
+END
+
+IDD_DLG_FILTER_CORE_SET DIALOGEX 0, 0, 463, 202
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "滤波器核 设置..."
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "确定",IDOK,349,181,50,14
+    PUSHBUTTON      "取消",IDCANCEL,406,181,50,14
+    EDITTEXT        IDC_EDIT1,85,18,357,14,ES_AUTOHSCROLL
+    LTEXT           "描述滤波器核",IDC_STATIC,25,20,49,8,0,WS_EX_TRANSPARENT
+    LTEXT           "",IDC_STATIC,24,39,417,118
+END
+
+IDD_DLG_FFT_SET DIALOGEX 0, 0, 255, 238
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "FFT 设置..."
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "确定",IDOK,198,217,50,14
+    PUSHBUTTON      "取消",IDCANCEL,198,217,50,14
+    EDITTEXT        IDC_EDIT_FFT_SIZE,58,18,122,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_FFT_STEP,57,43,124,14,ES_AUTOHSCROLL
+    LTEXT           "FFT 长度",IDC_STATIC,19,21,31,8
+    LTEXT           "FFT 步长",IDC_STATIC,18,47,31,8
+END
+
+IDD_DLG_SDR_SET DIALOGEX 0, 0, 557, 406
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "SDR pramas set"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "确定",IDOK,440,385,50,14
+    PUSHBUTTON      "取消",IDCANCEL,500,385,50,14
+    GROUPBOX        "SDR devices",IDC_STATIC_SDR_TREE,0,0,300,374
+    GROUPBOX        "set params",IDC_STATIC,300,0,252,374
+    CONTROL         "",IDC_SDR_PARMAS_TREE,"SysTreeView32",TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS | WS_HSCROLL | WS_GROUP | WS_TABSTOP,6,12,288,354
+    LTEXT           "Static",IDC_STATIC_SDR_PARAMS_TITLE,312,18,158,8
+    LTEXT           "Static",IDC_STATIC_SDR_PARAMS_COMMENT,306,48,240,318
+    COMBOBOX        IDC_COMBO_SDR_PARAMS,312,30,203,188,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDC_EDIT_SDR_PARAMS,312,30,183,14,ES_AUTOHSCROLL | ES_NUMBER | NOT WS_TABSTOP
+    PUSHBUTTON      "应用",IDAPPLY,380,385,50,14
+END
+
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+2 TEXTINCLUDE 
+BEGIN
+    "#define APSTUDIO_HIDDEN_SYMBOLS\r\n"
+    "#include ""windows.h""\r\n"
+    "#undef APSTUDIO_HIDDEN_SYMBOLS\r\n"
+    "#include ""resource.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    DLG_WAVEDEVICE, DIALOG
+    BEGIN
+    END
+
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+    END
+
+    IDD_DLGGOTO, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 180
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 87
+    END
+
+    IDD_DLGSAVELENGTH, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 180
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 81
+    END
+
+    IDD_DLGPROPERTIES, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 191
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 72
+    END
+
+    IDD_DLG_SHOW_WAVE_VALUE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 276
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 153
+    END
+
+    IDD_DLG_PLAY_STOP_POSITION, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 180
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 87
+    END
+
+    IDD_DLGSPECTRUMSETTING, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 340
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 260
+    END
+
+    IDD_DLG_FILTER_CORE_SET, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 456
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 195
+        HORZGUIDE, 157
+    END
+
+    IDD_DLG_FFT_SET, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 248
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 231
+    END
+
+    IDD_DLG_SDR_SET, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 550
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 399
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// AFX_DIALOG_LAYOUT
+//
+
+IDD_DLGSPECTRUMSETTING AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+IDD_ABOUTBOX AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+IDD_DLG_FILTER_CORE_SET AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+IDD_DLG_FFT_SET AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+IDD_DLG_SDR_SET AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE
+BEGIN
+    IDS_APP_TITLE           "myWave"
+    IDS_HELLO               "Hello World!"
+    IDC_MYWAVE              "MYWAVE"
+END
+
+#endif    // 中文(简体，中国) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

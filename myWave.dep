@@ -1,0 +1,27 @@
+# Microsoft Developer Studio Generated Dependency File, included by myWave.mak
+
+.\myWave.rc : \
+	".\myWave.ico"\
+	".\small.ico"\
+	
+
+.\StdAfx.cpp : \
+	"..\..\..\..\..\program files\microsoft platform sdk for windows xp sp2\include\basetsd.h"\
+	"..\..\..\..\..\program files\microsoft platform sdk for windows xp sp2\include\guiddef.h"\
+	"..\..\..\..\..\program files\microsoft platform sdk for windows xp sp2\include\reason.h"\
+	"..\..\..\..\..\program files\microsoft platform sdk for windows xp sp2\include\specstrings.h"\
+	"..\..\..\..\..\program files\microsoft platform sdk for windows xp sp2\include\stralign.h"\
+	"..\..\..\..\..\program files\microsoft platform sdk for windows xp sp2\include\tvout.h"\
+	".\StdAfx.h"\
+	
+
+.\Wave.cpp : \
+	".\Wave.h"\
+	".\WinMain.h"\
+	
+
+.\WinMain.cpp : \
+	".\myDebug.h"\
+	".\Wave.h"\
+	".\WinMain.h"\
+	
