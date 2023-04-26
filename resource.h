@@ -202,7 +202,29 @@
 #define IDM_WAVE_FOLLOW_ORIGNAL         32924
 #define ID_32925                        32925
 #define IDM_SOUND_WINDOW                32926
-#define IDC_MENU_AUDIO					32927
+#define IDC_MENU_AUDIO                  32927
+#define ID_32927                        32927
+#define IDM_FILTTEDWINDOW               32928
+#define IDC_MENU_FILTTED                32929
+#define IDM_AUDIO_WINDOW                32929
+#define ID_DEMODULATOR_AM               32930
+#define IDM_DEMODULATOR_AM              32931
+#define ID_32932                        32932
+#define ID_32933                        32933
+#define ID_32934                        32934
+#define ID_32935                        32935
+#define IDM_AUDIO_FILTER_IN             32936
+#define IDM_AUDIO_FILTER_OUT            32937
+#define IDM_AUDIO_FILTER_USE            32938
+#define IDM_AUDIO_FILTER_SET            32939
+#define ID_32940                        32940
+#define ID_32941                        32941
+#define ID_32942                        32942
+#define ID_32943                        32943
+#define IDM_AUDIO_OUT_SEL               32944
+#define IDM_AUDIO_FILT_OUT_SEL          32945
+#define IDM_AUDIO_IN_SEL                32946
+#define IDM_AUDIO_FILT_IN_SEL           32947
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -210,7 +232,7 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        152
-#define _APS_NEXT_COMMAND_VALUE         32927
+#define _APS_NEXT_COMMAND_VALUE         32948
 #define _APS_NEXT_CONTROL_VALUE         1025
 #define _APS_NEXT_SYMED_VALUE           110
 #endif

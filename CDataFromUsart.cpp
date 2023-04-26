@@ -5,7 +5,7 @@
 #include <process.h>
 
 #include "public.h"
-#include "CWaveData.h"
+#include "CData.h"
 
 #include "CDataFromUsart.h"
 
@@ -25,7 +25,6 @@ void CDataFromUsart::UsartGetData(void)
 	}
 
 	ListenThread(this);
-
 }
 
 /** 线程退出标志 */
@@ -275,13 +274,13 @@ UINT WINAPI CDataFromUsart::ListenThread(void* pParam)
 		}
 		/** 读取输入缓冲区中的数据并输出显示 */
 		UINT BytesReadBlock;
-		if ((DATA_BUFFER_LENGTH << 2) - clsWaveData.AdcGetCharLength < BytesInQue) {
-			BytesReadBlock = (DATA_BUFFER_LENGTH << 2) - clsWaveData.AdcGetCharLength;
+		if ((DATA_BUFFER_LENGTH << 2) - clsData.AdcGetCharLength < BytesInQue) {
+			BytesReadBlock = (DATA_BUFFER_LENGTH << 2) - clsData.AdcGetCharLength;
 			BytesInQue -= BytesReadBlock;
 		}
 		else
 			BytesReadBlock = BytesInQue;
-		UINT nBytesRead = pSerialPort->ReadBytesInQue((char*)(clsWaveData.AdcBuff) + clsWaveData.AdcGetCharLength, BytesReadBlock);
+		UINT nBytesRead = pSerialPort->ReadBytesInQue((char*)(clsData.AdcBuff) + clsData.AdcGetCharLength, BytesReadBlock);
 		//cout << " - " << nBytesRead << ":" << BytesInQue << endl;
 		if (nBytesRead != BytesReadBlock) 
 			cout << "Usart ReadByte Error\n" 
@@ -291,14 +290,14 @@ UINT WINAPI CDataFromUsart::ListenThread(void* pParam)
 		if (count++ % 100 == 0)
 		{
 			cout << endl << "StringToHex" << endl;
-			StringToHex((char*)clsWaveData.AdcBuff + clsWaveData.AdcGetCharLength, nBytesRead);
+			StringToHex((char*)clsData.AdcBuff + clsData.AdcGetCharLength, nBytesRead);
 		}
 
-		clsWaveData.NumPerSecInProcess += nBytesRead;
-		clsWaveData.AdcGetCharLength += nBytesRead;
-		clsWaveData.AdcPos = clsWaveData.AdcGetCharLength >> 2;
-		if (clsWaveData.AdcGetCharLength == (DATA_BUFFER_LENGTH << 2)) clsWaveData.AdcGetCharLength = 0;
-		clsWaveData.AdcGetNew = true;
+		clsData.NumPerSecInProcess += nBytesRead;
+		clsData.AdcGetCharLength += nBytesRead;
+		clsData.AdcPos = clsData.AdcGetCharLength >> 2;
+		if (clsData.AdcGetCharLength == (DATA_BUFFER_LENGTH << 2)) clsData.AdcGetCharLength = 0;
+		clsData.AdcGetNew = true;
 
 	}
 
@@ -440,6 +439,6 @@ LPTHREAD_START_ROUTINE CDataFromUsart::GetDataUsartThreadFun(LPVOID lp)
 {
 	OPENCONSOLE;
 	clsGetDataUsart.UsartGetData();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 	return 0;
 }

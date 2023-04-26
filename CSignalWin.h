@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string>
 
+#include "public.h"
 #include "CMessage.h"
 #include "CScreenButton.h"
 
@@ -36,16 +37,23 @@ public:
 
 	DRAWINFO	DrawInfo;
 
+	const char* Tag = NULL;
+
+	GetStrFunction GetStrFunc = NULL;
+
 	HWND hWnd = NULL;
+	HMENU hMenu = NULL;
 
 	UINT uTimerId;
 
-	void* OrignalBuff;
-	UINT* OrignalBuffPos;
+	UINT* SampleRate = NULL;
+
+	void* OrignalBuff = NULL;
+	UINT* OrignalBuffPos = NULL;
 	BUFF_DATA_TYPE	orignal_buff_type;
 
-	void* FilttedBuff;
-	UINT* FilttedBuffPos;
+	void* FilttedBuff = NULL;
+	UINT* FilttedBuffPos = NULL;
 	BUFF_DATA_TYPE	filtted_buff_type;
 
 	UINT		BuffDataBit;

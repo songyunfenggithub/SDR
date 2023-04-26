@@ -19,8 +19,7 @@
 #include "CSoundCard.h"
 #include "MyDebug.h"
 
-extern CWinMain clsWinMain;
-extern CSoundCard	clsSoundCard;
+#include "CData.h"
 
 CFile		clsFile;
 
@@ -156,6 +155,38 @@ BOOL CFile::SaveFile(VOID)
 		WriteFile(hFile, clsSoundCard.outBuffer + dwSaveStartPos, 
 			dwSaveEndPos - dwSaveStartPos, &NumberOfBytesWritten, NULL);
 		CloseHandle( hFile );
+	}
+	return TRUE;
+}
+
+BOOL CFile::SaveBuffToFile(VOID)
+{
+	DWORD  NumberOfBytesWritten;
+
+	if (clsFile.szFile[0] == '\0')if (!clsFile.GetSaveFile(clsWinMain.hWnd, FALSE))return FALSE;
+
+	if (clsFile.dwSaveEndPos == 0) clsFile.dwSaveEndPos = 50000000;
+
+	HANDLE hFile = CreateFile(szFile,
+		GENERIC_WRITE,
+		0,
+		NULL,
+		CREATE_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL);
+	if (INVALID_HANDLE_VALUE == hFile)
+	{
+		DbgMsg("Failed to create file :%d", GetLastError());
+		return FALSE;
+	}
+	else
+	{
+		DWORD dwLen = (dwSaveEndPos - dwSaveStartPos) * sizeof(ADCDATATYPE);
+		//WriteFile(hFile, "wa", 2, &NumberOfBytesWritten, NULL);
+		//WriteFile(hFile, &clsSoundCard.FormatEx, sizeof(WAVEFORMATEX), &NumberOfBytesWritten, NULL);
+		//WriteFile(hFile, &dwLen, 8, &NumberOfBytesWritten, NULL);
+		WriteFile(hFile, (char*)(clsData.AdcBuff + dwSaveStartPos), dwLen, &NumberOfBytesWritten, NULL);
+		CloseHandle(hFile);
 	}
 	return TRUE;
 }

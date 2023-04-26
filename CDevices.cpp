@@ -37,7 +37,7 @@ TCHAR           gszNo[]             = TEXT("No");
 #define APP_MAX_FILE_TITLE_CHARS    APP_MAX_FILE_PATH_CHARS
 #define APP_MAX_FILE_TITLE_BYTES    (APP_MAX_FILE_TITLE_CHARS * sizeof(TCHAR))
 
-typedef struct tACMAPPFILEDESC
+typedef struct ACMAPPFILEDESC_TAG
 {
     DWORD           fdwState;
 

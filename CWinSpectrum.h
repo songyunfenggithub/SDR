@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string>
 
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWinOneSpectrum.h"
 
 
@@ -36,7 +36,8 @@ public:
 
 	HWND	hWnd				= NULL;
 
-	UINT32  WinWidth, WinHeight;
+	//UINT32  WinWidth, WinHeight;
+	RECT WinRect;
 	UINT32	WinWidthSpectrum = 0, WinHeightSpectrum = 0;
 	UINT	PainttedFFT = 0;
 
@@ -58,7 +59,7 @@ public:
 	bool SpectrumAutoFollow = true;
 
 
-	int HScrollPos = 0, HScrollWidth = 0;
+	int HScrollPos = 0, VScrollPos = 0, HScrollWidth = 0;
 	double HScrollZoom = 1.0;
 	double VScrollZoom = 1.0;
 
@@ -86,11 +87,13 @@ public:
 	void Paint(HWND hWnd);
 	LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	BOOL OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	void PaintFFT(WHICHSIGNAL WhichSignal);
 	void KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	void InitBuff(void);
 
 	VOID GetRealClientRect(HWND hWnd, PRECT lprc);
+
+	void RestoreValue(void);
+	void SaveValue(void);
 
 	static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	static LRESULT CALLBACK DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);

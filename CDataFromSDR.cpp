@@ -6,7 +6,7 @@
 
 
 #include "public.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFilter.h"
 #include "CWaveFFT.h"
 #include "CWinFFT.h"
@@ -60,43 +60,43 @@ void CDataFromSDR::StreamACallback(short* xi, short* xq, sdrplay_api_StreamCbPar
 	);
 	*/
 
-	int m1 = (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) - clsWaveData.AdcGetCharLength;
+	int m1 = (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) - clsData.AdcGetCharLength;
 	int m2 = 0;
 	if (m1 > numSamples) {
 		m1 = numSamples;
-		memcpy((char*)clsWaveData.AdcBuff + clsWaveData.AdcGetCharLength, xi, m1);
-		clsWaveData.AdcGetCharLength += m1;
+		memcpy((char*)clsData.AdcBuff + clsData.AdcGetCharLength, xi, m1);
+		clsData.AdcGetCharLength += m1;
 	}
 	else {
 		m2 = numSamples - m1;
-		memcpy((char*)clsWaveData.AdcBuff + clsWaveData.AdcGetCharLength, xi, m1);
-		memcpy((char*)clsWaveData.AdcBuff, xi, m2);
-		clsWaveData.AdcGetCharLength = m2;
+		memcpy((char*)clsData.AdcBuff + clsData.AdcGetCharLength, xi, m1);
+		memcpy((char*)clsData.AdcBuff, xi, m2);
+		clsData.AdcGetCharLength = m2;
 	}
 
-	m1 = (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) - clsWaveData.AdcGetCharLength;
+	m1 = (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) - clsData.AdcGetCharLength;
 	m2 = 0;
 	if (m1 > numSamples) {
 		m1 = numSamples;
-		memcpy((char*)clsWaveData.AdcBuff + clsWaveData.AdcGetCharLength, xq, m1);
-		clsWaveData.AdcGetCharLength += m1;
+		memcpy((char*)clsData.AdcBuff + clsData.AdcGetCharLength, xq, m1);
+		clsData.AdcGetCharLength += m1;
 	}
 	else {
 		m2 = numSamples - m1;
-		memcpy((char*)clsWaveData.AdcBuff + clsWaveData.AdcGetCharLength, xq, m1);
-		memcpy((char*)clsWaveData.AdcBuff, xq, m2);
-		clsWaveData.AdcGetCharLength = m2;
+		memcpy((char*)clsData.AdcBuff + clsData.AdcGetCharLength, xq, m1);
+		memcpy((char*)clsData.AdcBuff, xq, m2);
+		clsData.AdcGetCharLength = m2;
 	}
 
-	//StringToHex((char*)(clsWaveData.AdcBuff) + clsWaveData.AdcGetCharLength, 20);
+	//StringToHex((char*)(clsData.AdcBuff) + clsData.AdcGetCharLength, 20);
 	//printf("%d\n", len);
 
 	
-	if ((DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) == clsWaveData.AdcGetCharLength) clsWaveData.AdcGetCharLength = 0;
+	if ((DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) == clsData.AdcGetCharLength) clsData.AdcGetCharLength = 0;
 
-	clsWaveData.AdcPos = clsWaveData.AdcGetCharLength >> DATA_BYTE_TO_POSITION_MOVEBIT;
-	//printf("pos:%d\n", clsWaveData.AdcPos);
-	clsWaveData.AdcGetNew = true;
+	clsData.AdcPos = clsData.AdcGetCharLength >> DATA_BYTE_TO_POSITION_MOVEBIT;
+	//printf("pos:%d\n", clsData.AdcPos);
+	clsData.AdcGetNew = true;
 
 	return;
 }
@@ -179,6 +179,8 @@ void CDataFromSDR::open_SDR_device(void)
 	if ((err = sdrplay_api_Open()) != sdrplay_api_Success)
 	{
 		printf("sdrplay_api_Open failed %s\n", sdrplay_api_GetErrorString(err));
+		system("PAUSE");
+		exit(0);
 	}
 	else
 	{
@@ -260,7 +262,7 @@ void CDataFromSDR::open_SDR_device(void)
 			if (deviceParams->devParams != NULL)
 			{
 				// Change from default Fs to 8MHz
-				deviceParams->devParams->fsFreq.fsHz = clsWaveData.AdcSampleRate;
+				deviceParams->devParams->fsFreq.fsHz = clsData.AdcSampleRate;
 			}
 			// Configure tuner parameters (depends on selected Tuner which parameters to use)
 			chParams = (chosenDevice->tuner == sdrplay_api_Tuner_B) ? deviceParams->rxChannelB :
@@ -333,6 +335,10 @@ void CDataFromSDR::open_SDR_device(void)
 	CloseApi:
 		// Close API
 		sdrplay_api_Close();
+
+		printf("sdr device open falild.\r\n");
+		system("PAUSE");
+		exit(0);
 	}
 }
 

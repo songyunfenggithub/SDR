@@ -108,14 +108,6 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Follow by Orignal",           IDM_WAVE_FOLLOW_ORIGNAL
     END
-    POPUP "频谱"
-    BEGIN
-        MENUITEM "频谱...",                       IDM_SPECTRUMWINDOW
-    END
-    POPUP "滤波器"
-    BEGIN
-        MENUITEM "滤波器设置...",                    IDM_FILTERWINDOW
-    END
     POPUP "波形"
     BEGIN
         MENUITEM "适合缩放",                        IDM_WAVE_AUTO_FIT
@@ -126,17 +118,16 @@ BEGIN
         MENUITEM "显示原信号",                       IDM_WAVE_ORIGNAL_SIGNAL_SHOW
         MENUITEM "显示滤波信号",                      IDM_WAVE_FILTTED_SIGNAL_SHOW
     END
-    POPUP "光电倍增管"
+    POPUP "视图"
     BEGIN
-        MENUITEM "倍增管计数...",                    IDM_PMT_WINDOW
-    END
-    POPUP "SDR"
-    BEGIN
+        MENUITEM "音频...",                       IDM_AUDIO_WINDOW
+        MENUITEM SEPARATOR
+        MENUITEM "滤波后信号...",                    IDM_FILTTEDWINDOW
+        MENUITEM "滤波器设置...",                    IDM_FILTERWINDOW
+        MENUITEM SEPARATOR
+        MENUITEM "频谱...",                       IDM_SPECTRUMWINDOW
+        MENUITEM SEPARATOR
         MENUITEM "SDR...",                      IDM_SDR_WINDOW
-    END
-    POPUP "音频"
-    BEGIN
-        MENUITEM "音频...",                       IDM_SOUND_WINDOW
     END
 END
 
@@ -159,7 +150,7 @@ BEGIN
     BEGIN
         MENUITEM "设置剪切位置...\tF8",               IDM_EDIT_SET_CUT_POS
     END
-    POPUP "音频"
+    POPUP "音频播放"
     BEGIN
         MENUITEM "播放\tCtrl + P",                IDM_STARTPLAY
         MENUITEM "暂停",                          IDM_PAUSEPLAY
@@ -167,6 +158,11 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "指定开始播放位置...\tF6",             IDM_FROMPOSPLAY
         MENUITEM "指定停止播放位置...",                 IDM_PLAY_STOP_POSITION
+        MENUITEM SEPARATOR
+        MENUITEM "播放输出缓冲",                      IDM_AUDIO_OUT_SEL
+        MENUITEM "播放输出滤波后缓冲",                   IDM_AUDIO_FILT_OUT_SEL
+        MENUITEM "播放录制缓冲",                      IDM_AUDIO_IN_SEL
+        MENUITEM "播放录制滤波后缓冲",                   IDM_AUDIO_FILT_IN_SEL
     END
     POPUP "录音"
     BEGIN
@@ -208,12 +204,105 @@ BEGIN
         MENUITEM "纵向缩小\tAlt+5",                 IDM_FFT_VERT_ZOOM_DECREASE
         MENUITEM "纵向还原\tAlt+6",                 IDM_FFT_VERT_ZOOM_HOME
         MENUITEM SEPARATOR
-        MENUITEM "显示原信号 FFT",                  IDM_FFT_ORIGNAL_SHOW
-        MENUITEM "显示原信号 FFT LOG",              IDM_FFT_ORIGNAL_LOG_SHOW
-        MENUITEM "显示滤波信号 FFT",                IDM_FFT_FILTTED_SHOW
-        MENUITEM "显示滤波信号 FFT LOG",            IDM_FFT_FILTTED_LOG_SHOW
+        MENUITEM "显示原信号 FFT",                   IDM_FFT_ORIGNAL_SHOW
+        MENUITEM "显示原信号 FFT LOG",               IDM_FFT_ORIGNAL_LOG_SHOW
+        MENUITEM "显示滤波信号 FFT",                  IDM_FFT_FILTTED_SHOW
+        MENUITEM "显示滤波信号 FFT LOG",              IDM_FFT_FILTTED_LOG_SHOW
         MENUITEM SEPARATOR
-        MENUITEM "定格",                          	IDM_FFT_HOLD
+        MENUITEM "定格",                          IDM_FFT_HOLD
+        MENUITEM SEPARATOR
+        MENUITEM "设置FFTSize...",                IDM_FFT_SET
+    END
+    POPUP "频率谱"
+    BEGIN
+        MENUITEM "显示原信号频率谱",                    IDM_SPECTRUM_ORIGNAL_SHOW
+        MENUITEM "显示原信号频率谱Log",                 IDM_SPECTRUM_ORIGNAL_LOG_SHOW
+        MENUITEM SEPARATOR
+        MENUITEM "显示缩放后频率谱",                    IDM_SPECTRUM_ZOOMED_SHOW
+    END
+    POPUP "波形"
+    BEGIN
+        MENUITEM "适合缩放",                        IDM_WAVE_AUTO_FIT
+        MENUITEM "耦合直流信号",                      IDM_WAVE_DC
+        MENUITEM "耦合交流信号",                      IDM_WAVE_AC
+        MENUITEM SEPARATOR
+        MENUITEM "原信号 偏移 滤波信号",                 IDM_WAVE_SIGNALS_OFFSET
+        MENUITEM "显示原信号",                       IDM_WAVE_ORIGNAL_SIGNAL_SHOW
+        MENUITEM "显示滤波信号",                      IDM_WAVE_FILTTED_SIGNAL_SHOW
+    END
+    POPUP "帮助"
+    BEGIN
+        MENUITEM "&About ...",                  IDM_ABOUT
+    END
+    POPUP "Demodulator"
+    BEGIN
+        MENUITEM "AM",                          IDM_DEMODULATOR_AM
+    END
+    POPUP "音频滤波"
+    BEGIN
+        MENUITEM "滤波输入信号",                      IDM_AUDIO_FILTER_IN
+        MENUITEM "滤波输出信号",                      IDM_AUDIO_FILTER_OUT
+        MENUITEM SEPARATOR
+        MENUITEM "使用滤波器",                       IDM_AUDIO_FILTER_USE
+        MENUITEM SEPARATOR
+        MENUITEM "滤波器设置...",                    IDM_AUDIO_FILTER_SET
+    END
+END
+
+IDC_MENU_FILTTED MENU
+BEGIN
+    POPUP "文件"
+    BEGIN
+        MENUITEM "&New",                        IDM_FILENEW
+        MENUITEM "&Open",                       IDM_FILEOPEN
+        MENUITEM "&Close",                      IDM_FILECLOSE
+        MENUITEM SEPARATOR
+        MENUITEM "&Save",                       IDM_FILESAVE
+        MENUITEM "Save &As ...",                IDM_FILESAVEAS
+        MENUITEM SEPARATOR
+        MENUITEM "&Properties",                 IDM_FILEPROPERTIES
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                       IDM_EXIT
+    END
+    POPUP "信号缩放"
+    BEGIN
+        MENUITEM "H Zoom +\tCtrl+1",            IDM_WAVEHZOOMINCREASE
+        MENUITEM "H Zoom - \tCtrl+2",           IDM_WAVEHZOOMDECREASE
+        MENUITEM "H Zoom \tCtrl+3",             IDM_WAVEHZOOMRESET
+        MENUITEM SEPARATOR
+        MENUITEM "V Zoom +\tCtrl+4",            IDM_WAVEVZOOMINCREASE
+        MENUITEM "V Zoom - \tCtrl+5",           IDM_WAVEVZOOMDECREASE
+        MENUITEM "V Zoom\tCtrl+6",              IDM_WAVEVZOOMRESET
+        MENUITEM SEPARATOR
+        MENUITEM "Auto Scroll\tCtrl+7",         IDM_WAVEAUTOSCROLL
+        MENUITEM SEPARATOR
+        MENUITEM "Follow by Orignal",           IDM_WAVE_FOLLOW_ORIGNAL
+    END
+    POPUP "FFT"
+    BEGIN
+        MENUITEM "水平放大\tAlt+1",                 IDM_FFT_HORZ_ZOOM_INCREASE
+        MENUITEM "水平缩小\tAlt+2",                 IDM_FFT_HORZ_ZOOM_DECREASE
+        MENUITEM "水平还原\tAlt+3",                 IDM_FFT_HORZ_ZOOM_HOME
+        MENUITEM SEPARATOR
+        MENUITEM "纵向放大\tAlt+4",                 IDM_FFT_VERT_ZOOM_INCREASE
+        MENUITEM "纵向缩小\tAlt+5",                 IDM_FFT_VERT_ZOOM_DECREASE
+        MENUITEM "纵向还原\tAlt+6",                 IDM_FFT_VERT_ZOOM_HOME
+        MENUITEM SEPARATOR
+        MENUITEM "显示原信号 FFT",                   IDM_FFT_ORIGNAL_SHOW
+        MENUITEM "显示原信号 FFT LOG",               IDM_FFT_ORIGNAL_LOG_SHOW
+        MENUITEM "显示滤波信号 FFT",                  IDM_FFT_FILTTED_SHOW
+        MENUITEM "显示滤波信号 FFT LOG",              IDM_FFT_FILTTED_LOG_SHOW
+        MENUITEM SEPARATOR
+        MENUITEM "定格",                          IDM_FFT_HOLD
+        MENUITEM SEPARATOR
+        MENUITEM "设置FFTSize...",                IDM_FFT_SET
+    END
+    POPUP "频率谱"
+    BEGIN
+        MENUITEM "显示原信号频率谱",                    IDM_SPECTRUM_ORIGNAL_SHOW
+        MENUITEM "显示原信号频率谱Log",                 IDM_SPECTRUM_ORIGNAL_LOG_SHOW
+        MENUITEM SEPARATOR
+        MENUITEM "显示缩放后频率谱",                    IDM_SPECTRUM_ZOOMED_SHOW
     END
     POPUP "波形"
     BEGIN
@@ -452,7 +541,7 @@ STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSM
 CAPTION "FFT 设置..."
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "确定",IDOK,198,217,50,14
+    DEFPUSHBUTTON   "确定",IDOK,139,217,50,14
     PUSHBUTTON      "取消",IDCANCEL,198,217,50,14
     EDITTEXT        IDC_EDIT_FFT_SIZE,58,18,122,14,ES_AUTOHSCROLL
     EDITTEXT        IDC_EDIT_FFT_STEP,57,43,124,14,ES_AUTOHSCROLL

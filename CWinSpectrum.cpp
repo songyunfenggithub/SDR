@@ -7,7 +7,7 @@
 
 #include "public.h"
 #include "myDebug.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFFT.h"
 #include "CWinFFT.h"
 #include "CWinSpectrum.h"
@@ -22,6 +22,7 @@ using namespace std;
 #define GET_WM_HSCROLL_POS(wp, lp)      HIWORD(wp)
 
 #define BOUND(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
+#define UP_TO_ZERO(x) (x = x < 0 ? 0 : x)
 
 #define DIVLONG		10
 #define DIVSHORT	5
@@ -45,7 +46,7 @@ CWinSpectrum::CWinSpectrum()
 CWinSpectrum::~CWinSpectrum()
 {
 	if(hWnd) DestroyWindow(hWnd);
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 }
 
 void CWinSpectrum::RegisterWindowsClass(void)
@@ -71,10 +72,12 @@ void CWinSpectrum::RegisterWindowsClass(void)
 
 void CWinSpectrum::OpenWindow(void)
 {
-	if (hWnd) {
-		ShowWindow(hWnd, SW_SHOW);
-		UpdateWindow(hWnd);
+	if (hWnd == NULL) {
+		hWnd = CreateWindow(SPECTRUM_WIN_CLASS, "Spectrum windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+			CW_USEDEFAULT, 0, 1400, 800, NULL, NULL, hInst, NULL);
 	}
+	ShowWindow(hWnd, SW_SHOW);
+	UpdateWindow(hWnd);
 }
 
 LRESULT CALLBACK CWinSpectrum::StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -89,20 +92,13 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 	switch (message)
 	{
 	case WM_CREATE:
-		
+	{
 		OPENCONSOLE;
-
 		clsWinSpect.hWnd = hWnd;
-
 		hMenu = GetMenu(hWnd);
-
-		{
-			HMENU m = GetSubMenu(hMenu, 2);
-			CheckMenuRadioItem(m, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
-		}
-
+		HMENU m = GetSubMenu(hMenu, 2);
+		CheckMenuRadioItem(m, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
 		CheckMenuItem(hMenu, IDM_SPECTRUM_FOLLOW, MF_BYCOMMAND | MF_CHECKED);
-
 		CheckMenuItem(hMenu, IDM_FFT_ORIGNAL_SHOW,
 			(clsWinFFT.bFFTOrignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		CheckMenuItem(hMenu, IDM_FFT_ORIGNAL_LOG_SHOW,
@@ -111,23 +107,18 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 			(clsWinFFT.bFFTFilttedShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		CheckMenuItem(hMenu, IDM_FFT_FILTTED_LOG_SHOW,
 			(clsWinFFT.bFFTFilttedLogShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-
 		CheckMenuItem(hMenu, IDM_FFT_HOLD,
 			(clsWinFFT.bFFTHold ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-
 		uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
 		//KillTimer(hWnd, 0);//DrawInfo.uTimerId);
-
-
+		RestoreValue();
 		hWndOneFFT = CreateWindow(FFT_ONE_WIN_CLASS, "FFT One window", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			0, 200, 500, 200, hWnd, NULL, hInst, NULL);
 		ShowWindow(hWndOneFFT, SW_SHOW);
-
 		hWndOneSpectrum = CreateWindow(SPECTRUM_ONE_WIN_CLASS, "Spectrum One window", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			0, 0, 500, 200, hWnd, NULL, hInst, NULL);
 		ShowWindow(hWndOneSpectrum, SW_SHOW);
 		//UpdateWindow(hWndOneSpectrum);
-
 		/*
 		{
 			SCROLLINFO si;
@@ -149,23 +140,20 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 
 		}
 		*/
-		break;
-
+	}
+	break;
 	case WM_TIMER:
-			InvalidateRect(hWnd, NULL, TRUE);
-			UpdateWindow(hWnd);
+		InvalidateRect(hWnd, NULL, TRUE);
+		UpdateWindow(hWnd);
 		break;
-
 	case WM_SIZE:
 	{
-		GetClientRect(hWnd, &rt);
-		WinWidth = rt.right;
-		WinHeight = rt.bottom;
+		GetClientRect(hWnd, &WinRect);
 		//WinOneSpectrumHeight = (WinHeight - SCROLLBAR_WIDTH) / 4;
 		int FFThight = WAVE_RECT_HEIGHT + WAVE_RECT_BORDER_TOP + WAVE_RECT_BORDER_BOTTON;
-		MoveWindow(hWndOneFFT, 0, 0, WinWidth, FFThight, true);
+		MoveWindow(hWndOneFFT, 0, 0, WinRect.right, FFThight, true);
 		//MoveWindow(hWndOneFFT, 0, 0, WinWidth, WinHeight, true);
-		MoveWindow(hWndOneSpectrum, 0, FFThight, WinWidth, WinHeight - FFThight, true);
+		MoveWindow(hWndOneSpectrum, 0, FFThight, WinRect.right, WinRect.bottom - FFThight, true);
 
 		//MoveWindow(hWndSpectrumHScrollBar, 0, 4 * WinOneSpectrumHeight, WinWidthSpectrum, SCROLLBAR_WIDTH, true);
 		//SetScrollRange(hWndSpectrumHScrollBar, SB_HORZ, 0, SPECTRUM_WIDTH - SPECTRUM_WIN_WIDTH / WinOneSpectrumHScrollZoom, TRUE);
@@ -173,17 +161,14 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 
 		//if (clsWaveFFT.HalfFFTSize - WinOneSpectrumHeight > 0)
 			//SetScrollRange(hWndSpectrumVScrollBar, SB_VERT, 0, clsWaveFFT.HalfFFTSize - WinOneSpectrumHeight, TRUE);
-
-				//滚动条初始化
+		//滚动条初始化
 		RECT rt;
 		GetRealClientRect(hWnd, &rt);
-		clsWinSpect.HScrollWidth = clsWaveFFT.HalfFFTSize - (rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
-		if (clsWinSpect.HScrollWidth < 0) clsWinSpect.HScrollWidth = 0;
-		SetScrollRange(hWnd, SB_HORZ, 0, clsWinSpect.HScrollWidth, TRUE);
-
+		HScrollWidth = clsWaveFFT.HalfFFTSize * HScrollZoom - (rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+		if (HScrollWidth < 0) HScrollWidth = 0;
+		SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
 	}
-		break;
-
+	break;
 	case WM_CHAR:
 		printf("char:%c\r\n", wParam);
 		switch (wParam)
@@ -220,31 +205,26 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 		}
 		return DefWindowProc(hWnd, message, wParam, lParam);
 		break;
-
 	case WM_ERASEBKGND:
 		//不加这条消息屏幕刷新会闪烁
 		break;
 	case WM_PAINT:
 		Paint(hWnd);
 		break;
-
 	case WM_KEYDOWN:
 	case WM_KEYUP:
 	case WM_VSCROLL:
 	case WM_HSCROLL:
 		KeyAndScroll(hWnd, message, wParam, lParam);
 		break;
-
 	case WM_DESTROY:
+		SaveValue();
 		if (clsWinOneFFT.hWnd) DestroyWindow(clsWinOneFFT.hWnd);
 		if (clsWinOneSpectrum.hWnd) DestroyWindow(clsWinOneSpectrum.hWnd);
-		//PostQuitMessage(0);
 		DbgMsg("WinSpectrum WM_DESTROY\r\n");
 		break;
-
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
-
 	}
 	return 0;
 }
@@ -321,30 +301,40 @@ BOOL CWinSpectrum::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	case IDM_FFT_HORZ_ZOOM_INCREASE:
 		if (HScrollZoom < FFT_ZOOM_MAX) {
 			HScrollZoom *= 2;
+			HScrollWidth = clsWaveFFT.HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
+			HScrollPos *= 2.0;
+			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
+			clsWinOneFFT.P2SubP1();
 			PostMessage(clsWinOneFFT.hWnd, WM_SIZE, 0, 0);
 		}
 		break;
 	case IDM_FFT_HORZ_ZOOM_DECREASE:
-
-		if (HScrollZoom * clsWaveFFT.FFTSize > clsWinOneFFT.WinWidth) {
+		if (HScrollZoom * clsWaveFFT.HalfFFTSize > WinRect.right) {
 			HScrollZoom /= 2.0;
+			HScrollWidth = clsWaveFFT.HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			UP_TO_ZERO(HScrollWidth);
+			SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
+			HScrollPos /= 2.0;
+			HScrollPos = BOUND(HScrollPos, 0, HScrollWidth);
+			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
+			clsWinOneFFT.P2SubP1();
 			PostMessage(clsWinOneFFT.hWnd, WM_SIZE, 0, 0);
 		}
 		break;
 	case IDM_FFT_HORZ_ZOOM_HOME:
+		HScrollPos /= HScrollZoom;
+		HScrollWidth = clsWaveFFT.HalfFFTSize - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+		SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
+		SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 		HScrollZoom = 1.0;
+		clsWinOneFFT.P2SubP1();
 		PostMessage(clsWinOneFFT.hWnd, WM_SIZE, 0, 0);
 		break;
 	case IDM_FFT_VERT_ZOOM_INCREASE:
-		if (VScrollZoom < FFT_ZOOM_MAX)
-			VScrollZoom *= 2.0;
-		break;
 	case IDM_FFT_VERT_ZOOM_DECREASE:
-		if (VScrollZoom < FFT_ZOOM_MAX)
-			VScrollZoom /= 2.0;
-		break;
 	case IDM_FFT_VERT_ZOOM_HOME:
-		VScrollZoom = 1.0;
+		PostMessage(clsWinOneFFT.hWnd, message, wParam, lParam);
 		break;
 	case IDM_FFT_ORIGNAL_SHOW:
 		clsWinOneFFT.bFFTOrignalShow = !clsWinOneFFT.bFFTOrignalShow;
@@ -449,21 +439,6 @@ VOID CWinSpectrum::Paint(HWND hWnd)
 	DeleteObject(hDC);
 
 	EndPaint(hWnd, &ps);
-}
-
-void CWinSpectrum::PaintFFT(WHICHSIGNAL WhichSignal)
-{
-	/*
-	if (WhichSignal == WHICHSIGNAL::SIGNAL_ORIGNAL) {
-		clsWinOneSpectrum.PaintFFTToSpectrum(&clsWinOneSpectrum.OrignalFFTData,		clsWinFFT.OrignalFFTBuff);
-		clsWinOneSpectrum.PaintFFTToSpectrum(&clsWinOneSpectrum.OrignalLogFFTData,	clsWinFFT.OrignalFFTBuffLog);
-	}
-	else {
-		clsWinOneSpectrum.PaintFFTToSpectrum(&clsWinOneSpectrum.FilttedFFTData,		clsWinFFT.FilttedFFTBuff);
-		clsWinOneSpectrum.PaintFFTToSpectrum(&clsWinOneSpectrum.FilttedLogFFTData,	clsWinFFT.FilttedFFTBuffLog);
-	}
-	*/
-
 }
 
 LRESULT CALLBACK CWinSpectrum::DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -643,15 +618,15 @@ void CWinSpectrum::KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 		}
 		if (dn != 0)
 		{
-			clsWinSpect.HScrollPos = BOUND(clsWinSpect.HScrollPos + dn, 0, clsWinSpect.HScrollWidth);
+			HScrollPos = BOUND(HScrollPos + dn, 0, HScrollWidth);
 		}
 		if (tbdn != 0)
 		{
-			clsWinSpect.HScrollPos = BOUND(tbdn, 0, clsWinSpect.HScrollWidth);
+			HScrollPos = BOUND(tbdn, 0, HScrollWidth);
 		}
 		if (dn != 0 || tbdn != 0)
 		{
-			SetScrollPos(hWnd, SB_HORZ, clsWinSpect.HScrollPos, TRUE);
+			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			InvalidateRect(hWnd, NULL, TRUE);
 			UpdateWindow(hWnd);
 			//printf("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
@@ -697,4 +672,34 @@ void CWinSpectrum::InitBuff(void)
 	BrieflyBuffs[2] = BrieflyFiltFFTBuff;
 	BrieflyBuffs[3] = BrieflyFiltFFTBuffLog;
 
+}
+
+void CWinSpectrum::SaveValue(void)
+{
+#define VALUE_LENGTH	100
+	char section[VALUE_LENGTH];
+	sprintf(section, "CWinSpectrum");
+	char value[VALUE_LENGTH];
+	WritePrivateProfileString(section, "HScrollPos", std::to_string(HScrollPos).c_str(), IniFilePath);
+	WritePrivateProfileString(section, "VScrollPos", std::to_string(VScrollPos).c_str(), IniFilePath);
+	sprintf(value, "%.20f", HScrollZoom);
+	WritePrivateProfileString(section, "HScrollZoom", value, IniFilePath);
+	sprintf(value, "%.20f", VScrollZoom);
+	WritePrivateProfileString(section, "VScrollZoom", value, IniFilePath);
+}
+
+void CWinSpectrum::RestoreValue(void)
+{
+#define VALUE_LENGTH	100
+	char value[VALUE_LENGTH];
+	char section[VALUE_LENGTH];
+	sprintf(section, "CWinSpectrum");
+	GetPrivateProfileString(section, "HScrollPos", "0", value, VALUE_LENGTH, IniFilePath);
+	HScrollPos = atoi(value);
+	GetPrivateProfileString(section, "VScrollPos", "0", value, VALUE_LENGTH, IniFilePath);
+	VScrollPos = atoi(value);
+	GetPrivateProfileString(section, "HScrollZoom", "1.0", value, VALUE_LENGTH, IniFilePath);
+	HScrollZoom = atof(value);
+	GetPrivateProfileString(section, "VScrollZoom", "1.0", value, VALUE_LENGTH, IniFilePath);
+	VScrollZoom = atof(value);
 }

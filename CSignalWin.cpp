@@ -9,7 +9,7 @@
 
 #include "public.h"
 #include "myDebug.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFFT.h"
 
 #include "CAudioWin.h"
@@ -19,7 +19,6 @@
 #define WAVE_RECT_BORDER_LEFT		20
 #define WAVE_RECT_BORDER_RIGHT		60
 #define WAVE_RECT_BORDER_BOTTON		25
-
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -64,7 +63,7 @@ CSignalWin::CSignalWin()
 CSignalWin::~CSignalWin()
 {
 	UnInit();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 }
 
 void CSignalWin::Init(UINT data_bit, UINT data_length)
@@ -305,7 +304,7 @@ void CSignalWin::CaculateHScroll(void)
 	//}
 
 	if (bAutoScroll) {
-		DrawInfo.dwHZoomedPos = (bFollowByOrignal == true ? clsWaveData.AdcPos : clsWaveData.FilttedPos) * DrawInfo.dbHZoom - DrawInfo.DrawWidth;
+		DrawInfo.dwHZoomedPos = (bFollowByOrignal == true ? *OrignalBuffPos : *FilttedBuffPos) * DrawInfo.dbHZoom - DrawInfo.DrawWidth;
 		if (DrawInfo.dwHZoomedPos < 0) DrawInfo.dwHZoomedPos = 0;
 	}
 	else {
@@ -425,8 +424,8 @@ void CSignalWin::Paint(void)
 				r.left = x;
 				r.top = WAVE_RECT_BORDER_TOP - DIVLONG - FONT_HEIGHT;
 				DrawText(hdc, s, strlen(s), &r, NULL);
-				//sprintf(s, "%.6fs", (double)pos / clsWaveData.AdcSampleRate);
-				formatKKDouble((double)pos / clsWaveData.AdcSampleRate, "s", s);
+				//sprintf(s, "%.6fs", (double)pos / *SampleRate);
+				formatKKDouble((double)pos / *SampleRate, "s", s);
 				r.top = WAVE_RECT_BORDER_TOP + DrawInfo.DrawHeight + DIVLONG;
 				DrawText(hdc, s, strlen(s), &r, NULL);
 			}
@@ -468,30 +467,36 @@ void CSignalWin::Paint(void)
 	DeleteObject(hPenLighter);
 
 	if (bDrawOrignalSignal) {
-		if (orignal_buff_type == short_type) DrawSignal_short(hdc, &rt, (short*)OrignalBuff, OrignalBuffPos, RGB(0, 255, 0));
-		if (orignal_buff_type == float_type) DrawSignal_float(hdc, &rt, (float*)OrignalBuff, OrignalBuffPos, RGB(0, 255, 0));
+		if (OrignalBuff != NULL) {
+			if (orignal_buff_type == short_type) DrawSignal_short(hdc, &rt, (short*)OrignalBuff, OrignalBuffPos, RGB(0, 255, 0));
+			if (orignal_buff_type == float_type) DrawSignal_float(hdc, &rt, (float*)OrignalBuff, OrignalBuffPos, RGB(0, 255, 0));
+		}
 	}
 	if (bDrawFilttedSignal) {
-		if (filtted_buff_type == short_type) DrawSignal_short(hdc, &rt, (short*)FilttedBuff, FilttedBuffPos, RGB(255, 255, 0));
-		if (filtted_buff_type == float_type) DrawSignal_float(hdc, &rt, (float*)FilttedBuff, FilttedBuffPos, RGB(255, 255, 0));
+		if (FilttedBuff != NULL) {
+			if (filtted_buff_type == short_type) DrawSignal_short(hdc, &rt, (short*)FilttedBuff, FilttedBuffPos, RGB(255, 255, 0));
+			if (filtted_buff_type == float_type) DrawSignal_float(hdc, &rt, (float*)FilttedBuff, FilttedBuffPos, RGB(255, 255, 0));
+		}
 	}
 
 	double z = DrawInfo.iVZoom >= 0 ? (1.0 / ((UINT64)1 << DrawInfo.iVZoom)) : ((UINT64)1 << -DrawInfo.iVZoom);
-	char tstr1[100], tstr2[100], tstradcpos[100], tstrfiltpos[100], tstrfftpos[100];
-	//clsWaveData.NumPerSec = 38400;
-	double TimePreDiv = 32.0 / clsWaveData.AdcSampleRate *
+	char tstr1[100], tstr2[100], tstradcpos[100], tstrfiltpos[100], tstrhbarpos[100], tstrfs[100];
+	//clsData.NumPerSec = 38400;
+	double TimePreDiv = 32.0 / *SampleRate *
 		(DrawInfo.iHZoom >= 0 ? 1.0 / ((UINT64)1 << DrawInfo.iHZoom) : ((UINT64)1 << -DrawInfo.iHZoom));
-	sprintf(s, "32 / DIV    %sV / DIV    %ss / DIV 中文\r\n"\
-		"Pos:%s\r\nFilterPos:%s\r\nFFTPos:%s\r\n"\
-		"hBarPos: %d\r\n"\
-		"AdcSampleRate: %d    Real AdcSampleRate: %d",
+	sprintf(s, "32/DIV %sV/DIV %ss/DIV\r\n"\
+		"Pos:%s\r\nFilttedPos:%s\r\n"\
+		"hBarPos=%s\r\n"\
+		"SampleRate=%s RealAdcSampleRate=%d\r\n"\
+		"HZoom: %d, %d \t VZoom: %d, %d",
 		formatKKDouble(32.0 * DrawInfo.VotagePerDIV * z, "", tstr1),
 		formatKKDouble(TimePreDiv, "", tstr2),
-		fomatKINT64(clsWaveData.AdcPos, tstradcpos),
-		fomatKINT64(clsWaveData.FilttedPos, tstrfiltpos),
-		fomatKINT64(clsWaveFFT.FFTPos, tstrfftpos),
-		DrawInfo.dwHZoomedPos,
-		clsWaveData.AdcSampleRate, clsWaveData.NumPerSec
+		fomatKINT64(*OrignalBuffPos, tstradcpos),
+		fomatKINT64(FilttedBuffPos ? *FilttedBuffPos : 0, tstrfiltpos),
+		fomatKINT64(DrawInfo.dwHZoomedPos, tstrhbarpos),
+		fomatKINT64(*SampleRate, tstrfs), 0,
+		DrawInfo.iHZoom, DrawInfo.iHZoom >= 0 ? 1 << DrawInfo.iHZoom : -(1 << -DrawInfo.iHZoom),
+		DrawInfo.iVZoom, DrawInfo.iVZoom >= 0 ? 1 << DrawInfo.iVZoom : -(1 << -DrawInfo.iVZoom)
 	);
 
 	r.top = WAVE_RECT_BORDER_TOP + DIVLONG;
@@ -504,7 +509,7 @@ void CSignalWin::Paint(void)
 	SetTextColor(hdc, RGB(255, 255, 255));
 
 	DrawText(hdc, s, strlen(s), &r, NULL);
-
+	/*
 	sprintf(s,
 		"HZoom: %d, %d \t VZoom: %d, %d",
 		DrawInfo.iHZoom, DrawInfo.iHZoom >= 0 ? 1 << DrawInfo.iHZoom : -(1 << -DrawInfo.iHZoom),
@@ -516,6 +521,7 @@ void CSignalWin::Paint(void)
 	sprintf(s, "vzoom %.40f", DrawInfo.dbVZoom);
 	r.top += FONT_HEIGHT;
 	DrawText(hdc, s, strlen(s), &r, NULL);
+	*/
 
 	DeleteObject(SelectObject(hdc, GetStockObject(SYSTEM_FONT)));
 
@@ -663,6 +669,8 @@ void CSignalWin::RegisterWindowsClass(void)
 	if (registted == true) return;
 	registted = true;
 
+	DbgMsg("CSignalWin::RegisterWindowsClass\r\n");
+
 	WNDCLASSEX wcex;
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
@@ -684,34 +692,25 @@ void CSignalWin::RegisterWindowsClass(void)
 
 LRESULT CALLBACK CSignalWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	CSignalWin* me;
-	HGLOBAL hMemProp;
-	void* lpMem;
-	hMemProp = (HGLOBAL)GetProp(hWnd, "H");
-	if (hMemProp) {
-		lpMem = GlobalLock(hMemProp);
-		memcpy(&me, lpMem, sizeof(UINT64));
-		GlobalUnlock(hMemProp);
-	}
+	CSignalWin* me = (CSignalWin*)get_WinClass(hWnd);
 
 	switch (message)
 	{
 	case WM_CREATE:
 	{
 		OPENCONSOLE;
-		me = (CSignalWin*)(((LPCREATESTRUCT)lParam)->lpCreateParams);
-		HGLOBAL hMemProp;
-		void* lpMem;
-		hMemProp = GlobalAlloc(GPTR, sizeof(INT64));
-		lpMem = GlobalLock(hMemProp);
-		memcpy(lpMem, &me, sizeof(UINT64));
-		GlobalUnlock(hMemProp);
-		SetProp(hWnd, "H", hMemProp);
+
+		me = (CSignalWin*)set_WinClass(hWnd, lParam);
 
 		me->hWnd = hWnd;
 		me->RestoreValue();
 		me->uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
 		//KillTimer(hWnd, uTimerId);
+
+		CheckMenuItem(me->hMenu, IDM_WAVEAUTOSCROLL,
+			(me->bAutoScroll ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(me->hMenu, IDM_WAVE_FOLLOW_ORIGNAL,
+			(me->bFollowByOrignal ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 	}
 	break;
 	case WM_CHAR:
@@ -736,25 +735,16 @@ LRESULT CALLBACK CSignalWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 		UpdateWindow(hWnd);
 		break;
 	case WM_SIZE:
+		printf("WM_SIZE\r\n");
 		me->GetRealClientRect(&me->WinRect);
-		//GetClientRect(me->hWnd, &me->WinRect);
 		me->DrawInfo.DrawHeight = me->WinRect.bottom - WAVE_RECT_BORDER_TOP - WAVE_RECT_BORDER_BOTTON;
 		UP_TO_ZERO(me->DrawInfo.DrawHeight);
 		me->DrawInfo.DrawWidth = me->WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT;
 		UP_TO_ZERO(me->DrawInfo.DrawWidth);
 		me->CaculateScrolls();
-		//me->CaculateVScroll();
 		break;
 	case WM_COMMAND:
 		return me->OnCommand(message, wParam, lParam);
-		break;
-	case WM_SYSCOMMAND:
-		if (LOWORD(wParam) == SC_CLOSE)
-		{
-			ShowWindow(hWnd, SW_HIDE);
-			break;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
 		break;
 	case WM_ERASEBKGND:
 		//不加这条消息屏幕刷新会闪烁
@@ -769,8 +759,11 @@ LRESULT CALLBACK CSignalWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 		me->KeyAndScroll(message, wParam, lParam);
 		break;
 	case WM_CLOSE:
+		DbgMsg("%s CSignalWin WM_CLOSE\r\n", me->Tag);
 		break;
 	case WM_DESTROY:
+		DbgMsg("%s CSignalWin WM_DESTROY\r\n", me->Tag);
+		me->hWnd = NULL;
 		me->SaveValue();
 		break;
 	default:
@@ -832,13 +825,13 @@ bool CSignalWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	break;
 	case IDM_WAVEAUTOSCROLL:
 		bAutoScroll = !bAutoScroll;
-		//CheckMenuItem(hMenu, IDM_WAVEAUTOSCROLL,
-		//	(bAutoScroll ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(hMenu, IDM_WAVEAUTOSCROLL,
+			(bAutoScroll ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 	case IDM_WAVE_FOLLOW_ORIGNAL:
 		bFollowByOrignal = !bFollowByOrignal;
-		//CheckMenuItem(hMenu, IDM_WAVE_FOLLOW_ORIGNAL,
-		//	(bFollowByOrignal ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(hMenu, IDM_WAVE_FOLLOW_ORIGNAL,
+			(bFollowByOrignal ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 		//Setting COMMANDS-----------------------
 	case IDM_SPECTRUM_PAUSE_BREAK:
@@ -874,22 +867,27 @@ void CSignalWin::GetRealClientRect(PRECT lprc)
 
 void CSignalWin::SaveValue(void)
 {
-	WritePrivateProfileString("CSignalWin", "iHZoom", std::to_string(DrawInfo.iHZoom).c_str(), IniFilePath);
-	WritePrivateProfileString("CSignalWin", "iVZoom", std::to_string(DrawInfo.iVZoom).c_str(), IniFilePath);
-	WritePrivateProfileString("CSignalWin", "iVOldZoom", std::to_string(DrawInfo.iVOldZoom).c_str(), IniFilePath);
-	WritePrivateProfileString("CSignalWin", "dwVZoomedPos", std::to_string(DrawInfo.dwVZoomedPos).c_str(), IniFilePath);
+#define VALUE_LENGTH	100
+	char section[VALUE_LENGTH];
+	sprintf(section, "%s_CSignalWin", Tag);
+	WritePrivateProfileString(section, "iHZoom", std::to_string(DrawInfo.iHZoom).c_str(), IniFilePath);
+	WritePrivateProfileString(section, "iVZoom", std::to_string(DrawInfo.iVZoom).c_str(), IniFilePath);
+	WritePrivateProfileString(section, "iVOldZoom", std::to_string(DrawInfo.iVOldZoom).c_str(), IniFilePath);
+	WritePrivateProfileString(section, "dwVZoomedPos", std::to_string(DrawInfo.dwVZoomedPos).c_str(), IniFilePath);
 }
 
 void CSignalWin::RestoreValue(void)
 {
 #define VALUE_LENGTH	100
 	char value[VALUE_LENGTH];
-	GetPrivateProfileString("CSignalWin", "iHZoom", "0", value, VALUE_LENGTH, IniFilePath);
+	char section[VALUE_LENGTH];
+	sprintf(section, "%s_CSignalWin", Tag);
+	GetPrivateProfileString(section, "iHZoom", "0", value, VALUE_LENGTH, IniFilePath);
 	DrawInfo.iHZoom = atoi(value);
-	GetPrivateProfileString("CSignalWin", "iVZoom", "0", value, VALUE_LENGTH, IniFilePath);
+	GetPrivateProfileString(section, "iVZoom", "0", value, VALUE_LENGTH, IniFilePath);
 	DrawInfo.iVZoom = atoi(value);
-	GetPrivateProfileString("CSignalWin", "iVOldZoom", "0", value, VALUE_LENGTH, IniFilePath);
+	GetPrivateProfileString(section, "iVOldZoom", "0", value, VALUE_LENGTH, IniFilePath);
 	DrawInfo.iVOldZoom = atoi(value);
-	GetPrivateProfileString("CSignalWin", "dwVZoomedPos", "0", value, VALUE_LENGTH, IniFilePath);
+	GetPrivateProfileString(section, "dwVZoomedPos", "0", value, VALUE_LENGTH, IniFilePath);
 	DrawInfo.dwVZoomedPos = std::strtoll(value, NULL, 10);
 }

@@ -9,7 +9,7 @@
 
 #include "public.h"
 #include "CSoundCard.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFFT.h"
 #include "CWaveFilter.h"
 #include "CWinFFT.h"
@@ -63,7 +63,7 @@ CWinSDRScan::CWinSDRScan()
 
 CWinSDRScan::~CWinSDRScan()
 {
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 }
 
 void CWinSDRScan::RegisterWindowsClass(void)
@@ -121,7 +121,7 @@ LRESULT CALLBACK CWinSDRScan::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 	case WM_MOUSEMOVE:
 		MouseX = GET_X_LPARAM(lParam);
 		MouseY = GET_Y_LPARAM(lParam);
-		//Hz = ((double)MouseY / clsWinSpect.WinOneSpectrumVScrollZoom + clsWinSpect.WinOneSpectrumVScrollPos) * clsWaveData.AdcSampleRate / clsWaveFFT.FFTSize;
+		//Hz = ((double)MouseY / clsWinSpect.WinOneSpectrumVScrollZoom + clsWinSpect.WinOneSpectrumVScrollPos) * clsData.AdcSampleRate / clsWaveFFT.FFTSize;
 		OnMouse(hWnd);
 		break;
 
@@ -205,7 +205,7 @@ void CWinSDRScan::OnMouse(HWND hWnd)
 
 	int i = 0;
 	char s[500], t[100];
-	FILTERCOREDATATYPE* pFilterCore = clsWaveFilter.pCurrentFilterInfo == NULL ? clsWaveFilter.FilterCore : clsWaveFilter.pCurrentFilterInfo->FilterCore;
+	FILTER_CORE_DATA_TYPE* pFilterCore = clsWaveFilter.pCurrentFilterInfo == NULL ? clsWaveFilter.FilterCore : clsWaveFilter.pCurrentFilterInfo->FilterCore;
 	int FilterLength = clsWaveFilter.pCurrentFilterInfo == NULL ? clsWaveFilter.FilterCoreLength : clsWaveFilter.pCurrentFilterInfo->CoreLength;
 	int X = (clsWinSpect.HScrollPos + MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
 	X = BOUND(X, 0, (clsWinSpect.HScrollPos + rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / clsWinSpect.HScrollZoom);
@@ -213,7 +213,7 @@ void CWinSDRScan::OnMouse(HWND hWnd)
 	int n = 0;
 	n += sprintf(strMouse + n, "X: %d, core V: %lf", X, Y);
 
-	double Hz = (double)X * clsWaveData.AdcSampleRate / clsWaveFFT.FFTSize;
+	double Hz = (double)X * clsData.AdcSampleRate / clsWaveFFT.FFTSize;
 	Y = X > clsWaveFFT.FFTSize / 2 ? 0 : clsWinSpect.OrignalFFTBuff[X];
 	n += sprintf(strMouse + n, " | ");
 	n += sprintf(strMouse + n, "Hz: %.03f, FFT: %s", Hz, formatKDouble(Y, 0.001, "", t));
@@ -276,7 +276,7 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 		{
 			if (!(i % 5))
 			{
-				sprintf(s, "%.02fhz", (double)(i * 32 + HScrollPos) / HScrollZoom * clsWaveData.AdcSampleRate / clsWaveFFT.FFTSize);
+				sprintf(s, "%.02fhz", (double)(i * 32 + HScrollPos) / HScrollZoom * clsData.AdcSampleRate / clsWaveFFT.FFTSize);
 				r.top = WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT + DIVLONG;
 				r.left = x;
 				SetTextColor(hdc, COLOR_ORIGNAL_FFT);
@@ -483,7 +483,7 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 			"FFT Size: %d      FFT Step: %d\r\n"\
 			"Sepctrum Hz£º%.03f",
 			CoreLength,
-			clsWaveData.AdcSampleRate, clsWaveData.NumPerSec,
+			clsData.AdcSampleRate, clsData.NumPerSec,
 			clsWaveFFT.FFTSize, clsWaveFFT.FFTStep,
 			clsWinOneSpectrum.Hz
 		);

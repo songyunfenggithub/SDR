@@ -6,7 +6,7 @@
 #include "math.h"
 
 #include "public.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFunc.h"
 
 CWaveFunc clsWaveFunc;
@@ -23,11 +23,11 @@ CWaveFunc::~CWaveFunc()
 
 void CWaveFunc::WaveGenerate(void)
 {
-	PADCDATATYPE p = clsWaveData.AdcBuff;
-	clsWaveData.AdcPos = 0xFFFFF;
+	PADCDATATYPE p = clsData.AdcBuff;
+	clsData.AdcPos = 0xFFFFF;
 	UINT32 i;
 
-	for (i = 0; i < clsWaveData.AdcPos; i++)
+	for (i = 0; i < clsData.AdcPos; i++)
 	{
 		*p++ = Sin(i, 500, (1 << 31)-1);// +Sin(i, 200, 1 << 31);
 	}
@@ -35,14 +35,14 @@ void CWaveFunc::WaveGenerate(void)
 
 double CWaveFunc::Sin(UINT32 i, double Hz, double amplitude)
 {
-	double d = amplitude * sin(2 * M_PI / (clsWaveData.AdcSampleRate / Hz) * i);
+	double d = amplitude * sin(2 * M_PI / (clsData.AdcSampleRate / Hz) * i);
 	//printf("%f\r\n", d);
 	return d;
 }
 
 double CWaveFunc::Triangle(UINT32 i, double Hz, double amplitude)
 {
-	double l = clsWaveData.AdcSampleRate / Hz;
+	double l = clsData.AdcSampleRate / Hz;
 
 	return 0;
 }

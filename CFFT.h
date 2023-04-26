@@ -27,7 +27,8 @@ public:
 		double imagin;
 	} Complex;
 
-	HANDLE  hMutexBuff;
+	HANDLE hMutexBuff;
+	HANDLE hFFT_Thread = NULL;
 
 	CFFTWin *fftWin = NULL;
 
@@ -43,6 +44,8 @@ public:
 
 	double* FFTOutBuff = NULL ;
 	double* FFTOutLogBuff = NULL;
+	double* FFTBrieflyBuff = NULL;
+	double* FFTBrieflyLogBuff = NULL;
 
 	UINT average_Deep = FFT_DEEP;
 	UINT average_Deep_mask = average_Deep - 1;
@@ -59,15 +62,9 @@ public:
 	float	FFTPerSec = 0.0;
 
 	bool FFTlog = true;
-
 	bool FFTDoing = true;
-	
 	bool FFTNext = false;
-
-	bool FFTT_hread_Exit = false;
-
-	double FFTMaxValue;
-
+	bool bFFT_Thread_Exitted = true;
 
 public:
 	CFFT();
@@ -87,7 +84,6 @@ public:
 	void Add_Complex(Complex* src1, Complex* src2, Complex* dst);
 
 	double GetFFTMaxValue(void);
-	double Get_FFT_Max_Value(void);
 
 	static LPTHREAD_START_ROUTINE FFT_Thread(LPVOID lp);
 	void FFT_func(void);

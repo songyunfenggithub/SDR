@@ -11,6 +11,7 @@
 //#define W801
 #define SDR
 //#define USART
+//#define USART_INMP441
 //#define SOUNDCARD
 
 #define ADC_DATA_MAX_ZOOM_BIT				8
@@ -53,12 +54,19 @@ typedef	float		FILTEDDATATYPE, * PFILTEDDATATYPE;
 typedef INT16    ADCDATATYPE, * PADCDATATYPE;
 #endif
 
+#ifdef USART_INMP441
+#define DATA_BYTE_TO_POSITION_MOVEBIT		2   
+#define ADC_DATA_SAMPLE_BIT					32
+#define ADC_SAMPLE_RATE						5000UL
+typedef INT32    ADCDATATYPE, * PADCDATATYPE;
+#endif
+
 enum WHICHSIGNAL {
 	SIGNAL_ORIGNAL = 0,
 	SIGNAL_FILTTED = 1
 };
 
-class CWaveData
+class CData
 {
 public:
 
@@ -74,20 +82,20 @@ public:
 
 	FILTEDDATATYPE  FilttedBuff[DATA_BUFFER_LENGTH];
 	UINT8	FilttedFlag[DATA_BUFFER_LENGTH] = {0};
-	UINT	FilttingPos = 0, FilttedPos = 0;
+	UINT	FilttingPos = 0, FilttedPos = 0, FilttedBuffPos = 0;
 
 	UINT	FilttedForwardBuff[DATA_BUFFER_LENGTH];
 	UINT  FilttedForwardPos = 0;
 
 public:
-	CWaveData();
-	virtual ~CWaveData();
+	CData();
+	virtual ~CData();
 
 	void GeneratorWave(void);
 	static TIMERPROC NumPerSecTimer_Func(void);
 
 };
 
-extern CWaveData clsWaveData;
+extern CData clsData;
 
 

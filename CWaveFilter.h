@@ -22,15 +22,17 @@
 
 #define MAX_FILTER_NUMBER		0x100
 
-typedef float FILTERCOREDATATYPE;
+typedef float FILTER_CORE_DATA_TYPE;
 
 
-#define CUDA_FILTER_BUFF_SRC_LENGTH				0x10000
-#define CUDA_FILTER_BUFF_SRC_LENGTH_MASK		0x0FFFF
+#define CUDA_FILTER_BUFF_SRC_LENGTH			0x20000
+#define CUDA_FILTER_BUFF_SRC_LENGTH_MASK	(CUDA_FILTER_BUFF_SRC_LENGTH  - 1)
 #define CUDA_FILTER_BUFF_STEP_LENGTH		(CUDA_FILTER_BUFF_SRC_LENGTH >> 2)
 #define CUDA_FILTER_BUFF_STEP_LENGTH_MASK	(CUDA_FILTER_BUFF_SRC_LENGTH_MASK >> 2)
 
 #define FILTER_DESC_LENGTH		1024
+
+class CFilterWin;
 
 class CWaveFilter
 {
@@ -48,16 +50,17 @@ public:
 	struct FILTERINFO
 	{
 		char* CoreDescStr = NULL;
-		FilterType   Type;
-		UINT	FreqCenter,BandWidth,SampleRate;
+		FilterType Type;
+		UINT	FreqCenter,BandWidth;
 		double  FreqFallWidth;
-		UINT	  CoreLength;
-		FILTERCOREDATATYPE* FilterCore = NULL;
+		UINT	CoreLength;
+		FILTER_CORE_DATA_TYPE* FilterCore = NULL;
 		bool	Enable = false;
 		INT		subFilteindex = 0;
 		UINT	subFilterNum = 0;
 		UINT	IterateLevel = 0;
-		UINT	decimationFactor = 1;
+		UINT	decimationFactorBit = 0;
+		UINT	SampleRate = 0;
 		FILTERINFO* nextFilter = NULL;
 	};
 
@@ -68,7 +71,7 @@ public:
 
 	FILTERINFO *pCurrentFilterInfo;
 
-	//FILTERCOREDATATYPE*	FilterCore = NULL;
+	//FILTER_CORE_DATA_TYPE*	FilterCore = NULL;
 	//int		FilterCoreLength = 0;
 	//int     FilterCoreIterateLevel = 0;
 	UINT32 filter_ready_poss[FILTER_WORK_THREADS] = { 0, 0, 0, 0 };
@@ -77,14 +80,6 @@ public:
 
 	HANDLE hFilterMutex;	//定义互斥对象句柄
 	HANDLE hCoreMutex;	//定义互斥对象句柄
-
-	HANDLE hCoreAnalyseMutex;	//定义互斥对象句柄
-
-	double* CoreAnalyseDataBuff			= NULL;
-	double* CoreAnalyseFilttedDataBuff	= NULL;
-	double* CoreAnalyseFFTBuff			= NULL;
-	double* CoreAnalyseFFTLogBuff		= NULL;
-	int		CoreAnalyseFFTLength		= 0;
 
 	char FilterCoreDesc[FILTER_CORE_DESC_MAX_LENGTH];
 
@@ -95,9 +90,9 @@ public:
 	~CWaveFilter();
 
 	void core(PFILTERINFO pFilterInfo);
-	void corepluse(FILTERCOREDATATYPE* pR, FILTERCOREDATATYPE* pS, UINT32 corelen);
-	void lowcore(FILTERCOREDATATYPE fc, FILTERCOREDATATYPE* pBuf, UINT32 corelen);
-	void invcore(FILTERCOREDATATYPE* pBuf, UINT32 corelen);
+	void corepluse(FILTER_CORE_DATA_TYPE* pR, FILTER_CORE_DATA_TYPE* pS, UINT32 corelen);
+	void lowcore(FILTER_CORE_DATA_TYPE fc, FILTER_CORE_DATA_TYPE* pBuf, UINT32 corelen);
+	void invcore(FILTER_CORE_DATA_TYPE* pBuf, UINT32 corelen);
 
 
 	void GetCMDFilter(char* pCMD);
@@ -124,7 +119,10 @@ public:
 	static LPTHREAD_START_ROUTINE cuda_filter_thread(LPVOID lp);
 	void cuda_filter_func(void);
 
-	void FilterCoreAnalyse(PFILTERINFO pFilterInfo);
+	void FilterCoreAnalyse(CFilterWin* pFilterWin, PFILTERINFO pFilterInfo);
+
+	void SaveValue(void);
+	void RestoreValue(void);
 };
 
 extern CWaveFilter clsWaveFilter;

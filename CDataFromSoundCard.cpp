@@ -10,7 +10,7 @@
 
 
 #include "public.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWinMain.h"
 #include "CDataFromSoundCard.h"
 #include "MyDebug.h"
@@ -87,15 +87,15 @@ void CALLBACK CDataFromSoundCard::waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR d
 		break;
 	case WIM_DATA:
 		LPWAVEHDR pWaveHdr = (LPWAVEHDR)dwParam1;
-		clsWaveData.AdcGetCharLength += pWaveHdr->dwBytesRecorded;
-		//clsWaveData.AdcPos += pWaveHdr->dwBytesRecorded / clsGetDataSDC.FormatEx.nBlockAlign;
-		//if (clsWaveData.AdcPos > DATA_BUFFER_LENGTH) clsWaveData.AdcPos -= DATA_BUFFER_LENGTH;
-		if (clsWaveData.AdcGetCharLength >= (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT))
-			clsWaveData.AdcGetCharLength -= DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT;
-		clsWaveData.AdcPos = clsWaveData.AdcGetCharLength >> DATA_BYTE_TO_POSITION_MOVEBIT;
-		clsWaveData.AdcGetNew = true;
+		clsData.AdcGetCharLength += pWaveHdr->dwBytesRecorded;
+		//clsData.AdcPos += pWaveHdr->dwBytesRecorded / clsGetDataSDC.FormatEx.nBlockAlign;
+		//if (clsData.AdcPos > DATA_BUFFER_LENGTH) clsData.AdcPos -= DATA_BUFFER_LENGTH;
+		if (clsData.AdcGetCharLength >= (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT))
+			clsData.AdcGetCharLength -= DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT;
+		clsData.AdcPos = clsData.AdcGetCharLength >> DATA_BYTE_TO_POSITION_MOVEBIT;
+		clsData.AdcGetNew = true;
 
-		pWaveHdr->lpData = (char*)clsWaveData.AdcBuff + clsWaveData.AdcGetCharLength;
+		pWaveHdr->lpData = (char*)clsData.AdcBuff + clsData.AdcGetCharLength;
 		waveInAddBuffer(hwi, pWaveHdr, sizeof(WAVEHDR));
 
 		break;
@@ -160,7 +160,7 @@ void CDataFromSoundCard::OpenIn(void)
 
 	InData.fInOpen = TRUE;
 
-	InData.WaveInHdr.lpData = (char*)clsWaveData.AdcBuff;
+	InData.WaveInHdr.lpData = (char*)clsData.AdcBuff;
 	InData.WaveInHdr.dwBufferLength = IN_BUFFER_LENGTH;
 	InData.WaveInHdr.dwFlags = WHDR_DONE;
 	InData.WaveInHdr.dwLoops = 0L;
@@ -189,7 +189,7 @@ void CDataFromSoundCard::OpenOut(DWORD dwPos, DWORD dwEndPos)
 	}
 	OutData.fOutOpen = TRUE;
 
-	OutData.WaveOutHdr.lpData = (char*)clsWaveData.AdcBuff + dwPos * FormatEx.nBlockAlign;
+	OutData.WaveOutHdr.lpData = (char*)clsData.AdcBuff + dwPos * FormatEx.nBlockAlign;
 	OutData.WaveOutHdr.dwBufferLength = (dwEndPos - dwPos) * FormatEx.nBlockAlign;
 	OutData.WaveOutHdr.dwFlags = 0L;
 	OutData.WaveOutHdr.dwLoops = 0L;

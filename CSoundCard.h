@@ -9,6 +9,7 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
+#include <minwindef.h>
 #include <mmsystem.h>
 #include <mmreg.h>
 #include <msacm.h>
@@ -31,7 +32,6 @@ public:
 
 	unsigned char inBuffer[SOUNDCARD_IN_BUFFER_LENGTH];
 	unsigned char outBuffer[SOUNDCARD_OUT_BUFFER_LENGTH];
-	DWORD	inBufLength = 0;
 	DWORD	outBufLength = 0;
 	DWORD	outPos = 0, outEndPos = 0;
 	DWORD	inPos = 0, inEndPos = 0;
@@ -63,7 +63,7 @@ typedef struct OUTDATATAG
 
 public:
 	CSoundCard();
-	virtual ~CSoundCard();
+	~CSoundCard();
 
 	void OpenIn(UINT pos, UINT endPos);
 	void CloseIn(void);
@@ -78,12 +78,10 @@ public:
 	void GeneratorWave(void);
 	void GetWave(unsigned char*p, DWORD dwLength);
 	void GetWave2(HDC hDC, unsigned char*p, DWORD dwLength);
-	void ClearNoise(void);
-	void ClearNoise2(void);
-	void ClearNoise3(void);
 
 	static void CALLBACK waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
 	static void CALLBACK waveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
+
 	static LRESULT CALLBACK DlgGotoProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 	static LRESULT CALLBACK DlgPropertiesProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 	static LRESULT CALLBACK DlgWaveValueProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);

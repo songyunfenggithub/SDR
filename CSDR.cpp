@@ -952,12 +952,12 @@ void CSDR::edit_check_range(void)
 void CSDR::set_params_SampleRate(int index)
 {
 	//clsSDR.SdrSampleRate = *(double*)SDR_params[index].pValue;
-	//clsWaveData.AdcSampleRate = clsSDR.DecimationFactorEnable != 0 ? clsSDR.SdrSampleRate / clsSDR.DecimationFactor : clsSDR.SdrSampleRate;
+	//clsData.AdcSampleRate = clsSDR.DecimationFactorEnable != 0 ? clsSDR.SdrSampleRate / clsSDR.DecimationFactor : clsSDR.SdrSampleRate;
 	
-	clsWaveData.AdcSampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ? 
+	clsData.AdcSampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ? 
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz / clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor : 
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz;
-	clsWaveFilter.rootFilterInfo.SampleRate = clsWaveData.AdcSampleRate;
+	clsWaveFilter.rootFilterInfo.SampleRate = clsData.AdcSampleRate / (1 << clsWaveFilter.rootFilterInfo.decimationFactorBit);
 	clsWaveFilter.ReBuildFilterCore();
 	printf("set_params_SampleRate\r\n");
 }

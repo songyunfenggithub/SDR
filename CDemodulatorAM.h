@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFilter.h"
 
 #define DEMODULATOR_AM_DECIMATION_FACTOR_BIT	0x3
@@ -17,31 +17,39 @@
 #define DEMODULATOR_AM_BUFF_STEP_LENGTH						0x2000
 #define DEMODULATOR_AM_FILTER_SAMPLERATE_OFFSET_BIT			0x3
 
+class CAudio;
 
 class CDemodulatorAM
 {
 public:
-	CHAR AMFilterCoreDesc[FILTER_DESC_LENGTH];
-	
-	FILTEDDATATYPE	FilttedBuff[DEMODULATOR_AM_FILTTED_BUFF_LENGTH];
-	UINT FilttedPos = 0;
 
-	FILTEDDATATYPE	AMBuff[DEMODULATOR_AM_BUFF_LENGTH];
-	UINT AMPos = 0;
+	CAudio* m_Audio = NULL;
 
+	FILTEDDATATYPE	*SrcBuff = NULL;
+	UINT *SrcPos = NULL;
+	UINT SrcPosMask = 0;
+	UINT DemodulattedPos = 0;
+	UINT DemodulatorStepLength = 0;
 
-	CWaveFilter::PFILTERINFO pFilterInfo;
+	HANDLE h_AM_Demodulator_Thread = NULL;
+	bool AM_Demodulator_Doing = false;
 
+	double Am_Decimation_Factor = 1.0;
 
 public:
 	CDemodulatorAM();
 	~CDemodulatorAM();
 
-	void build_AM_Filter_Core(void);
+	void Init(void);
+	void UnInit(void);
 
 	void SaveValue(void);
 	void RestoreValue(void);
+	
+	void AM_Demodulator_Thread_Func(void);
+	void AM_Demodulator_Thread_Func_Get_Envelope(void);
+	static LPTHREAD_START_ROUTINE AM_Demodulator_Thread(LPVOID lp);
 
 };
 
-extern CDemodulatorAM clsDemodulatorAm;
+//extern CDemodulatorAM clsDemodulatorAm;

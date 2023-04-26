@@ -8,7 +8,7 @@
 #include <iostream>
 
 #include "public.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFFT.h"
 #include "CWinSpectrum.h"
 #include "CWinOneSpectrum.h"
@@ -38,7 +38,7 @@ CWinOneSpectrum::CWinOneSpectrum()
 
 CWinOneSpectrum::~CWinOneSpectrum()
 {
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 }
 
 void CWinOneSpectrum::RegisterWindowsClass(void)
@@ -63,7 +63,7 @@ void CWinOneSpectrum::RegisterWindowsClass(void)
 }
 
 
-void CWinOneSpectrum::InitDrawBuff(HWND hWnd)
+void CWinOneSpectrum::InitDrawBuff(void)
 {
 	WaitForSingleObject(hDrawMutex, INFINITE);
 
@@ -120,7 +120,7 @@ LRESULT CALLBACK CWinOneSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam
 	case WM_MOUSEMOVE:
 		MouseX = GET_X_LPARAM(lParam);
 		MouseY = GET_Y_LPARAM(lParam);
-		Hz = ((double)(MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom + clsWinSpect.HScrollPos) * clsWaveData.AdcSampleRate / clsWaveFFT.FFTSize;
+		Hz = ((double)(MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom + clsWinSpect.HScrollPos) * clsData.AdcSampleRate / clsWaveFFT.FFTSize;
 		//OnMouse(hWnd);
 		break;
 
@@ -130,43 +130,29 @@ LRESULT CALLBACK CWinOneSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam
 		break;
 
 	case WM_SIZE:
-		InitDrawBuff(hWnd);
-		GetRealClientRect(hWnd, &rt);
+		InitDrawBuff();
+		GetRealClientRect(&rt);
 		WinWidth = rt.right;
 		break;
 
 	case WM_COMMAND:
-		return OnCommand(hWnd, message, wParam, lParam);
+		return OnCommand(message, wParam, lParam);
 		break;
-
-	case WM_SYSCOMMAND:
-		if (LOWORD(wParam) == SC_CLOSE)
-		{
-			ShowWindow(hWnd, SW_HIDE);
-			break;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
-		break;
-
 	case WM_ERASEBKGND:
 		//不加这条消息屏幕刷新会闪烁
 		break;
 	case WM_PAINT:
-		Paint(hWnd);
+		Paint();
 		break;
-
 	case WM_DESTROY:
-		//PostQuitMessage(0);
 		break;
-
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
-
 	}
 	return 0;
 }
 
-BOOL CWinOneSpectrum::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+bool CWinOneSpectrum::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	wmId = LOWORD(wParam);
@@ -187,7 +173,7 @@ BOOL CWinOneSpectrum::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 	return TRUE;
 }
 
-VOID CWinOneSpectrum::Paint(HWND hWnd)
+void CWinOneSpectrum::Paint(void)
 {
 	HDC		hDC;
 	PAINTSTRUCT ps;
@@ -277,20 +263,41 @@ void CWinOneSpectrum::PaintSpectrum(void)
 	//rt.right = rt.left + 2;
 	//FillRect(hdc, &rt, hbr);
 	//DeleteObject(hbr);
-	int istep = clsWinOneSpectrum.bSpectrumZoomedShow == true ? 1 : (clsWinSpect.HScrollZoom < 1.0 ? ((double)1.0 / clsWinSpect.HScrollZoom) : 1);
+	int istep = clsWinSpect.HScrollZoom < 1.0 ? ((double)1.0 / clsWinSpect.HScrollZoom) : 1;
 	int X;
-	double fftmaxdiff = fftmaxv - fftminv;
-	double fftmaxdiffstep = fftmaxdiff / 4.0;
-	double fftdiffstep1 = fftmaxv - 1 * fftmaxdiffstep;
-	double fftdiffstep2 = fftmaxv - 2 * fftmaxdiffstep;
-	double fftdiffstep3 = fftmaxv - 3 * fftmaxdiffstep;
-	double scroll = clsWinOneSpectrum.bSpectrumZoomedShow == true ? 1.0 : clsWinSpect.HScrollZoom;
+
+	double averageV = 0.0;
+	double minV = DBL_MAX;
+	double maxV = -1.0 * DBL_MAX;
+	UINT averagei = 0;
+
+
+	for (int i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
+		i < halfFFTSize &&
+		(i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= clsWinOneSpectrum.WinWidth - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+		i += istep) {
+		averageV += pBuf[i];
+		minV = min(minV, pBuf[i]);
+		maxV = max(maxV, pBuf[i]);
+		averagei++;
+	}
+	averageV /= averagei;
+	double top, botton;
+	double fftmaxdiff = maxV - minV;
+	double topToAverage = 1.0;
+	double averageTobotton = 0.2;
+	top = averageV + topToAverage;
+	botton = averageV - averageTobotton;
+	double fftmaxdiffstep = topToAverage / 3.0;
+	double fftdiffstep1 = top - 1 * fftmaxdiffstep;
+	double fftdiffstep2 = top - 2 * fftmaxdiffstep;
+	double fftdiffstep3 = top - 3 * fftmaxdiffstep;
+
 	if (clsWinOneSpectrum.whichSignel & 1) {
 		X = 0;
-		//for (int y = 0; y < DrawLen; y++) 
-		for (int i = clsWinSpect.HScrollPos / scroll;
+		for (int i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
 			i < halfFFTSize &&
-			(i * scroll - clsWinSpect.HScrollPos <= clsWinOneSpectrum.WinWidth - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			(i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= clsWinOneSpectrum.WinWidth - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
 			i += istep)
 		{
 			/*
@@ -319,46 +326,56 @@ void CWinOneSpectrum::PaintSpectrum(void)
 
 
 			double v = pBuf[i];
+			if (v > top) v = top;
 			double d;
-			d = v - fftdiffstep1;
+			d = v - fftdiffstep2;
 			if (d > 0) {
-				C = (BYTE)((0xFF / fftmaxdiffstep) * d);
-				cx = RGB(~C, 255, ~C);
+				C = (BYTE)((0xFF / (2 * fftmaxdiffstep)) * d);
+				cx = RGB(255, 255 - C / 2, ~C);
 			}
 			else {
-				d = v - fftdiffstep2;
+				d = v - fftdiffstep3;
 				if (d > 0) {
 					C = (BYTE)((0xFF / fftmaxdiffstep) * d);
 					cx = RGB(C, C, 255);
 				}
 				else {
-					d = v - fftdiffstep3;
-					if (d > 0) {
-						C = (BYTE)((0xFF / fftmaxdiffstep) * d);
+					//d = v - fftdiffstep3;
+					//if (d > 0) {
+					//	C = (BYTE)((0xFF / fftmaxdiffstep) * d);
+					//	cx = RGB(0, 0, C);
+					//}
+					//else {
+						d = v - botton;
+						C = (BYTE)((0xFF / averageTobotton) * d);
 						cx = RGB(0, 0, C);
-					}
-					else {
-						d = v - fftminv;
-						C = (BYTE)((0xFF / fftmaxdiffstep) * d);
-						cx = RGB(~C, ~C, 0);
-					}
+					//}
 				}
 			}
-			SetPixel(clsWinOneSpectrum.hDCFFT, X, clsWinOneSpectrum.SpectrumY, cx);
+			//SetPixel(clsWinOneSpectrum.hDCFFT, X, clsWinOneSpectrum.SpectrumY, cx);
+			//X++;
 
-
-
-			X++;
-			//LineTo()
+			if (clsWinSpect.HScrollZoom <= 1.0) {
+				SetPixel(clsWinOneSpectrum.hDCFFT, X, clsWinOneSpectrum.SpectrumY, cx);
+				X++;
+			}
+			else {
+				HPEN hPen = CreatePen(PS_SOLID, 0, cx);
+				SelectObject(clsWinOneSpectrum.hDCFFT, hPen);
+				MoveToEx(clsWinOneSpectrum.hDCFFT, X - clsWinSpect.HScrollZoom / 2, clsWinOneSpectrum.SpectrumY, NULL);
+				LineTo(clsWinOneSpectrum.hDCFFT, X + clsWinSpect.HScrollZoom / 2, clsWinOneSpectrum.SpectrumY);
+				X += clsWinSpect.HScrollZoom;
+				DeleteObject(hPen);
+			}
 		}
 	}
 	else {
 		X = 0;
 
 //		for (UINT32 y = 0; y < FFTLen; y++)
-		for (int i = clsWinSpect.HScrollPos / scroll;
+		for (int i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
 			i < halfFFTSize &&
-			(i * scroll - clsWinSpect.HScrollPos <= clsWinOneSpectrum.WinWidth - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			(i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= clsWinOneSpectrum.WinWidth - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
 			i += istep)
 		{
 //			color = (UINT)(((double)(1.0 * 0xFFFFFFFF) / fftmaxdiff) * (pBuf[i] - fftminv));
@@ -414,8 +431,20 @@ void CWinOneSpectrum::PaintSpectrum(void)
 				}
 			}
 	*/
-			SetPixel(clsWinOneSpectrum.hDCFFT, X, clsWinOneSpectrum.SpectrumY, cx);
-			X++;
+			//SetPixel(clsWinOneSpectrum.hDCFFT, X, clsWinOneSpectrum.SpectrumY, cx);
+			//X++;
+			if (clsWinSpect.HScrollZoom <= 1.0) {
+				SetPixel(clsWinOneSpectrum.hDCFFT, X, clsWinOneSpectrum.SpectrumY, cx);
+				X++;
+			}
+			else {
+				HPEN hPen = CreatePen(PS_SOLID, 0, cx);
+				SelectObject(clsWinOneSpectrum.hDCFFT, hPen);
+				MoveToEx(clsWinOneSpectrum.hDCFFT, X - clsWinSpect.HScrollZoom / 2, clsWinOneSpectrum.SpectrumY, NULL);
+				LineTo(clsWinOneSpectrum.hDCFFT, X + clsWinSpect.HScrollZoom / 2, clsWinOneSpectrum.SpectrumY);
+				X += clsWinSpect.HScrollZoom;
+				DeleteObject(hPen);
+			}
 		}
 	}
 
@@ -431,7 +460,7 @@ void CWinOneSpectrum::PaintSpectrum(void)
 
 }
 
-VOID CWinOneSpectrum::GetRealClientRect(HWND hWnd, PRECT lprc)
+void CWinOneSpectrum::GetRealClientRect(PRECT lprc)
 {
 	DWORD dwStyle;
 	dwStyle = GetWindowLong(hWnd, GWL_STYLE);

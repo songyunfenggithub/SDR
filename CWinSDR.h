@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string>
 
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWinOneSpectrum.h"
 
 #define WAVE_RECT_HEIGHT				0X200

@@ -14,7 +14,7 @@
 #include <math.h>
 
 #include "public.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CFFT.h"
 #include "CFFTWin.h"
 #include "cuda_FFT.cuh"
@@ -30,8 +30,7 @@ CFFT::CFFT()
 CFFT::~CFFT()
 {
 	FFTDoing = false;
-	while (FFTT_hread_Exit == false);
-
+	while (bFFT_Thread_Exitted == false);
 	UnInit();
 }
 
@@ -53,37 +52,36 @@ void CFFT::Init(CFFTWin* fftwin)
 	data_buff_data_bits = fftWin->data_buff_data_bits;
 	data_buff_length_mask = fftWin->data_buff_length_mask;
 
+	cuda_FFT_Init(FFTSize, FFTStep, data_buff_data_bits);
+
 	average_Deep = fftWin->average_Deep;
 	average_Deep_mask = average_Deep - 1;
 	average_Deep_num = 0;
 
-	//if (cuda_fft == NULL) 
-	//	cuda_fft = new cuda_CFFT(); 
-	//else 
-	//cuda_FFT_UnInit();
-	cuda_FFT_Init(this);
-
-	if (FFT_src) delete[] FFT_src;
+	if (FFT_src)
+		delete[] FFT_src;
 	FFT_src = new double[FFTSize];
 
-	if (FFT_src_com) delete[] FFT_src_com;
+	if (FFT_src_com)
+		delete[] FFT_src_com;
 	FFT_src_com = new Complex[FFTSize];
 
-	int memsize = (HalfFFTSize + 2) * (average_Deep + 2);
-	if (FFTBuff) delete[] FFTBuff;
+	int memsize = (HalfFFTSize + 2) * (average_Deep + 4);
+	if (FFTBuff)
+		delete[] FFTBuff;
 	FFTBuff = new double[memsize];
 	memset(FFTBuff, 0, memsize * sizeof(double));
 	FFTOutBuff = &FFTBuff[(HalfFFTSize + 2) * average_Deep];
 	FFTOutLogBuff = &FFTBuff[(HalfFFTSize + 2) * (average_Deep + 1)];
-
-	FFTMaxValue = Get_FFT_Max_Value();
+	FFTBrieflyBuff = &FFTBuff[(HalfFFTSize + 2) * (average_Deep + 2)];
+	FFTBrieflyLogBuff = &FFTBuff[(HalfFFTSize + 2) * (average_Deep + 3)];
 
 	ReleaseMutex(hMutexBuff);
 }
 
 void CFFT::UnInit(void)
 {
-	cuda_FFT_UnInit();
+
 }
 
 void CFFT::Add_Complex(Complex* src1, Complex* src2, Complex* dst)
@@ -336,6 +334,7 @@ void CFFT::FFT(void* Buff, BUFF_DATA_TYPE type, uint32_t pos, UINT mask)
 	FFTOutLogBuff[i] = log10(FFTOutBuff[i] / FFTMaxValue);
 	FFTCount++;
 
+	fftWin->BrieflyBuff();
 	fftWin->PaintSpectrum(this);
 
 	ReleaseMutex(hMutexBuff);
@@ -352,8 +351,10 @@ void CFFT::FFT(void* Buff, BUFF_DATA_TYPE type, uint32_t pos, UINT mask)
 LPTHREAD_START_ROUTINE CFFT::FFT_Thread(LPVOID lp)
 {
 	OPENCONSOLE;
-	((CFFT*)lp)->FFT_func();
-	CLOSECONSOLE;
+	CFFTWin* fw = (CFFTWin*)lp;
+	fw->fft->Init(fw);
+	fw->fft->FFT_func();
+	//CLOSECONSOLE;
 	return 0;
 }
 
@@ -361,12 +362,15 @@ void CFFT::FFT_func(void)
 {
 	UINT fft_pos;
 	UINT fft_between;
+
+	FFTDoing = true;
+	bFFT_Thread_Exitted = false;
 	while (FFTDoing && Program_In_Process)
 	{
 		if (FFTNext == false) {	Sleep(0); continue;	}
 		FFTNext = false;
 
-		while (true) {
+		while (FFTDoing) {
 			fft_pos = *DataBuffPos;
 			fft_between = (fft_pos - FFTPos) & data_buff_length_mask;
 			if (fft_between > FFTStep) {
@@ -380,7 +384,10 @@ void CFFT::FFT_func(void)
 			}
 		}
 	}
-	FFTT_hread_Exit = true;
+
+	cuda_FFT_UnInit();
+	bFFT_Thread_Exitted = true;
+	hFFT_Thread = NULL;
 }
 
 double CFFT::GetFFTMaxValue(void)
@@ -397,21 +404,4 @@ double CFFT::GetFFTMaxValue(void)
 	printf("maxvalue:%d, %lf\n", max, d);
 	return d/16;
 
-}
-
-double CFFT::Get_FFT_Max_Value(void)
-{
-	double *buff = new double[FFTSize];
-	int i;
-	double maxd = 0;
-	UINT64 max = ((UINT64)1 << (data_buff_data_bits - 1)) - 1;
-	for (i = 0; i < FFTSize; i++) buff[i] = (double)max * sin(2 * M_PI * i / FFTSize);
-	cuda_FFT_Prepare_Data_for_MaxValue(buff);
-	cuda_FFT();
-	int f = 1;
-	maxd = sqrt(cuda_FFT_CompoData[f].x * cuda_FFT_CompoData[f].x + 
-		cuda_FFT_CompoData[f].y * cuda_FFT_CompoData[f].y);
-	printf("maxvalue:%d, %lf\n", max, maxd);
-	free(buff);
-	return maxd;
 }

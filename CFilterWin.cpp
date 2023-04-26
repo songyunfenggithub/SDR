@@ -10,10 +10,10 @@
 #include "public.h"
 #include "myDebug.h"
 #include "CSoundCard.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFFT.h"
 #include "CWaveFilter.h"
-#include "CWinFilter.h"
+#include "CFilterWin.h"
 #include "CDemodulatorAM.h"
 
 using namespace std;
@@ -49,31 +49,42 @@ using namespace std;
 #define COLOR_TEXT_BACKGOUND	RGB(0, 0, 0)
 #define COLOR_TEXT				RGB(255, 255, 255)
 
-CWinFilter clsWinFilter;
+const char filterComment[] = "滤波器长度,  滤波器迭代层数,  x;  滤波器类型,  中心频率,  有效宽度;  ...\n"\
+"example: 1023, 2, 0; 1, 50, 10\n"\
+"滤波器长度 必须是奇数.\n"\
+"滤波器迭代层数 0 不迭代; 1 - 3 迭代层数.\n"\
+"x 无效设置，任意数.\n"\
+"滤波器类型\n"\
+"  0 指定为低通滤波器.\n"\
+"  1 指定为高通滤波器.\n"\
+"  2 指定为带通滤波器.\n"\
+"  3 指定为阻带滤波器.\n"\
+"中心频率\n"\
+"有效宽度\n";
 
-
-const char filterComment[] = "滤波器长度,  滤波器迭代层数,  x;  滤波器类型,  中心频率,  有效宽度;  ...\n        example: 1023,2,0;1,50,10\n滤波器长度 必须是奇数.\n滤波器迭代层数 0 不迭代; 1 - 3 迭代层数.\nx 无效设置，任意数.\n滤波器类型\n    0 放在滤波器第一位，表示包含低通信号.\n    1 放在滤波器任意位置，表示包含相邻滤波器频率之间的带通信号;\n       如果处于第一位置，表示不包含低通信号;\n       如果处于最后位置，表示不包含高通信号.\n";
-CWinFilter::CWinFilter()
+CFilterWin::CFilterWin()
 {
-	
-	pFilterInfo = &clsWaveFilter.rootFilterInfo;
+	hCoreAnalyseMutex = CreateMutex(NULL, false, "hCoreAnalyseMutex");		//创建互斥对象
 
+	//pFilterInfo = &clsWaveFilter.rootFilterInfo;
 	RegisterWindowsClass();
 }
 
-CWinFilter::~CWinFilter()
+CFilterWin::~CFilterWin()
 {
 
 }
 
-void CWinFilter::RegisterWindowsClass(void)
+void CFilterWin::RegisterWindowsClass(void)
 {
+	static bool registted = false;
+	if (registted == true) return;
+	registted = true;
+
 	WNDCLASSEX wcex;
-
 	wcex.cbSize = sizeof(WNDCLASSEX);
-
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc = (WNDPROC)CWinFilter::StaticWndProc;
+	wcex.lpfnWndProc = (WNDPROC)CFilterWin::WndProc;
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
 	wcex.hInstance = hInst;
@@ -87,28 +98,24 @@ void CWinFilter::RegisterWindowsClass(void)
 	RegisterClassEx(&wcex);
 }
 
-void CWinFilter::OpenWindow(void)
+void CFilterWin::OpenWindow(void)
 {
-	if (hWnd == NULL) hWnd = CreateWindow(FILTER_WIN_CLASS, "Filter windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-		CW_USEDEFAULT, 0, 1400, 800, NULL, NULL, hInst, NULL);
+	if (hWnd == NULL) {
+		hWnd = CreateWindow(FILTER_WIN_CLASS, "Filter windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+			CW_USEDEFAULT, 0, 1400, 800, NULL, NULL, hInst, this);
+	}
 	ShowWindow(hWnd, SW_SHOW);
 	UpdateWindow(hWnd);
 }
 
-LRESULT CALLBACK CWinFilter::StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK CFilterWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	return clsWinFilter.WndProc(hWnd, message, wParam, lParam);
-}
-
-LRESULT CALLBACK CWinFilter::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	RECT rt;
-
+	CFilterWin* me = (CFilterWin*)get_WinClass(hWnd);	
 	switch (message)
 	{
 	case WM_MOUSEMOVE:
 	{
-		if (clsWaveFilter.CoreAnalyseFFTBuff == NULL) break;
+		if (me->CoreAnalyseFFTBuff == NULL) break;
 		HDC hDC = GetDC(hWnd);
 		PAINTSTRUCT ps;
 		RECT r, rt;
@@ -131,11 +138,11 @@ LRESULT CALLBACK CWinFilter::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 		int yPos = GET_Y_LPARAM(lParam);
 		int i = 0;
 		char s[500];
-		FILTERCOREDATATYPE* pFilterCore = clsWinFilter.pFilterInfo->FilterCore;
-		int FilterLength = clsWinFilter.pFilterInfo->CoreLength;
-		int X = (HScrollPos + xPos - WAVE_RECT_BORDER_LEFT) / HScrollZoom;
-		X = BOUND(X, 0, (HScrollPos + rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / HScrollZoom);
-		FILTERCOREDATATYPE Y = X > FilterLength ? 0 : pFilterCore[X];
+		FILTER_CORE_DATA_TYPE* pFilterCore = me->pFilterInfo->FilterCore;
+		int FilterLength = me->pFilterInfo->CoreLength;
+		int X = (me->HScrollPos + xPos - WAVE_RECT_BORDER_LEFT) / me->HScrollZoom;
+		X = BOUND(X, 0, (me->HScrollPos + rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / me->HScrollZoom);
+		FILTER_CORE_DATA_TYPE Y = X > FilterLength ? 0 : pFilterCore[X];
 		sprintf(s, "X: %d, core V: %lf", X, Y);
 		SetTextColor(hDC, COLOR_FILTER_CORE);
 		DrawText(hDC, s, strlen(s), &r, NULL);
@@ -143,15 +150,15 @@ LRESULT CALLBACK CWinFilter::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 
 		r.left += 200;
 		SetTextColor(hDC, COLOR_FFT);
-		FILTERCOREDATATYPE Hz = X * (clsWinFilter.pFilterInfo->SampleRate / clsWinFilter.pFilterInfo->decimationFactor) / clsWaveFilter.CoreAnalyseFFTLength;
-		Y = X > clsWaveFilter.CoreAnalyseFFTLength / 2 ? 0 : clsWaveFilter.CoreAnalyseFFTBuff[X];
+		FILTER_CORE_DATA_TYPE Hz = X * (clsData.AdcSampleRate / (1 << me->pFilterInfo->decimationFactorBit)) / me->CoreAnalyseFFTLength;
+		Y = X > me->CoreAnalyseFFTLength / 2 ? 0 : me->CoreAnalyseFFTBuff[X];
 		sprintf(s, "Hz: %.03f, FFT: %lf", Hz, Y);
 		DrawText(hDC, s, strlen(s), &r, NULL);
 
 		r.left += 250;
 		SetTextColor(hDC, COLOR_FFT_LOG);
 		int Ypos = BOUND(yPos - WAVE_RECT_BORDER_TOP, 0, WAVE_RECT_HEIGHT);
-		double Ylog = 20 * (X > clsWaveFilter.CoreAnalyseFFTLength/2 ? 0 : clsWaveFilter.CoreAnalyseFFTLogBuff[X]);
+		double Ylog = 20 * (X > me->CoreAnalyseFFTLength/2 ? 0 : me->CoreAnalyseFFTLogBuff[X]);
 		sprintf(s, "Y: %.03fdb, logFFT: %fdb", -(double)Ypos / 64 * 20, Ylog);
 		DrawText(hDC, s, strlen(s), &r, NULL);
 
@@ -161,60 +168,46 @@ LRESULT CALLBACK CWinFilter::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 
 		ReleaseDC(hWnd, hDC);
 	}
-		break;
+	break;
 	case WM_CREATE:
-		{
-			clsWinFilter.hWnd = hWnd;
+	{
+		OPENCONSOLE;
+		me = (CFilterWin*)set_WinClass(hWnd, lParam);
 
-			hMenuMain = GetMenu(hWnd);
+		me->hWnd = hWnd;
+		me->hMenuMain = GetMenu(hWnd);
+		CheckMenuItem(me->hMenuMain, IDM_FILTER_CORE_SHOW,
+			(me->filterCoreShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(me->hMenuMain, IDM_FILTER_CORE_SPECTRUM_SHOW,
+			(me->filterCoreSpectrumShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(me->hMenuMain, IDM_FILTER_CORE_SPECTRUM_LOG_SHOW,
+			(me->filterCoreSpectrumLogShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 
-			CheckMenuItem(hMenuMain, IDM_FILTER_CORE_SHOW,
-				(filterCoreShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-			CheckMenuItem(hMenuMain, IDM_FILTER_CORE_SPECTRUM_SHOW,
-				(filterCoreSpectrumShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-			CheckMenuItem(hMenuMain, IDM_FILTER_CORE_SPECTRUM_LOG_SHOW,
-				(filterCoreSpectrumLogShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-
-			hMenuFilterItems = CreateMenu();
-			HMENU hMENUItem;
-			AppendMenu(hMenuMain, MF_POPUP, (UINT_PTR)hMenuFilterItems, "滤波器");
-			//set_CoreAnalyse_root_Filter(&clsWaveFilter.rootFilterInfo);
-			set_CoreAnalyse_root_Filter(clsDemodulatorAm.pFilterInfo);
+		me->hMenuFilterItems = CreateMenu();
+		AppendMenu(me->hMenuMain, MF_POPUP, (UINT_PTR)me->hMenuFilterItems, "滤波器");
+		me->set_CoreAnalyse_root_Filter(&clsWaveFilter.rootFilterInfo);
 	}
-
-		break;
-
+	break;
 	case WM_TIMER:
 		break;
-
 	case WM_SIZE:
 		//CacheInit(hWnd);
 		break;
-
 	case WM_COMMAND:
-		OnCommand(hWnd, message, wParam, lParam);
+		me->OnCommand(message, wParam, lParam);
 		break;
-	case WM_SYSCOMMAND:
-		if (LOWORD(wParam) == SC_CLOSE)
-		{
-			ShowWindow(hWnd, SW_HIDE);
-			break;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
-		break;
-
 	case WM_PAINT:
-		Paint(hWnd);
+		me->Paint();
 		break;
-
 	case WM_KEYDOWN:
 	case WM_KEYUP:
 	case WM_VSCROLL:
 	case WM_HSCROLL:
-		KeyAndScroll(hWnd, message, wParam, lParam);
+		me->KeyAndScroll(message, wParam, lParam);
 		break;
 	case WM_DESTROY:
-		DbgMsg("WinFilter WM_DESTROY\r\n");
+		DbgMsg("CFilterWin WM_DESTROY\r\n");
+		me->hWnd = NULL;
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -223,11 +216,10 @@ LRESULT CALLBACK CWinFilter::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 	return 0;
 }
 
-VOID CWinFilter::set_CoreAnalyse_root_Filter(CWaveFilter::PFILTERINFO pFilterInfo)
+void CFilterWin::set_CoreAnalyse_root_Filter(CWaveFilter::PFILTERINFO pFilterInfo)
 {
 	rootFilterInfo = pFilterInfo;
 
-	
 	char s[100];
 	int i = 0;
 
@@ -253,35 +245,38 @@ VOID CWinFilter::set_CoreAnalyse_root_Filter(CWaveFilter::PFILTERINFO pFilterInf
 	InitFilterCoreAnalyse(pFilterInfo);
 }
 
-VOID CWinFilter::InitFilterCoreAnalyse(CWaveFilter::PFILTERINFO pFilterInfo)
+void CFilterWin::InitFilterCoreAnalyse(CWaveFilter::PFILTERINFO pFilterInfo)
 {
 	this->pFilterInfo = pFilterInfo;
 	int index = pFilterInfo == rootFilterInfo ? rootFilterInfo->subFilterNum : pFilterInfo->subFilteindex;
 	CheckMenuRadioItem(hMenuFilterItems, 0, rootFilterInfo->subFilterNum, index, MF_BYPOSITION);
-
-	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CWinFilter::FilterCoreAnalyse, pFilterInfo, 0, NULL);
+	CoreAnalyse.pFilterWin = this;
+	CoreAnalyse.pFilterInfo = pFilterInfo;
+	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilterWin::FilterCoreAnalyse, &CoreAnalyse, 0, NULL);
 }
 
-LPTHREAD_START_ROUTINE CWinFilter::FilterCoreAnalyse(LPVOID lp)
+LPTHREAD_START_ROUTINE CFilterWin::FilterCoreAnalyse(LPVOID lp)
 {
-	CWaveFilter::PFILTERINFO pFilterInfo = (CWaveFilter::PFILTERINFO)lp;
+	CORE_ANALYSE_DATA *CoreAnalyse = (CORE_ANALYSE_DATA*) lp;
+	CFilterWin* pFilterWin = CoreAnalyse->pFilterWin;
+	CWaveFilter::PFILTERINFO pFilterInfo = CoreAnalyse->pFilterInfo;
 
-	clsWaveFilter.FilterCoreAnalyse(pFilterInfo);
+	clsWaveFilter.FilterCoreAnalyse(pFilterWin, pFilterInfo);
 
-	clsWinFilter.HOriginalWidth = (pFilterInfo->CoreLength > clsWaveFilter.CoreAnalyseFFTLength ? pFilterInfo->CoreLength : clsWaveFilter.CoreAnalyseFFTLength);
-	clsWinFilter.HScrollWidth = clsWinFilter.HScrollZoom * clsWinFilter.HOriginalWidth;
+	pFilterWin->HOriginalWidth = (pFilterInfo->CoreLength > pFilterWin->CoreAnalyseFFTLength ? pFilterInfo->CoreLength : pFilterWin->CoreAnalyseFFTLength);
+	pFilterWin->HScrollWidth = pFilterWin->HScrollZoom * pFilterWin->HOriginalWidth;
 	RECT rc;
-	clsWinFilter.GetRealClientRect(clsWinFilter.hWnd, &rc);
-	clsWinFilter.HScrollWidth -= rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT;
-	if (clsWinFilter.HScrollWidth < 0) clsWinFilter.HScrollWidth = 0;
-	SetScrollRange(clsWinFilter.hWnd, SB_HORZ, 0, clsWinFilter.HScrollWidth, TRUE);
+	pFilterWin->GetRealClientRect(&rc);
+	pFilterWin->HScrollWidth -= rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT;
+	if (pFilterWin->HScrollWidth < 0) pFilterWin->HScrollWidth = 0;
+	SetScrollRange(pFilterWin->hWnd, SB_HORZ, 0, pFilterWin->HScrollWidth, TRUE);
 
-	InvalidateRect(clsWinFilter.hWnd, NULL, true);
+	InvalidateRect(pFilterWin->hWnd, NULL, true);
 	
 	return 0;
 }
 
-BOOL CWinFilter::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+bool CFilterWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	wmId = LOWORD(wParam);
@@ -311,16 +306,16 @@ BOOL CWinFilter::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		break;
 
 	case IDM_FILTER_CORE_SETTING:
-		DialogBox(hInst, (LPCTSTR)IDD_DLG_FILTER_CORE_SET, hWnd, (DLGPROC)DlgFilterCoreProc);
+		DialogBoxParam(hInst, (LPCTSTR)IDD_DLG_FILTER_CORE_SET, hWnd, (DLGPROC)DlgFilterCoreProc, (LPARAM)this);
 		break;
 	case IDM_FILTER_ZOOM_INC:
 		if (HScrollZoom < 16) HScrollZoom *= 2;
-		GetRealClientRect(hWnd, &rc);
+		GetRealClientRect(&rc);
 		SetScrollRange(hWnd, SB_HORZ, 0, (HScrollWidth = HScrollZoom * HOriginalWidth - rc.right) > 0 ? HScrollWidth : 0, TRUE);
 		InvalidateRect(hWnd, NULL, true);
 		break;
 	case IDM_FILTER_ZOOM_DEC:
-		GetRealClientRect(hWnd, &rc);
+		GetRealClientRect(&rc);
 		if (HScrollZoom > 1.5) HScrollZoom /= 2;
 		else {
 			if (HScrollZoom * HOriginalWidth > rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_LEFT) HScrollZoom /= 2;
@@ -330,7 +325,7 @@ BOOL CWinFilter::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		break;
 	case IDM_FILTER_ZOOM_HOME:
 		HScrollZoom = 1.0;
-		GetRealClientRect(hWnd, &rc);
+		GetRealClientRect(&rc);
 		SetScrollRange(hWnd, SB_HORZ, 0, (HScrollWidth = HScrollZoom * HOriginalWidth - rc.right) > 0 ? HScrollWidth : 0, TRUE);
 		InvalidateRect(hWnd, NULL, true);
 		break;
@@ -364,7 +359,7 @@ BOOL CWinFilter::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 	return TRUE;
 }
 
-VOID CWinFilter::Paint(HWND hWnd)
+VOID CFilterWin::Paint(void)
 {
 	HDC		hDC;
 	PAINTSTRUCT ps;
@@ -378,10 +373,7 @@ VOID CWinFilter::Paint(HWND hWnd)
 	HDC		hdc = CreateCompatibleDC(hDC);
 	HBITMAP hbmp = CreateCompatibleBitmap(hDC, rt.right, rt.bottom);
 	SelectObject(hdc, hbmp);
-
-	SelectObject(hdc, CreateFont(14, 0, 0, 0, 0, 0, 0, 0,
-		DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, _T("Arial")));
-
+	SelectObject(hdc, CreateFont(14, 0, 0, 0, 0, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, _T("Arial")));
 	FillRect(hdc, &rt, (HBRUSH)GetStockObject(BRUSH_BACKGROUND));
 
 	int	x, y, pos, i;
@@ -413,7 +405,7 @@ VOID CWinFilter::Paint(HWND hWnd)
 			if (!(i % 5))
 			{
 				sprintf(s, "%.02fhz", (double)(i * 32 + HScrollPos) / HScrollZoom * 
-					(pFilterInfo->SampleRate / pFilterInfo->decimationFactor) / clsWaveFilter.CoreAnalyseFFTLength);
+					(clsData.AdcSampleRate / (1 << pFilterInfo->decimationFactorBit)) / CoreAnalyseFFTLength);
 				r.top = WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT + DIVLONG;
 				r.left = x;
 				SetTextColor(hdc, COLOR_FFT);
@@ -466,128 +458,129 @@ VOID CWinFilter::Paint(HWND hWnd)
 	DeleteObject(hPenLighter);
 
 	//绘制信号--------------------------------------------------
-	FILTERCOREDATATYPE* pFilterCore = pFilterInfo->FilterCore;
-	if (pFilterCore)
-	{
-		int istep = HScrollZoom < 1 ? 1 / HScrollZoom : 1;
-		int Xstep = HScrollZoom > 1 ? HScrollZoom : 1;
-		double scale;
-		int X, Y;
-		//绘制滤波器核--------------------------------------------------
-		if (filterCoreShow == true) {
-			int CoreLength = pFilterInfo->CoreLength;
-			Y = 0;
-			FILTERCOREDATATYPE CoreCenter = 256;
-			FILTERCOREDATATYPE FilterCoreMaxValue = 0.0;
-			for (i = 0; i < CoreLength; i++) if (FilterCoreMaxValue < abs(pFilterCore[i])) FilterCoreMaxValue = abs(pFilterCore[i]);
-			//FilterCoreMaxValue = 1.0;
-			scale = CoreCenter / FilterCoreMaxValue;
-			i = HScrollPos / HScrollZoom;
-			if (i < CoreLength) Y = CoreCenter - pFilterCore[i] * scale;
-			X = WAVE_RECT_BORDER_LEFT;
-			MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-			hPen = CreatePen(PS_SOLID, 1, COLOR_FILTER_CORE);
-			SelectObject(hdc, hPen);
-			for (i += istep; i < CoreLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+	if (pFilterInfo != NULL) {
+		FILTER_CORE_DATA_TYPE* pFilterCore = pFilterInfo->FilterCore;
+		if (pFilterCore) {
+			int istep = HScrollZoom < 1 ? 1 / HScrollZoom : 1;
+			int Xstep = HScrollZoom > 1 ? HScrollZoom : 1;
+			double scale;
+			int X, Y;
+			//绘制滤波器核--------------------------------------------------
+			if (filterCoreShow == true) {
+				int CoreLength = pFilterInfo->CoreLength;
+				Y = 0;
+				FILTER_CORE_DATA_TYPE CoreCenter = 256;
+				FILTER_CORE_DATA_TYPE FilterCoreMaxValue = 0.0;
+				for (i = 0; i < CoreLength; i++) if (FilterCoreMaxValue < abs(pFilterCore[i])) FilterCoreMaxValue = abs(pFilterCore[i]);
+				//FilterCoreMaxValue = 1.0;
+				scale = CoreCenter / FilterCoreMaxValue;
+				i = HScrollPos / HScrollZoom;
+				if (i < CoreLength) Y = CoreCenter - pFilterCore[i] * scale;
+				X = WAVE_RECT_BORDER_LEFT;
+				MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
+				hPen = CreatePen(PS_SOLID, 1, COLOR_FILTER_CORE);
+				SelectObject(hdc, hPen);
+				for (i += istep; i < CoreLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+				{
+					X += Xstep;
+					Y = CoreCenter - pFilterCore[i] * scale;
+					LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
+				}
+				DeleteObject(hPen);
+			}
+
+			WaitForSingleObject(hCoreAnalyseMutex, INFINITE);
+			//绘制滤波 FFT 信号--------------------------------------------------
+			if (CoreAnalyseFFTBuff)
 			{
-				X += Xstep;
-				Y = CoreCenter - pFilterCore[i] * scale;
-				LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
-			}
-			DeleteObject(hPen);
-		}
+				int FFTLength = CoreAnalyseFFTLength / 2;
+				if (filterCoreSpectrumShow == true) {
+					double* pFFTBuf = CoreAnalyseFFTBuff;
 
-		WaitForSingleObject(clsWaveFilter.hCoreAnalyseMutex, INFINITE);
-		//绘制滤波 FFT 信号--------------------------------------------------
-		if (clsWaveFilter.CoreAnalyseFFTBuff)
-		{
-			int FFTLength = clsWaveFilter.CoreAnalyseFFTLength / 2;
-			if (filterCoreSpectrumShow == true) {
-				double* pFFTBuf = clsWaveFilter.CoreAnalyseFFTBuff;
-
-				double fftvmax = pFFTBuf[FFTLength];
-				scale = WAVE_RECT_HEIGHT;// / fftvmax;
-				i = HScrollPos / HScrollZoom;
-				if (i < FFTLength)
-					Y = WAVE_RECT_HEIGHT - pFFTBuf[i] * scale;
-				Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-				X = WAVE_RECT_BORDER_LEFT;
-				MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-				hPen = CreatePen(PS_SOLID, 1, COLOR_FFT);
-				SelectObject(hdc, hPen);
-				for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-				{
-					X += Xstep;
-					Y = WAVE_RECT_HEIGHT - pFFTBuf[i] * scale;
+					double fftvmax = pFFTBuf[FFTLength];
+					scale = WAVE_RECT_HEIGHT;// / fftvmax;
+					i = HScrollPos / HScrollZoom;
+					if (i < FFTLength)
+						Y = WAVE_RECT_HEIGHT - pFFTBuf[i] * scale;
 					Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-					LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
+					X = WAVE_RECT_BORDER_LEFT;
+					MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
+					hPen = CreatePen(PS_SOLID, 1, COLOR_FFT);
+					SelectObject(hdc, hPen);
+					for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+					{
+						X += Xstep;
+						Y = WAVE_RECT_HEIGHT - pFFTBuf[i] * scale;
+						Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+						LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
+					}
+					DeleteObject(hPen);
 				}
-				DeleteObject(hPen);
-			}
 
-			if (filterCoreSpectrumLogShow == true) {
-				//绘制滤波 FFT Log10 信号--------------------------------------------------
-				double* pFFTLogBuf = clsWaveFilter.CoreAnalyseFFTLogBuff;
-				double fftlogmax = pFFTLogBuf[FFTLength];
-				double fftlogmin = pFFTLogBuf[FFTLength + 1];
-				scale = WAVE_RECT_HEIGHT;// / fftlogmin;
-				i = HScrollPos / HScrollZoom;
-				if (i < FFTLength)
-					Y = pFFTLogBuf[i] * -64;
-				//Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-				X = WAVE_RECT_BORDER_LEFT;
-				MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-				hPen = CreatePen(PS_SOLID, 1, COLOR_FFT_LOG);
-				SelectObject(hdc, hPen);
-				for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-				{
-					X += Xstep;
-					Y = pFFTLogBuf[i] * -64;
+				if (filterCoreSpectrumLogShow == true) {
+					//绘制滤波 FFT Log10 信号--------------------------------------------------
+					double* pFFTLogBuf = CoreAnalyseFFTLogBuff;
+					double fftlogmax = pFFTLogBuf[FFTLength];
+					double fftlogmin = pFFTLogBuf[FFTLength + 1];
+					scale = WAVE_RECT_HEIGHT;// / fftlogmin;
+					i = HScrollPos / HScrollZoom;
+					if (i < FFTLength)
+						Y = pFFTLogBuf[i] * -64;
 					//Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-					LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
+					X = WAVE_RECT_BORDER_LEFT;
+					MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
+					hPen = CreatePen(PS_SOLID, 1, COLOR_FFT_LOG);
+					SelectObject(hdc, hPen);
+					for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+					{
+						X += Xstep;
+						Y = pFFTLogBuf[i] * -64;
+						//Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+						LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
+					}
+					DeleteObject(hPen);
 				}
-				DeleteObject(hPen);
 			}
+			ReleaseMutex(hCoreAnalyseMutex);
 		}
-		ReleaseMutex(clsWaveFilter.hCoreAnalyseMutex);
+
+		//---------------------------------------
+
+		double FullVotage = 5.0;
+		UINT64 a64 = 1;
+		double VotagePerDIV = (FullVotage / (unsigned __int64)(a64 << (sizeof(ADCDATATYPE) * 8)));
+		a64 = 1;
+		char tstr1[100], tstr2[100];
+		a64 = 1;
+		r.top = WAVE_RECT_HEIGHT + WAVE_RECT_BORDER_TOP + DIVLONG + 20;
+		r.left = WAVE_RECT_BORDER_TOP;
+		r.right = rt.right;
+		r.bottom = rt.bottom;
+		sprintf(s, "32pix / DIV\r\n"\
+			"AdcSampleRate: %d\r\n"\
+			"Core Length: %d\r\n"\
+			"decimationFactorBit: %d, SampleRate: %d, RealSampleRate: %d\r\n"\
+			"FreqFallWidth: %.3f\r\n"\
+			"CoreNum: %d CoreIndex:%d\r\n"\
+			"Core Desc: %s\r\n"\
+			"HZoom: %f",
+			clsData.AdcSampleRate,
+			pFilterInfo->CoreLength,
+			pFilterInfo->decimationFactorBit, clsData.AdcSampleRate, clsData.AdcSampleRate / (1 << pFilterInfo->decimationFactorBit),
+			pFilterInfo->FreqFallWidth,
+			rootFilterInfo->subFilterNum, pFilterInfo->subFilteindex,
+			rootFilterInfo->CoreDescStr,
+			HScrollZoom
+		);
+		SetBkMode(hdc, TRANSPARENT);
+		//	SetBkMode(hdc, OPAQUE); 
+		//	SetBkColor(hdc,COLOR_TEXT_BACKGOUND);
+
+		SetTextColor(hdc, COLOR_TEXT);
+		DrawText(hdc, s, strlen(s), &r, NULL);
+
+		DeleteObject(SelectObject(hdc, GetStockObject(SYSTEM_FONT)));
 	}
-
-	//---------------------------------------
-
-	double FullVotage = 5.0;
-	UINT64 a64 = 1;
-	double VotagePerDIV = (FullVotage / (unsigned __int64)(a64 << (sizeof(ADCDATATYPE) * 8)));
-	a64 = 1;
-	char tstr1[100], tstr2[100];
-	a64 = 1;
-	r.top = WAVE_RECT_HEIGHT + WAVE_RECT_BORDER_TOP + DIVLONG + 20;
-	r.left = WAVE_RECT_BORDER_TOP;
-	r.right = rt.right;
-	r.bottom = rt.bottom;
-	sprintf(s, "32pix / DIV\r\n"\
-		"AdcSampleRate: %d\r\n"\
-		"Core Length: %d\r\n"\
-		"decimationFactor: %d, SampleRate: %d, RealSampleRate: %d\r\n"\
-		"FreqFallWidth: %.3f\r\n"\
-		"CoreNum: %d CoreIndex:%d\r\n"\
-		"Core Desc: %s\r\n"\
-		"HZoom: %f",
-		clsWaveData.AdcSampleRate,
-		pFilterInfo->CoreLength,
-		pFilterInfo->decimationFactor, pFilterInfo->SampleRate, pFilterInfo->SampleRate / pFilterInfo->decimationFactor,
-		pFilterInfo->FreqFallWidth,
-		rootFilterInfo->subFilterNum, pFilterInfo->subFilteindex,
-		rootFilterInfo->CoreDescStr,
-		HScrollZoom
-	);
-		SetBkMode(hdc, TRANSPARENT); 
-	//	SetBkMode(hdc, OPAQUE); 
-	//	SetBkColor(hdc,COLOR_TEXT_BACKGOUND);
-
-	SetTextColor(hdc, COLOR_TEXT);
-	DrawText(hdc, s, strlen(s), &r, NULL);
-
-	DeleteObject(SelectObject(hdc, GetStockObject(SYSTEM_FONT)));
 
 	BitBlt(hDC,
 		0, 0,
@@ -602,7 +595,7 @@ VOID CWinFilter::Paint(HWND hWnd)
 }
 
 
-VOID CWinFilter::GetRealClientRect(HWND hWnd, PRECT lprc)
+VOID CFilterWin::GetRealClientRect(PRECT lprc)
 {
 	DWORD dwStyle;
 	dwStyle = GetWindowLong(hWnd, GWL_STYLE);
@@ -613,7 +606,7 @@ VOID CWinFilter::GetRealClientRect(HWND hWnd, PRECT lprc)
 		lprc->right += GetSystemMetrics(SM_CXVSCROLL);
 }
 
-void CWinFilter::KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+void CFilterWin::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	INT     iMax, iMin, iPos;
 	int		dn = 0, tbdn = 0;
@@ -742,15 +735,18 @@ void CWinFilter::KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 
 }
 
-LRESULT CALLBACK CWinFilter::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK CFilterWin::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	CFilterWin* me = (CFilterWin*)get_DlgWinClass(hDlg);
 	switch (message)
 	{
 	case WM_INITDIALOG:
+		me = (CFilterWin*)set_DlgWinClass(hDlg, lParam);
+
 		//DWORD dwPos = GetDlgItemInt(hDlg, IDC_EDITGOTO, 0, 0);
 		//SetDlgItemInt(hDlg, IDC_EDIT_PLAY_STOP_POSITION,	clsSoundCard.dwPlayStopPosition, TRUE);
-		SetDlgItemText(hDlg, IDC_EDIT1,	clsWinFilter.rootFilterInfo->CoreDescStr);
-		SetDlgItemInt(hDlg, IDC_EDIT2, clsWinFilter.rootFilterInfo->decimationFactor, TRUE);
+		SetDlgItemText(hDlg, IDC_EDIT1,	me->rootFilterInfo->CoreDescStr);
+		SetDlgItemInt(hDlg, IDC_EDIT2, me->rootFilterInfo->decimationFactorBit, TRUE);
 		CheckDlgButton(hDlg, IDC_CHECK1, TRUE);
 		SetDlgItemText(hDlg, IDC_STATIC1, filterComment);
 		return TRUE;
@@ -762,13 +758,14 @@ LRESULT CALLBACK CWinFilter::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM w
 			{
 				char s[8192];
 				GetDlgItemText(hDlg, IDC_EDIT1, s, FILTER_CORE_DESC_MAX_LENGTH);
-				int decimationFactor = GetDlgItemInt(hDlg, IDC_EDIT2, NULL, TRUE);
+				UINT decimationFactor = GetDlgItemInt(hDlg, IDC_EDIT2, NULL, false);
 				//IsDlgButtonChecked(hDlg, IDC_CHECK1) == true ?
-					//GetDlgItemInt(hDlg, IDC_EDIT2, NULL, TRUE) : clsWaveData.AdcSampleRate;
-				clsWinFilter.rootFilterInfo->decimationFactor = decimationFactor;
-				clsWaveFilter.setFilterCoreDesc(clsWinFilter.rootFilterInfo,s);
-				clsWaveFilter.ParseCoreDesc(clsWinFilter.rootFilterInfo);
-				clsWinFilter.set_CoreAnalyse_root_Filter(clsWinFilter.rootFilterInfo);
+					//GetDlgItemInt(hDlg, IDC_EDIT2, NULL, TRUE) : clsData.AdcSampleRate;
+				clsWaveFilter.rootFilterInfo.decimationFactorBit = decimationFactor;
+				clsWaveFilter.rootFilterInfo.SampleRate = clsData.AdcSampleRate / (1 << clsWaveFilter.rootFilterInfo.decimationFactorBit);
+				clsWaveFilter.setFilterCoreDesc(me->rootFilterInfo,s);
+				clsWaveFilter.ParseCoreDesc(me->rootFilterInfo);
+				me->set_CoreAnalyse_root_Filter(me->rootFilterInfo);
 			}
 			EndDialog(hDlg, LOWORD(wParam));
 			return TRUE;

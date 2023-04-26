@@ -17,14 +17,15 @@
 
 //#include "CXPathXML.h"
 #include "CDataFromTcpIp.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFilter.h"
 #include "CWinSpectrum.h"
 #include "CWaveFFT.h"
 #include "CWinFFT.h"
 #include "CWinOneFFT.h"
+#include "CFilterWin.h"
 
-#include "cuda_FFT.cuh"
+#include "cuda_CFFT.cuh"
 
 using namespace std;
 
@@ -39,7 +40,6 @@ CWaveFFT::CWaveFFT()
 	
 	hMutexBuff = CreateMutex(NULL, false, "CWaveFFThMutexBuff");
 
-	InitAllBuff(FFT_SIZE, FFT_STEP);
 }
 
 CWaveFFT::~CWaveFFT()
@@ -63,11 +63,23 @@ void CWaveFFT::InitAllBuff(UINT fftsize, UINT fftstep)
 	WaitForSingleObject(hMutexBuff, INFINITE);
 	WaitForSingleObject(clsWinSpect.hMutexBuff, INFINITE);
 
-	clsWaveFFT.FFTSize = fftsize;
-	clsWaveFFT.FFTStep = fftstep;
-	clsWaveFFT.HalfFFTSize = fftsize / 2;
+	FFTSize = fftsize;
+	HalfFFTSize = fftsize / 2;
+	FFTStep = fftstep;
 
-	cuda_FFT_Init();
+	//cuda_FFT_Init();
+	if (orignal_FFT != NULL) delete orignal_FFT;
+	orignal_FFT = new cuda_CFFT(); 
+	orignal_FFT->cuda_FFT_Init(FFTSize, FFTStep, ADC_DATA_SAMPLE_BIT);
+
+	if (filtted_FFT != NULL) delete filtted_FFT;
+	filtted_FFT = new cuda_CFFT();
+	filtted_FFT->cuda_FFT_Init(
+		FFTSize >> clsWaveFilter.rootFilterInfo.decimationFactorBit,
+		FFTStep >> clsWaveFilter.rootFilterInfo.decimationFactorBit,
+		ADC_DATA_SAMPLE_BIT
+	);
+
 	clsWaveFFT.InitBuff();
 	clsWinSpect.Init();
 	clsWinSpect.InitBuff();
@@ -237,12 +249,12 @@ void CWaveFFT::NormalFFT(WHICHSIGNAL WhichSignal, UINT pos)
 	memset(FFT_src, 0, FFTSize * sizeof(double));
 	if (WhichSignal == WHICHSIGNAL::SIGNAL_ORIGNAL) {
 		for (i = 0; i < FFTStep; i++, pos++) {
-			FFT_src[i] = (double)clsWaveData.AdcBuff[pos & DATA_BUFFER_MASK];
+			FFT_src[i] = (double)clsData.AdcBuff[pos & DATA_BUFFER_MASK];
 		}
 	}
 	else {
 		for (i = 0; i < FFTStep; i++, pos++) {
-			FFT_src[i] = (double)clsWaveData.FilttedBuff[pos & DATA_BUFFER_MASK];
+			FFT_src[i] = (double)clsData.FilttedBuff[pos & DATA_BUFFER_MASK];
 		}
 	}
 
@@ -300,9 +312,17 @@ void CWaveFFT::FFT(WHICHSIGNAL WhichSignal, UINT pos)
 	clock_t start, end;
 	start = clock();
 
-	cuda_FFT(WhichSignal, pos);
-
+	if (WhichSignal == WHICHSIGNAL::SIGNAL_ORIGNAL)
+	{
+		this->orignal_FFT->cuda_FFT(clsData.AdcBuff, BUFF_DATA_TYPE::short_type, pos, DATA_BUFFER_MASK);
+	}
+	else {
+		this->filtted_FFT->cuda_FFT(clsData.FilttedBuff, BUFF_DATA_TYPE::float_type, pos, DATA_BUFFER_MASK);
+	}
+	//cuda_FFT(WhichSignal, pos);
 	//NormalFFT(WhichSignal, pos);
+
+	end = clock();
 
 	double maxfftv = 0.0;
 	double minfftv = DBL_MAX;// numeric_limits<double>::max();
@@ -315,22 +335,25 @@ void CWaveFFT::FFT(WHICHSIGNAL WhichSignal, UINT pos)
 	double* sublogbuf;
 	double scale = FFTSize / FFTStep;
 
+	int HalfFFTSize = WhichSignal == WHICHSIGNAL::SIGNAL_ORIGNAL ? this->HalfFFTSize : (this->HalfFFTSize >> clsWaveFilter.rootFilterInfo.decimationFactorBit);
+	double FFTMaxValue = WhichSignal == WHICHSIGNAL::SIGNAL_ORIGNAL ? orignal_FFT->FFTMaxValue : filtted_FFT->FFTMaxValue;
+
 	if (WhichSignal == WHICHSIGNAL::SIGNAL_ORIGNAL)
 	{
 		buf			= &FFTOrignalBuff[FFTOrignalBuffNum * (HalfFFTSize + 2)];
 		buflog		= &FFTOrignalLogBuff[FFTOrignalBuffNum * (HalfFFTSize + 2)];
-		subbuf		= &FFTOrignalBuff[((FFTOrignalBuffNum + 1) & FFT_DEEP_MASK) * (HalfFFTSize + 2)];
-		sublogbuf	= &FFTOrignalLogBuff[((FFTOrignalBuffNum + 1) & FFT_DEEP_MASK) * (HalfFFTSize + 2)];
 		FFTOrignalBuffNum++;
-		FFTOrignalBuffNum &= FFT_DEEP_MASK;
+		if (FFTOrignalBuffNum == FFTDeep) FFTOrignalBuffNum = 0;
+		subbuf		= &FFTOrignalBuff[FFTOrignalBuffNum * (HalfFFTSize + 2)];
+		sublogbuf	= &FFTOrignalLogBuff[FFTOrignalBuffNum * (HalfFFTSize + 2)];
 		for (i = 0; i < HalfFFTSize; i++)
 		{
 			//d = scale * sqrt(FFT_src_com[i].real * FFT_src_com[i].real + FFT_src_com[i].imagin * FFT_src_com[i].imagin);
-			d = scale * sqrt(cuda_FFT_CompoData[i].x * cuda_FFT_CompoData[i].x + cuda_FFT_CompoData[i].y * cuda_FFT_CompoData[i].y);
-			buf[i] = d / FFT_DEEP;
+			d = scale * sqrt(orignal_FFT->cuda_FFT_CompoData[i].x * orignal_FFT->cuda_FFT_CompoData[i].x + orignal_FFT->cuda_FFT_CompoData[i].y * orignal_FFT->cuda_FFT_CompoData[i].y);
+			buf[i] = d / (FFTDeep - 1);
 			dlog = log10(d / FFTMaxValue);
 //			dlog = log10(d);
-			buflog[i] = dlog / FFT_DEEP;
+			buflog[i] = dlog / (FFTDeep - 1);
 			FFTOBuff[i] += buf[i];
 			FFTOLogBuff[i] += buflog[i];
 			FFTOBuff[i] -= subbuf[i];
@@ -341,16 +364,16 @@ void CWaveFFT::FFT(WHICHSIGNAL WhichSignal, UINT pos)
 			if (i && maxfftvlog < dlog)maxfftvlog = dlog;
 			if (i && minfftvlog > dlog)minfftvlog = dlog;
 		}
-		buf[i] = maxfftv / FFT_DEEP;
+		buf[i] = maxfftv / (FFTDeep - 1);
 		FFTOBuff[i] += buf[i];
-		buflog[i] = maxfftvlog / FFT_DEEP;
+		buflog[i] = maxfftvlog / (FFTDeep - 1);
 		FFTOLogBuff[i] += buflog[i];
 		FFTOBuff[i] -= subbuf[i];
 		FFTOLogBuff[i] -= sublogbuf[i];
 		i++;
-		buf[i] = minfftv / FFT_DEEP;
+		buf[i] = minfftv / (FFTDeep - 1);
 		FFTOBuff[i] += buf[i];
-		buflog[i] = minfftvlog / FFT_DEEP;
+		buflog[i] = minfftvlog / (FFTDeep - 1);
 		FFTOLogBuff[i] += buflog[i];
 		FFTOBuff[i] -= subbuf[i];
 		FFTOLogBuff[i] -= sublogbuf[i];
@@ -359,18 +382,18 @@ void CWaveFFT::FFT(WHICHSIGNAL WhichSignal, UINT pos)
 	else {
 		buf = &FFTFilttedBuff[FFTFilttedBuffNum * (HalfFFTSize + 2)];
 		buflog = &FFTFilttedLogBuff[FFTFilttedBuffNum * (HalfFFTSize + 2)];
-		subbuf = &FFTFilttedBuff[((FFTFilttedBuffNum + 1) & FFT_DEEP_MASK) * (HalfFFTSize + 2)];
-		sublogbuf = &FFTFilttedLogBuff[((FFTFilttedBuffNum + 1) & FFT_DEEP_MASK) * (HalfFFTSize + 2)];
 		FFTFilttedBuffNum++;
-		FFTFilttedBuffNum &= FFT_DEEP_MASK;
+		if (FFTFilttedBuffNum == FFTDeep) FFTFilttedBuffNum = 0;
+		subbuf = &FFTFilttedBuff[FFTFilttedBuffNum * (HalfFFTSize + 2)];
+		sublogbuf = &FFTFilttedLogBuff[FFTFilttedBuffNum * (HalfFFTSize + 2)];
 		for (i = 0; i < HalfFFTSize; i++)
 		{
 			//d = scale * sqrt(FFT_src_com[i].real * FFT_src_com[i].real + FFT_src_com[i].imagin * FFT_src_com[i].imagin);
-			d = scale * sqrt(cuda_FFT_CompoData[i].x * cuda_FFT_CompoData[i].x + cuda_FFT_CompoData[i].y * cuda_FFT_CompoData[i].y);
-			buf[i] = d / FFT_DEEP;
+			d = scale * sqrt(filtted_FFT->cuda_FFT_CompoData[i].x * filtted_FFT->cuda_FFT_CompoData[i].x + filtted_FFT->cuda_FFT_CompoData[i].y * filtted_FFT->cuda_FFT_CompoData[i].y);
+			buf[i] = d / (FFTDeep - 1);
 			dlog = log10(d / FFTMaxValue);
 //			dlog = log10(d);
-			buflog[i] = dlog / FFT_DEEP;
+			buflog[i] = dlog / (FFTDeep - 1);
 
 			FFTFBuff[i] += buf[i];
 			FFTFLogBuff[i] += buflog[i];
@@ -381,16 +404,16 @@ void CWaveFFT::FFT(WHICHSIGNAL WhichSignal, UINT pos)
 			if (i && maxfftvlog < dlog)maxfftvlog = dlog;
 			if (i && minfftvlog > dlog)minfftvlog = dlog;
 		}
-		buf[i] = maxfftv / FFT_DEEP;
+		buf[i] = maxfftv / (FFTDeep - 1);
 		FFTFBuff[i] += buf[i];
-		buflog[i] = maxfftvlog / FFT_DEEP;
+		buflog[i] = maxfftvlog / (FFTDeep - 1);
 		FFTFLogBuff[i] += buflog[i];
 		FFTFBuff[i] -= subbuf[i];
 		FFTFLogBuff[i] -= sublogbuf[i];
 		i++;
-		buf[i] = minfftv / FFT_DEEP;
+		buf[i] = minfftv / (FFTDeep - 1);
 		FFTFBuff[i] += buf[i];
-		buflog[i] = minfftvlog / FFT_DEEP;
+		buflog[i] = minfftvlog / (FFTDeep - 1);
 		FFTFLogBuff[i] += buflog[i];
 		FFTFBuff[i] -= subbuf[i];
 		FFTFLogBuff[i] -= sublogbuf[i];
@@ -411,8 +434,7 @@ void CWaveFFT::FFT(WHICHSIGNAL WhichSignal, UINT pos)
 			CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CWinOneSpectrum::PaintSpectrum, NULL, 0, NULL);
 		}
 	}
-//	if (clsWinOneFFT.FilttedFFTBuffReady == false && WhichSignal == WHICHSIGNAL::SIGNAL_FILTTED) {
-	if (WhichSignal == WHICHSIGNAL::SIGNAL_FILTTED) {
+	else  {
 		WaitForSingleObject(clsWinSpect.hMutexBuff, INFINITE);
 		memcpy(clsWinSpect.FilttedFFTBuff, FFTFBuff, sizeof(double) * (HalfFFTSize + 2));
 		memcpy(clsWinSpect.FilttedFFTBuffLog, FFTFLogBuff, sizeof(double) * (HalfFFTSize + 2));
@@ -434,9 +456,7 @@ void CWaveFFT::FFT(WHICHSIGNAL WhichSignal, UINT pos)
 	FFTCount++;
 	//printf("FFTCount: %d, %d\r\n", FFTCount, sizeof(double));
 
-	clsWinSpect.PaintFFT(WhichSignal);
-
-	end = clock();
+	//end = clock();
 
 	static int TimeDelay = 0;
 	if (TimeDelay++ == 100)
@@ -456,12 +476,12 @@ void CWaveFFT::FFT_orignal(WHICHSIGNAL WhichSignal, uint32_t pos)
 	int i;
 	if (WhichSignal == WHICHSIGNAL::SIGNAL_ORIGNAL) {
 		for (i = 0; i < FFTSize; i++, pos++) {
-			src[i] = (double)clsWaveData.AdcBuff[pos & DATA_BUFFER_MASK];
+			src[i] = (double)clsData.AdcBuff[pos & DATA_BUFFER_MASK];
 		}
 	}
 	else {
 		for (i = 0; i < FFTSize; i++, pos++) {
-			src[i] = (double)clsWaveData.FilttedBuff[pos & DATA_BUFFER_MASK];
+			src[i] = (double)clsData.FilttedBuff[pos & DATA_BUFFER_MASK];
 		}
 	}
 
@@ -559,11 +579,7 @@ void CWaveFFT::FFT_orignal(WHICHSIGNAL WhichSignal, uint32_t pos)
 	FFTCount++;
 	//printf("FFTCount: %d, %d\r\n", FFTCount, sizeof(double));
 
-	clsWinSpect.PaintFFT(WhichSignal);
-
-	//printf("maxfftv%lf, minfftv%lf\r\n", maxfftv, minfftv);
-
-	end = clock();
+	//end = clock();
 
 	static int TimeDelay = 0;
 	if (TimeDelay++ == 100)
@@ -575,8 +591,11 @@ void CWaveFFT::FFT_orignal(WHICHSIGNAL WhichSignal, uint32_t pos)
 ////////////////////////////////////////////////////////////////////
 
 
-void CWaveFFT::only_FFT(FILTERCOREDATATYPE* pbuf, int size_n, double** ppfft_vs, double** ppfft_log_vs)
+void CWaveFFT::FFT_for_FilterCore_Analyze(FILTER_CORE_DATA_TYPE* pbuf, CFilterWin* pFilterWin)
 {
+	WaitForSingleObject(pFilterWin->hCoreAnalyseMutex, INFINITE);
+
+	UINT size_n = pFilterWin->CoreAnalyseFFTLength;
 	double*  src = new double[size_n];
 	Complex* src_com = new Complex[size_n];
 	int i;
@@ -630,56 +649,40 @@ void CWaveFFT::only_FFT(FILTERCOREDATATYPE* pbuf, int size_n, double** ppfft_vs,
 	double fftvlogmax = -1.0 * DBL_MAX;
 	double fftvlogmin = DBL_MAX;
 	int half_n = size_n / 2;
-	double* fftvs		=	*ppfft_vs		= new double[half_n + 2];
-	double* fftvslog	=	*ppfft_log_vs	= new double[half_n + 2];
+	
+	if (pFilterWin->CoreAnalyseFFTBuff != NULL) { 
+		delete[] pFilterWin->CoreAnalyseFFTBuff;   
+		pFilterWin->CoreAnalyseFFTBuff = NULL; 
+	}
+	if (pFilterWin->CoreAnalyseFFTLogBuff != NULL) { 
+		delete[] pFilterWin->CoreAnalyseFFTLogBuff; 
+		pFilterWin->CoreAnalyseFFTLogBuff = NULL; 
+	}
+	pFilterWin->CoreAnalyseFFTBuff = new double[half_n + 2];
+	pFilterWin->CoreAnalyseFFTLogBuff = new double[half_n + 2];
 
-	ofstream ofd, ofdlog;
-	string t1;
-	string t2;
-	char str[1024];
+	double* fftvs = pFilterWin->CoreAnalyseFFTBuff;
+	double* fftvslog = pFilterWin->CoreAnalyseFFTLogBuff;
 
-	ofd.open("core_frequency.txt");
-	if (!ofd.is_open())	cout << "open file core_frequency.txt failure" << endl;
-	ofdlog.open("core_frequency_log.txt");
-	if (!ofdlog.is_open())	cout << "open file core_frequency_log.txt failure" << endl;
 	double d;
 	for (i = 0; i < half_n; i++) {
-		fftvs[i] = sqrt(src_com[i].real * src_com[i].real +	src_com[i].imagin * src_com[i].imagin);
-		if (fftvmax < fftvs[i]) fftvmax = fftvs[i];
-		if (fftvmin > fftvs[i]) fftvmin = fftvs[i];
-		sprintf(str, "%d : %lf : %.09f", i, (double)i * clsWaveData.AdcSampleRate / size_n, fftvs[i]);
-		ofd << str << endl;
+		d = sqrt(src_com[i].real * src_com[i].real + src_com[i].imagin * src_com[i].imagin);
+		fftvs[i] = d;
+		fftvslog[i] = log10(d);
+		if (fftvmax < d) fftvmax = d;
+		if (fftvmin > d) fftvmin = d;
 	}
-	fftvs[i]		= fftvmax;
-	sprintf(str, "max %.09f", fftvs[i]);
-	ofd << str << endl;
+	fftvs[i] = fftvmax;
+	fftvslog[i] = log10(fftvmax);
 	i++;
-	fftvs[i]		= fftvmin;
-	sprintf(str, "min %.09f", fftvs[i]);
-	ofd << str << endl;
-
-	for (i = 0; i < half_n; i++) {
-		fftvslog[i] = log10(fftvs[i]);
-		if (fftvlogmax < fftvslog[i]) fftvlogmax = fftvslog[i];
-		if (fftvlogmin > fftvslog[i]) fftvlogmin = fftvslog[i];
-		sprintf(str, "%d : %lf : %.09f", i, (double)i * clsWaveData.AdcSampleRate / size_n, fftvslog[i]);
-		ofdlog << str << endl;
-	}
-	fftvslog[i] = fftvlogmax;
-	sprintf(str, "max %.09f", fftvslog[i]);
-	ofdlog << str << endl;
-	i++;
-	fftvslog[i] = fftvlogmin;
-	sprintf(str, "min %.09f", fftvslog[i]);
-	ofdlog << str << endl;
-
+	fftvs[i] = fftvmin;
+	fftvslog[i] = log10(fftvmin);
 
 	delete[] src;
 	delete[] src_com;
 
-	ofd.close();
-	ofdlog.close();
 	end = clock();
+	ReleaseMutex(pFilterWin->hCoreAnalyseMutex);
 }
 
 void CWaveFFT::setInput(double* data, int  n)
@@ -698,39 +701,40 @@ LPTHREAD_START_ROUTINE CWaveFFT::FFT_Thread(LPVOID lp)
 {
 	OPENCONSOLE;
 	clsWaveFFT.FFT_func();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 	return 0;
 }
 
 void CWaveFFT::FFT_func(void)
 {
+
 	UINT orignal_work_pos;
 	UINT orignal_between;
 	UINT filtted_work_pos;
 	UINT filtted_between;
+
 	while (FFTDoing && Program_In_Process)
 	{
 		clsWinOneFFT.FFTNeedReDraw = false;
-		while (clsWinOneFFT.FFTNeedReDraw == false);
+		while (FFTDoing && clsWinOneFFT.FFTNeedReDraw == false) {
+			Sleep(50);
+		}
 
-		orignal_work_pos = clsWaveData.AdcPos;
+		UINT fftstep_filtted = FFTStep >> clsWaveFilter.rootFilterInfo.decimationFactorBit;
+		orignal_work_pos = clsData.AdcPos;
 		orignal_between = (orignal_work_pos - FFTPos) & DATA_BUFFER_MASK;
-		filtted_work_pos = clsWaveData.FilttedPos;
+		filtted_work_pos = clsData.FilttedBuffPos;
 		filtted_between = (filtted_work_pos - FFTFilttedPos) & DATA_BUFFER_MASK;
-		if (orignal_between > FFTStep || filtted_between > FFTStep) {
+		if (orignal_between > FFTStep || filtted_between > fftstep_filtted) {
 			if (orignal_between > FFTStep)
 			{
-				FFT(WHICHSIGNAL::SIGNAL_ORIGNAL, orignal_work_pos - FFTStep );
+				FFT(WHICHSIGNAL::SIGNAL_ORIGNAL, orignal_work_pos - FFTStep);
 				FFTPos = orignal_work_pos;
-				//if (FFTPos >= DATA_BUFFER_LENGTH) FFTPos -= DATA_BUFFER_LENGTH;
 			}
-			if (filtted_between > FFTStep)
+			if (filtted_between > fftstep_filtted)
 			{
-				//FFT(WHICHSIGNAL::SIGNAL_ORIGNAL, FFTFilttedPos);
-				//FFTPos += FFTStep;
-				FFT(WHICHSIGNAL::SIGNAL_FILTTED, filtted_work_pos - FFTStep);
+				FFT(WHICHSIGNAL::SIGNAL_FILTTED, filtted_work_pos - fftstep_filtted);
 				FFTFilttedPos = filtted_work_pos;
-				//if (FFTFilttedPos >= DATA_BUFFER_LENGTH) FFTFilttedPos -= DATA_BUFFER_LENGTH;
 			}
 		}
 		else {
@@ -738,8 +742,8 @@ void CWaveFFT::FFT_func(void)
 			continue;
 		}
 	}
-
-
+	orignal_FFT->cuda_FFT_UnInit();
+	filtted_FFT->cuda_FFT_UnInit();
 	FFTThreadExit = true;
 }
 
@@ -772,9 +776,6 @@ void CWaveFFT::InitBuff(void)
 	FFTFilttedLogBuff = new double[memsize];
 	memset(FFTFilttedLogBuff, 0, memsize * sizeof(double));
 	FFTFLogBuff = &FFTFilttedLogBuff[(HalfFFTSize + 2) * FFT_DEEP];
-
-	FFTMaxValue = Get_FFT_Max_Value();
-
 }
 
 double CWaveFFT::GetFFTMaxValue(void)
@@ -791,32 +792,4 @@ double CWaveFFT::GetFFTMaxValue(void)
 	printf("maxvalue:%d, %lf\n", max, d);
 	return d/16;
 
-}
-
-double CWaveFFT::Get_FFT_Max_Value(void)
-{
-
-
-	//WaitForSingleObject(hMutexBuff, INFINITE);
-
-	double *buff = new double[FFTSize];
-
-	int i;
-	double maxd = 0;
-	UINT64 max = ((UINT64)1 << (ADC_DATA_SAMPLE_BIT - 1)) - 1;
-	for (i = 0; i < FFTSize; i++) {
-		buff[i] = (double)max * sin(2 * M_PI * i / FFTSize);
-	}
-
-	cuda_FFT_Prepare_Data_for_MaxValue(buff);
-	cuda_FFT();
-	int f = 1;
-	maxd = sqrt(cuda_FFT_CompoData[f].x * cuda_FFT_CompoData[f].x + cuda_FFT_CompoData[f].y * cuda_FFT_CompoData[f].y);
-	printf("maxvalue:%d, %lf\n", max, maxd);
-
-	free(buff);
-
-//	ReleaseMutex(hMutexBuff);
-
-	return maxd;
 }

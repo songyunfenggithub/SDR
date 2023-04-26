@@ -48,15 +48,15 @@ public:
 
 	void isWaitingToInitBuff(void);
 
-	void InitDrawBuff(HWND hWnd);
-	void Paint(HWND hWnd);
-	LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	BOOL OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	VOID GetRealClientRect(HWND hWnd, PRECT lprc);
+	void InitDrawBuff(void);
+	void Paint(void);
+	bool OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
+	void GetRealClientRect(PRECT lprc);
 
 	static void PaintSpectrum(void);
 
 	static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+	LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 };
 
 extern CWinOneSpectrum clsWinOneSpectrum;

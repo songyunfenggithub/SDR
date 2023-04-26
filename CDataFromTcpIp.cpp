@@ -5,11 +5,12 @@
 
 #include "public.h"
 #include "CDataFromTcpIp.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFilter.h"
 #include "CWaveFFT.h"
 #include "CWinFFT.h"
 #include "CWinSpectrum.h"
+#include "CWinMain.h"
 
 #pragma comment(lib,"ws2_32.lib")  
 
@@ -48,7 +49,7 @@ LPTHREAD_START_ROUTINE CDataFromTcpIp::GetDataTcpIpThreadFun(LPVOID lp)
 {
 	OPENCONSOLE;
 	clsGetDataTcpIp.TcpIpGetData();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 
 	return 0;
 }
@@ -139,17 +140,17 @@ bool CDataFromTcpIp::TcpIpGetData(void)
 				}
 				//普通数据
 				if (FD_ISSET(hRecvSocket, &rset)) {
-					if((DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) == clsWaveData.AdcGetCharLength) clsWaveData.AdcGetCharLength = 0;
-					int m = (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) - clsWaveData.AdcGetCharLength;
+					if((DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) == clsData.AdcGetCharLength) clsData.AdcGetCharLength = 0;
+					int m = (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) - clsData.AdcGetCharLength;
 					if (m > 1024) m = 1024;
-					n = recv(hRecvSocket, (char*)clsWaveData.AdcBuff + clsWaveData.AdcGetCharLength, m, MSG_WAITALL);
+					n = recv(hRecvSocket, (char*)clsData.AdcBuff + clsData.AdcGetCharLength, m, MSG_WAITALL);
 					if (0 == n) {
 						printf("on recv nornal data , peer closed\n");
 						printf("Rc:0\n");
 						closesocket(hRecvSocket);
 						break;
 					}
-					//StringToHex((char*)(clsWaveData.AdcBuff) + clsWaveData.AdcGetCharLength, 20);
+					//StringToHex((char*)(clsData.AdcBuff) + clsData.AdcGetCharLength, 20);
 					//printf("%d\n", len);
 					if (n > 0) {
 						if ((n % 4) != 0) {
@@ -157,12 +158,12 @@ bool CDataFromTcpIp::TcpIpGetData(void)
 							//closesocket(hRecvSocket);
 							//break;
 						}
-						clsWaveData.AdcGetCharLength += n;
-						if (clsWaveData.AdcGetCharLength >= (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT))
-							clsWaveData.AdcGetCharLength -= DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT;
-						clsWaveData.AdcPos = clsWaveData.AdcGetCharLength >> DATA_BYTE_TO_POSITION_MOVEBIT;
-						//printf("pos:%d\n", clsWaveData.AdcPos);
-						clsWaveData.AdcGetNew = true;
+						clsData.AdcGetCharLength += n;
+						if (clsData.AdcGetCharLength >= (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT))
+							clsData.AdcGetCharLength -= DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT;
+						clsData.AdcPos = clsData.AdcGetCharLength >> DATA_BYTE_TO_POSITION_MOVEBIT;
+						//printf("pos:%d\n", clsData.AdcPos);
+						clsData.AdcGetNew = true;
 					}
 					else Sleep(100);
 				}
@@ -179,7 +180,7 @@ LPTHREAD_START_ROUTINE CDataFromTcpIp::ControlTcpIpThreadFun(LPVOID lp)
 {
 	OPENCONSOLE;
 	clsGetDataTcpIp.TcpIpControl();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 
 	return 0;
 }
@@ -305,7 +306,7 @@ bool CDataFromTcpIp::TcpIpControl(void)
 						printf("%s\r\n", clsWaveFilter.FilterCoreDesc);
 						clsWaveFilter.setFilterCoreDesc(&clsWaveFilter.rootFilterInfo, clsWaveFilter.FilterCoreDesc);
 						clsWaveFilter.ParseCoreDesc(&clsWaveFilter.rootFilterInfo);
-						clsWaveFilter.FilterCoreAnalyse(&clsWaveFilter.rootFilterInfo);
+						clsWaveFilter.FilterCoreAnalyse(clsWinMain.m_FilterWin, &clsWaveFilter.rootFilterInfo);
 						break;
 					case FORWARD_CMD_TYPE_FFT_SET:
 						printf("FORWARD_CMD_TYPE_FFT_SET\r\n");
@@ -348,7 +349,7 @@ LPTHREAD_START_ROUTINE CDataFromTcpIp::SendFiltedDataTcpIpThreadFun(LPVOID lp)
 {
 	OPENCONSOLE;
 	clsGetDataTcpIp.TcpIpSendFiltedData();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 
 	return 0;
 }
@@ -476,15 +477,15 @@ bool CDataFromTcpIp::TcpIpSendFiltedData(void)
 				}
 				//普通数据
 				if (FD_ISSET(hSendFiltedDataSocket, &rset)) {
-					len = recv(hSendFiltedDataSocket, (char*)(clsWaveData.AdcBuff) + clsWaveData.AdcGetCharLength, 1024, 0);
+					len = recv(hSendFiltedDataSocket, (char*)(clsData.AdcBuff) + clsData.AdcGetCharLength, 1024, 0);
 					if (0 == len) {
 						puts("on recv nornal data , peer closed");
 						closesocket(hSendFiltedDataSocket);
 						break;
 					}
-					clsWaveData.AdcGetCharLength += len;
-					clsWaveData.AdcPos = clsWaveData.AdcGetCharLength >> 1;
-					clsWaveData.AdcGetCharLength = true;
+					clsData.AdcGetCharLength += len;
+					clsData.AdcPos = clsData.AdcGetCharLength >> 1;
+					clsData.AdcGetCharLength = true;
 				}
 			}
 		}
@@ -500,7 +501,7 @@ LPTHREAD_START_ROUTINE CDataFromTcpIp::SendFFTDataTcpIpThreadFun(LPVOID lp)
 {
 	OPENCONSOLE;
 	clsGetDataTcpIp.TcpIpSendFFTData();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 
 	return 0;
 }
@@ -592,15 +593,15 @@ bool CDataFromTcpIp::TcpIpSendFFTData(void)
 				}
 				//普通数据
 				if (FD_ISSET(hRecvSocket, &rset)) {
-					len = recv(hRecvSocket, (char*)(clsWaveData.AdcBuff) + clsWaveData.AdcGetCharLength, 1024, 0);
+					len = recv(hRecvSocket, (char*)(clsData.AdcBuff) + clsData.AdcGetCharLength, 1024, 0);
 					if (0 == len) {
 						puts("on recv nornal data , peer closed");
 						closesocket(hRecvSocket);
 						break;
 					}
-					clsWaveData.AdcGetCharLength += len;
-					clsWaveData.AdcPos = clsWaveData.AdcGetCharLength >> 1;
-					clsWaveData.AdcGetCharLength = true;
+					clsData.AdcGetCharLength += len;
+					clsData.AdcPos = clsData.AdcGetCharLength >> 1;
+					clsData.AdcGetCharLength = true;
 				}
 			}
 		}

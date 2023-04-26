@@ -14,14 +14,14 @@
 #include <string>
 #include <map>
 
-#include "CWaveData.h"
+#include "CData.h"
 
 
 typedef void (*set_params_func)(int index);
 
 typedef std::map<const char*, int>	SDR_ENUM_MAP;
 
-typedef enum {
+typedef enum sdrplay_api_decimationFactorT_ENUM{
 	decimationFactor1 = 1,
 	decimationFactor2 = 2,
 	decimationFactor4 = 4,
@@ -31,7 +31,7 @@ typedef enum {
 	decimationFactor64 = 64
 }sdrplay_api_decimationFactorT;
 
-typedef enum {
+typedef enum SDR_PAMRAS_TYPE_ENUM {
 	SDR_PAMRAS_NONE,
 	SDR_PAMRAS_ENUM,
 	SDR_PAMRAS_FLOAT,
@@ -42,7 +42,7 @@ typedef enum {
 	SDR_PAMRAS_UCHAR
 }SDR_PAMRAS_TYPE;
 
-typedef struct tagSDRParams
+typedef struct SDRParams_TAG
 {
 	int level;
 	char* txt;
@@ -55,9 +55,7 @@ typedef struct tagSDRParams
 	set_params_func p_set_params_func;
 }SDRParams;
 
-
 extern SDRParams SDR_params[];
-
 
 class CSDR
 {

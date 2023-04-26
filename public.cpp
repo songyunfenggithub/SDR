@@ -18,6 +18,61 @@ BOOLEAN isGetDataExited = false;
 
 CHAR IniFilePath[] = "./default.ini";
 
+
+void* get_WinClass(HWND hWnd)
+{
+	void* me = NULL;
+	HGLOBAL hMemProp;
+	void* lpMem;
+	hMemProp = (HGLOBAL)GetProp(hWnd, "H");
+	if (hMemProp) {
+		lpMem = GlobalLock(hMemProp);
+		memcpy(&me, lpMem, sizeof(UINT64));
+		GlobalUnlock(hMemProp);
+	}
+	return me;
+}
+
+void* set_WinClass(HWND hWnd, LPARAM lParam)
+{
+	void* me = (void*)(((LPCREATESTRUCT)lParam)->lpCreateParams);
+	HGLOBAL hMemProp;
+	void* lpMem;
+	hMemProp = GlobalAlloc(GPTR, sizeof(INT64));
+	lpMem = GlobalLock(hMemProp);
+	memcpy(lpMem, &me, sizeof(UINT64));
+	GlobalUnlock(hMemProp);
+	SetProp(hWnd, "H", hMemProp);
+	return me;
+}
+
+void* get_DlgWinClass(HWND hDlg)
+{
+	void* me = NULL;
+	HGLOBAL hMemProp;
+	void* lpMem;
+	hMemProp = (HGLOBAL)GetProp(hDlg, "H");
+	if (hMemProp) {
+		lpMem = GlobalLock(hMemProp);
+		memcpy(&me, lpMem, sizeof(UINT64));
+		GlobalUnlock(hMemProp);
+	}
+	return me;
+}
+
+void* set_DlgWinClass(HWND hDlg, LPARAM lParam)
+{
+	void* me = (void*)lParam;
+	HGLOBAL hMemProp;
+	void* lpMem;
+	hMemProp = GlobalAlloc(GPTR, sizeof(INT64));
+	lpMem = GlobalLock(hMemProp);
+	memcpy(lpMem, &me, sizeof(UINT64));
+	GlobalUnlock(hMemProp);
+	SetProp(hDlg, "H", hMemProp);
+	return me;
+}
+
 void MainInit(void)
 {
 
@@ -72,7 +127,7 @@ char* DoubleToFormat(double val, int dotlen, char* p)
 
 char* fomatKINT64(INT64 v, char* str)
 {
-	int n = 50;
+	int n = 45;
 	INT64 m = v, y = 0;
 	str[n] = '\0';
 	char tstr[100];

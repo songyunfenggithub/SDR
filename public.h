@@ -33,8 +33,10 @@
 
 #define FORWARD_CMD_TYPE_FFT_SIGNAL_SAMPLE_RATE		20
 
+#define BOUND(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
+#define UP_TO_ZERO(x) (x = x < 0 ? 0 : x)
 
-typedef enum {
+typedef enum BUFF_DATA_TYPE_ENUM{
 	u_char_type,
 	u_short_type,
 	u_int_type,
@@ -47,6 +49,7 @@ typedef enum {
 	double_type
 }BUFF_DATA_TYPE;
 
+typedef void(*GetStrFunction)(char*);
 
 extern HINSTANCE	hInst;
 
@@ -56,6 +59,11 @@ extern BOOLEAN isGetDataExited;
 extern  CHAR IniFilePath[];
 
 extern HANDLE  cuda_FFT_hMutexBuff;
+
+void* set_WinClass(HWND hWnd, LPARAM lParam);
+void* get_WinClass(HWND hWnd);
+void* set_DlgWinClass(HWND hDlg, LPARAM lParam);
+void* get_DlgWinClass(HWND hDlg);
 
 void MainInit(void);
 

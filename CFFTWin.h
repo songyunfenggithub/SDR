@@ -17,7 +17,13 @@ class CFFT;
 class CFFTWin
 {
 public:
+	const char* Tag = NULL;
+
+	GetStrFunction GetStrFunc = NULL;
+
 	HWND hWnd = NULL;
+	HMENU hMenu = NULL;
+	HMENU hMenuSpect = NULL;
 
 	UINT uTimerId;
 
@@ -35,11 +41,13 @@ public:
 	double HScrollZoom = 1.0;
 	double VScrollZoom = 1.0;
 
+	UINT* SampleRate = NULL;
+
 	CFFT* fft = NULL;
 	BUFF_DATA_TYPE buff_type = BUFF_DATA_TYPE::short_type;
-	short*	DataBuff;
+	void*	DataBuff;
 	UINT*	DataBuffPos = NULL;
-	UINT	data_buff_data_bits = 12;
+	UINT	data_buff_data_bits = 16;
 	UINT	data_buff_length_mask;
 
 	UINT FFTSize = 8192;
@@ -47,8 +55,6 @@ public:
 	UINT FFTStep = 8192;
 	UINT average_Deep = FFT_DEEP;
 
-
-	HWND hWndVScroll = NULL;
 	double DBMin = -24.0;
 
 	UINT FFTHeight = 512;
@@ -57,10 +63,8 @@ public:
 	INT		SpectrumY = -1;
 	HDC		hDCFFT = NULL;
 	HBITMAP hBMPFFT = NULL;
-	bool isSpectrumZoomedShow = true;
-	bool isDrawLogSpectrum = true;
-
-	HANDLE hFFT_Thread = NULL;
+	bool isSpectrumZoomedShow = false;
+	bool isDrawLogSpectrum = false;
 
 public:
 	CFFTWin();
@@ -77,10 +81,16 @@ public:
 	void KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
 
 	void PaintFFT(HDC hdc, CFFT* fft);
+	void PaintFFTBriefly(HDC hdc, CFFT* fft);
 
+	void BrieflyBuff(void);
 	void PaintSpectrum(CFFT* fft);
 	void SpectrumToWin(HDC hDC);
 	void InitDrawBuff(void);
 
+	void RestoreValue(void);
+	void SaveValue(void);
+
 	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+	static LRESULT CALLBACK DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 };

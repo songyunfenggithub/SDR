@@ -9,14 +9,16 @@
 #include <mmsystem.h>
 #include <mmreg.h>
 #include <msacm.h>
+#include <commdlg.h>
 #include <math.h>
 
-
 #include "public.h"
-#include "CWaveData.h"
-#include "CWinMain.h"
-#include "CSoundCard.h"
 #include "MyDebug.h"
+
+#include "CData.h"
+#include "CWinMain.h"
+#include "CAudio.h"
+#include "CSoundCard.h"
 
 CSoundCard clsSoundCard;
 
@@ -38,9 +40,9 @@ CSoundCard::CSoundCard()
 
 	FormatEx.nChannels = 1; 
 	FormatEx.nSamplesPerSec = SOUNDCARD_SAMPLE;
-	FormatEx.nAvgBytesPerSec = SOUNDCARD_SAMPLE;
-	FormatEx.nBlockAlign = 1; 
 	FormatEx.wBitsPerSample = 8;
+	FormatEx.nAvgBytesPerSec = FormatEx.wBitsPerSample / 8 * FormatEx.nChannels * FormatEx.nSamplesPerSec;
+	FormatEx.nBlockAlign = 1; 
 /*
   	FormatEx.nChannels = 1; 
 	FormatEx.nSamplesPerSec = 44100L; 
@@ -78,151 +80,6 @@ CSoundCard::~CSoundCard()
 	if(OutData.fOutOpen)waveOutClose(OutData.hWaveOut);
 }
 
-void CSoundCard::ClearNoise(void)
-{
-	DWORD i;
-	unsigned char *p = (unsigned char*)outBuffer + 1;
-	DWORD dwPrevMax, dwMax, dwPrevMin, dwMin;
-
-	dwPrevMax = dwMax = dwPrevMin = dwMin = 0;
-	bool fUp = false;
-	double dbHz, dbSec, dbWidth;
-	dbHz = dbSec = 0.0;
-	
-	outBufLength = SOUNDCARD_OUT_BUFFER_LENGTH;
-
-	for(i = 1; i < outBufLength; i++, p++)
-	{
-		if(*p > *(p - 1))
-		{
-			if(!fUp)
-			{
-				//get a min
-				dwMin = i;
-				fUp = true;
-			}
-		}
-		else if(*p < *(p - 1))
-		{
-			if(fUp)
-			{
-				//get a max
-				if((i - dwMax) < 8)
-				{
-					for(DWORD j = 0,l = i - dwMax; j < l; j++)
-					{
-						*(p - j) = *p;
-					}
-					/*
-				dbWidth = i - dwMax;
-				dbSec = dbWidth / FormatEx.nSamplesPerSec;
-				dbHz = 1 / dbSec;
-				DbgMsg(("Pos: %d, Width: %f, Sec: %f, Hz: %f.", 
-					dwMax, dbWidth, dbSec, dbHz));
-					*/
-				}
-				dwMax = i;
-				fUp = false;
-			}
-		}
-
-	}
-}
-
-void CSoundCard::ClearNoise2(void)
-{
-	DWORD i,j,k;
-	unsigned char *p2,*p = (unsigned char*)outBuffer + 1;
-	DWORD dwPrevMax, dwMax, dwPrevMin, dwMin;
-
-	dwPrevMax = dwMax = dwPrevMin = dwMin = 0;
-	bool fUp = false;
-	double dbHz, dbSec, dbWidth;
-	dbHz = dbSec = 0.0;
-	WORD E,L;
-	E = 0;
-	L = 3;
-	
-	outBufLength = SOUNDCARD_OUT_BUFFER_LENGTH;
-
-	for(i = 1,j = 0; i < outBufLength; i++, p++, j++)
-	{
-		p2 = p;
-		for(E = k = 0; k < L; k++)
-		{
-			E += *p2++;
-		}
-		*p = E / L;
-	}
-}
-
-void CSoundCard::ClearNoise3(void)
-{
-	unsigned char *p = (unsigned char*)outBuffer;
-	PUCHAR pMin,pPrevMin, pMax, pPrevMax, pEnd;
-	DWORD dwH = 0,dwPrevH = 0;
-
-	bool fUp = false;
-	double dbHz, dbSec, dbWidth;
-	dbHz = dbSec = 0.0;
-
-	int i,j,k;
-	i = j = k = 0;
-	bool fMax = false;
-	PUCHAR pp, pFirstMin;
-	pFirstMin = NULL;
-
-	pEnd = outBuffer + outBufLength;
-
-	for(p = outBuffer; p < pEnd; p++)
-	{
-		if(*p > *(p - 1))
-		{
-			if(!fUp)
-			{
-				//get a min
-				pMin = p - 1;
-				fUp = true;
-				if(fMax)
-				{
-					pFirstMin = pMin;
-					fMax = false;
-				}
-			}
-		}
-		else if(*p < *(p - 1))
-		{
-			if(fUp)
-			{
-				//get a max
-				pMax = p - 1;
-				dwH = *pMax - *pMin;
-				if(dwH > dwPrevH && dwH > 0x10)
-				{
-					DbgMsg("%d. Pos: %d, Width: %d, High: %d", 
-						i++, p - pBuffer,pMax - pMin, dwH);
-					//*p = 0xFF;
-					fMax = true;
-
-					if(pFirstMin){
-					int w = pMin - pFirstMin,
-						h = *pFirstMin - *pMin;
-					for(pp = pFirstMin; pp < pMin; pp++)
-					{
-						*pp = *pFirstMin - h + h*(pMin - pp)/w;
-					}
-					pFirstMin = NULL;
-					}
-
-				}
-				dwPrevH = dwH;
-				fUp = false;
-			}
-		}
-
-	}
-}
-
 LRESULT CALLBACK CSoundCard::DlgGotoProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
@@ -237,10 +94,7 @@ LRESULT CALLBACK CSoundCard::DlgGotoProc(HWND hDlg, UINT message, WPARAM wParam,
 				{
 				DWORD dwPos = GetDlgItemInt(hDlg, IDC_EDITGOTO, 0, 0);
 				clsWinMain.DrawInfo.dwHZoomedPos = 
-					clsWinMain.DrawInfo.iHZoom > 0 ?
-					(dwPos << clsWinMain.DrawInfo.iHZoom)
-					:
-					(dwPos >> - clsWinMain.DrawInfo.iHZoom);
+					clsWinMain.DrawInfo.iHZoom > 0 ? (dwPos << clsWinMain.DrawInfo.iHZoom) : (dwPos >> - clsWinMain.DrawInfo.iHZoom);
 				}
 			case IDCANCEL:
 				EndDialog(hDlg, LOWORD(wParam));
@@ -523,24 +377,19 @@ void CALLBACK CSoundCard::waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstanc
 		//clsSoundCard.FreeIn();
 		break;
 	case WIM_DATA:
-		if(clsSoundCard.inBufLength * clsSoundCard.FormatEx.nBlockAlign > SOUNDCARD_IN_BUFFER_LENGTH - SOUNDCARD_IN_STEP_LENGTH)
-		{
-			clsSoundCard.CloseIn();
-			return;
-		}
 		LPWAVEHDR pWaveHdr = (LPWAVEHDR)dwParam1;
-		if (pWaveHdr->dwBytesRecorded != SOUNDCARD_IN_STEP_LENGTH)
-			DbgMsg("Sound Card Record dwBytesRecorded %d : $d\r\n", pWaveHdr->dwBytesRecorded, SOUNDCARD_IN_STEP_LENGTH);
-		clsSoundCard.inBufLength += pWaveHdr->dwBytesRecorded;
-		clsSoundCard.inPos += pWaveHdr->dwBytesRecorded;
+		if (pWaveHdr->dwBytesRecorded != pWaveHdr->dwBufferLength) {
+			DbgMsg("Sound Card Record dwBytesRecorded %d : $d\r\n", pWaveHdr->dwBytesRecorded, pWaveHdr->dwBufferLength);
+		}
 		if (clsSoundCard.inEndPos - clsSoundCard.inPos <= 0) {
 			clsSoundCard.CloseIn();
 			break;
 		}
-		pWaveHdr->lpData = (char*)clsSoundCard.inBuffer + clsSoundCard.inBufLength;
+		pWaveHdr->lpData = (char*)clsSoundCard.inBuffer + clsSoundCard.inPos;
 		pWaveHdr->dwBufferLength = (clsSoundCard.inEndPos - clsSoundCard.inPos) < SOUNDCARD_IN_STEP_LENGTH ? 
 			(clsSoundCard.inEndPos - clsSoundCard.inPos) : SOUNDCARD_IN_STEP_LENGTH;
 		waveInAddBuffer(hwi, pWaveHdr, sizeof(WAVEHDR));
+		clsSoundCard.inPos += pWaveHdr->dwBufferLength;
 		break;
 	}
 }
@@ -556,18 +405,17 @@ void CALLBACK CSoundCard::waveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInsta
 		waveOutUnprepareHeader(clsSoundCard.OutData.hWaveOut, &clsSoundCard.OutData.WaveOutHdr2, sizeof(WAVEHDR));
 		break;
 	case WOM_DONE:
-		clsSoundCard.outPos += SOUNDCARD_OUT_STEP_LENGTH;
 		if (clsSoundCard.outEndPos - clsSoundCard.outPos <= 0) {
 			clsSoundCard.CloseOut();
 		}
 		else {
 			LPWAVEHDR pWaveHdr = (LPWAVEHDR)dwParam1;
-			//if(pWaveHdr->dwFlags == 0)
 			pWaveHdr->lpData = (char*)clsSoundCard.outBuffer + clsSoundCard.outPos;
 			pWaveHdr->dwBufferLength = (clsSoundCard.outEndPos - clsSoundCard.outPos) < SOUNDCARD_OUT_STEP_LENGTH ?
 				(clsSoundCard.outEndPos - clsSoundCard.outPos) : SOUNDCARD_OUT_STEP_LENGTH;
 			waveOutPrepareHeader(clsSoundCard.OutData.hWaveOut, pWaveHdr, sizeof(WAVEHDR));
 			waveOutWrite(clsSoundCard.OutData.hWaveOut, pWaveHdr, sizeof(WAVEHDR));
+			clsSoundCard.outPos += pWaveHdr->dwBufferLength;
 		}
 		break;
 
@@ -616,7 +464,6 @@ void CSoundCard::OpenIn(UINT pos, UINT endPos)
  
 	InData.fInOpen = TRUE;
  
-	inBufLength = 0;
 	inPos = pos;
 	inEndPos = endPos;
 
@@ -629,16 +476,17 @@ void CSoundCard::OpenIn(UINT pos, UINT endPos)
 	waveInAddBuffer(InData.hWaveIn, &InData.WaveInHdr1, sizeof(WAVEHDR));
 	wResult = waveInStart(InData.hWaveIn);
 
-	inPos += SOUNDCARD_IN_STEP_LENGTH;
+	inPos += InData.WaveInHdr1.dwBufferLength;
 	if ((inEndPos - inPos) <= 0) return;
     
 	InData.WaveInHdr2.lpData = (char*)inBuffer + inPos;
 	InData.WaveInHdr2.dwBufferLength = (inEndPos - inPos) < SOUNDCARD_IN_STEP_LENGTH ? (inEndPos - inPos) : SOUNDCARD_IN_STEP_LENGTH;
 	InData.WaveInHdr2.dwFlags = WHDR_DONE;
 	InData.WaveInHdr2.dwLoops = 0L;
-
+	
 	waveInPrepareHeader(InData.hWaveIn, &InData.WaveInHdr2, sizeof(WAVEHDR));
 	waveInAddBuffer(InData.hWaveIn, &InData.WaveInHdr2, sizeof(WAVEHDR));
+	inPos += InData.WaveInHdr1.dwBufferLength;
 
 }
 
@@ -652,9 +500,8 @@ void CSoundCard::OpenOut(DWORD dwPos, DWORD dwEndPos)
                     (LPWAVEFORMATEX)&FormatEx, 
                     (DWORD_PTR)waveOutProc, 0L, CALLBACK_FUNCTION))
     { 
-        MessageBox(clsWinMain.hWnd, 
-                   "Failed to open waveform output device.", 
-                   NULL, MB_OK | MB_ICONEXCLAMATION); 
+        //MessageBox(clsWinMain.hWnd, "Failed to open waveform output device.", NULL, MB_OK | MB_ICONEXCLAMATION); 
+		printf("Failed to open waveform output device.\r\n");
         return; 
     } 
 
@@ -670,7 +517,7 @@ void CSoundCard::OpenOut(DWORD dwPos, DWORD dwEndPos)
 	waveOutPrepareHeader(OutData.hWaveOut, &OutData.WaveOutHdr1, sizeof(WAVEHDR));
 	wResult = waveOutWrite(OutData.hWaveOut, &OutData.WaveOutHdr1, sizeof(WAVEHDR));
 
-	outPos += SOUNDCARD_OUT_STEP_LENGTH;
+	outPos += OutData.WaveOutHdr1.dwBufferLength;
 	if (outPos > outEndPos) return;
 
 	OutData.WaveOutHdr2.lpData = (char*)outBuffer + outPos;// * FormatEx.nBlockAlign; 
@@ -679,7 +526,8 @@ void CSoundCard::OpenOut(DWORD dwPos, DWORD dwEndPos)
 	OutData.WaveOutHdr2.dwLoops = 0L;
 	waveOutPrepareHeader(OutData.hWaveOut, &OutData.WaveOutHdr2, sizeof(WAVEHDR));
     wResult = waveOutWrite(OutData.hWaveOut, &OutData.WaveOutHdr2, sizeof(WAVEHDR)); 
-    
+
+	outPos += OutData.WaveOutHdr1.dwBufferLength;
 //	if (wResult != 0)FreeOut();
 } 
 

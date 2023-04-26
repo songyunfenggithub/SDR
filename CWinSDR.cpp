@@ -13,7 +13,7 @@
 #include <map>
 
 #include "public.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFFT.h"
 #include "CWinFFT.h"
 #include "CWinSDR.h"
@@ -53,7 +53,7 @@ CWinSDR::CWinSDR()
 CWinSDR::~CWinSDR()
 {
 	if (hWnd) DestroyWindow(hWnd);
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 }
 
 void CWinSDR::RegisterWindowsClass(void)
@@ -79,10 +79,12 @@ void CWinSDR::RegisterWindowsClass(void)
 
 void CWinSDR::OpenWindow(void)
 {
-	if (hWnd) {
-		ShowWindow(hWnd, SW_SHOW);
-		UpdateWindow(hWnd);
+	if (hWnd == NULL) {
+		hWnd = CreateWindow(SDR_WIN_CLASS, "SDR windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+			CW_USEDEFAULT, 0, 1400, 800, NULL, NULL, hInst, this);
 	}
+	ShowWindow(hWnd, SW_SHOW);
+	UpdateWindow(hWnd);
 }
 
 
@@ -99,7 +101,7 @@ void CWinSDR::ProcessKey(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONDOWN:
 		pt.x = LOWORD(lParam);
 		pt.y = HIWORD(lParam);
-		hz = (uint32_t)(clsWaveData.AdcSampleRate * pt.y / clsWaveFFT.FFTSize);
+		hz = (uint32_t)(clsData.AdcSampleRate * pt.y / clsWaveFFT.FFTSize);
 		cout << pt.x << ":" << pt.y << ":" << hz << endl;
 		break;
 
@@ -310,34 +312,22 @@ LRESULT CALLBACK CWinSDR::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 	case WM_COMMAND:
 		return OnCommand(hWnd, message, wParam, lParam);
 		break;
-	case WM_SYSCOMMAND:
-		if (LOWORD(wParam) == SC_CLOSE)
-		{
-			ShowWindow(hWnd, SW_HIDE);
-			break;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
-		break;
-
 	case WM_ERASEBKGND:
 		//不加这条消息屏幕刷新会闪烁
 		break;
 	case WM_PAINT:
 		Paint(hWnd);
 		break;
-
 	case WM_KEYDOWN:
 	case WM_KEYUP:
 	case WM_VSCROLL:
 	case WM_HSCROLL:
 		break;
 	case WM_DESTROY:
-		PostQuitMessage(0);
+		this->hWnd = NULL;
 		break;
-
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
-
 	}
 	return 0;
 }

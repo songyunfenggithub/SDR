@@ -8,7 +8,8 @@
 #include <time.h>
 #include <Windows.h>
 
-#include "CFFT.h"
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 #include "cuda_CFFT.cuh"
 
@@ -26,6 +27,16 @@
                      status );                                                                                         \
     }
 
+cuda_CFFT::cuda_CFFT()
+{
+
+}
+
+cuda_CFFT::~cuda_CFFT()
+{
+    cuda_FFT_UnInit();
+}
+
 void cuda_CFFT::cuda_FFT(void)
 {
     float cost, s;
@@ -41,11 +52,12 @@ void cuda_CFFT::cuda_FFT(void)
     //printf("Time of cudaFFT: %fms\r\n", GetTickCount() - s);
 }
 
-void cuda_CFFT::cuda_FFT_Init(CFFT *fft)
+void cuda_CFFT::cuda_FFT_Init(UINT fftsize, UINT fftstep, UINT data_bits)
 {
-    this->fft = fft;
-    FFTSize = fft->FFTSize;
-    FFTStep = fft->FFTStep;
+    cuda_FFT_UnInit();
+
+    FFTSize = fftsize;
+    FFTStep = fftstep;
 
     if (cuda_FFT_CompiData != NULL) free(cuda_FFT_CompiData);
     cuda_FFT_CompiData = (cufftDoubleComplex*)malloc(FFTSize * sizeof(cufftDoubleComplex));//allocate memory for the data in host
@@ -61,17 +73,32 @@ void cuda_CFFT::cuda_FFT_Init(CFFT *fft)
 
     if (cuda_FFT_fft_plan != 0) cufftDestroy(cuda_FFT_fft_plan);
     cufftPlan1d(&cuda_FFT_fft_plan, FFTSize, CUFFT_Z2Z, 1);//declaration
+
+    FFTMaxValue = Get_FFT_Max_Value(data_bits);
 }
 
 void cuda_CFFT::cuda_FFT_UnInit(void)
 {
-    while (fft->FFTT_hread_Exit == false);
-
-    if (cuda_FFT_CompiData != NULL) free(cuda_FFT_CompiData);
-    if (cuda_FFT_CompoData != NULL) free(cuda_FFT_CompoData);
-    if (cuda_FFT_d_fftData != NULL)  cudaFree(cuda_FFT_d_fftData);
-    if (cuda_FFT_d_outfftData != NULL)  cudaFree(cuda_FFT_d_outfftData);
-    if (cuda_FFT_fft_plan != 0) cufftDestroy(cuda_FFT_fft_plan);
+    if (cuda_FFT_CompiData != NULL) {
+        free(cuda_FFT_CompiData);
+        cuda_FFT_CompiData = NULL;
+    }
+    if (cuda_FFT_CompoData != NULL) {
+        free(cuda_FFT_CompoData);
+        cuda_FFT_CompoData = NULL;
+    }
+    if (cuda_FFT_d_fftData != NULL) {
+        cudaFree(cuda_FFT_d_fftData);
+        cuda_FFT_d_fftData = NULL;
+    }
+    if (cuda_FFT_d_outfftData != NULL) {
+        cudaFree(cuda_FFT_d_outfftData);
+        cuda_FFT_d_outfftData = NULL;
+    }
+    if (cuda_FFT_fft_plan != 0) {
+        cufftDestroy(cuda_FFT_fft_plan);
+        cuda_FFT_fft_plan = 0;
+    }
     printf("Cuda_CFFT_Closed.\r\n");
 }
 
@@ -124,4 +151,20 @@ void cuda_CFFT::cuda_FFT_Prepare_Data_for_MaxValue(double* buff)
         cuda_FFT_CompiData[i].x = (double)buff[i];
         cuda_FFT_CompiData[i].y = 0;
     }
+}
+
+double cuda_CFFT::Get_FFT_Max_Value(UINT data_bits)
+{
+    double* buff = new double[FFTSize];
+    int i;
+    double maxd = 0;
+    UINT64 max = ((UINT64)1 << (data_bits - 1)) - 1;
+    for (i = 0; i < FFTSize; i++) buff[i] = (double)max * sin(2 * M_PI * i / FFTSize);
+    cuda_FFT_Prepare_Data_for_MaxValue(buff);
+    cuda_FFT();
+    int f = 1;
+    maxd = sqrt(cuda_FFT_CompoData[f].x * cuda_FFT_CompoData[f].x + cuda_FFT_CompoData[f].y * cuda_FFT_CompoData[f].y);
+    printf("maxvalue:%d, %lf\n", max, maxd);
+    free(buff);
+    return maxd;
 }

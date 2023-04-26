@@ -19,14 +19,14 @@
 
 
 #include "CWaveFunc.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFilter.h"
 #include "CWaveFFT.h"
 
 #include "CWinMain.h"
 #include "CWinSpectrum.h"
 #include "CWinPMT.h"
-#include "CWinFilter.h"
+#include "CFilterWin.h"
 #include "CWinSDR.h"
 
 #include "CDataFromTcpIp.h"
@@ -35,11 +35,13 @@
 #include "CDataFromSoundCard.h"
 #include "CDataFromSDR.h"
 
-#include "cuda_Filter.cuh"
+#include "cuda_CFilter.cuh"
+#include "cuda_CFilter2.cuh"
 #include "cuda_FFT.cuh"
 
-#include "CWaveAnalyze.h"
+#include "CAnalyze.h"
 #include "CAudioWin.h"
+#include "CFilttedWin.h"
 
 #include "MyDebug.h"
 
@@ -334,12 +336,6 @@ LRESULT CALLBACK CWinMain::WndProcReal(HWND hWnd, UINT message, WPARAM wParam, L
 		CheckMenuItem(hMyMenu, IDM_WAVE_FILTTED_SIGNAL_SHOW,
 			(DrawInfo.bFilttedSignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 
-		clsWinSpect.hWnd = CreateWindow(SPECTRUM_WIN_CLASS, "Spectrum windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-			CW_USEDEFAULT, 0, 1400, 800, NULL, NULL, hInst, NULL);
-		clsWinSDR.hWnd = CreateWindow(SDR_WIN_CLASS, "SDR windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-			CW_USEDEFAULT, 0, 1400, 800, NULL, NULL, hInst, NULL);
-
-
 		DrawInfo.uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
 
 		//clsSoundCard.MyWave(NULL);
@@ -362,32 +358,30 @@ LRESULT CALLBACK CWinMain::WndProcReal(HWND hWnd, UINT message, WPARAM wParam, L
 		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CWaveFilter::filter_thread4, NULL, 0, NULL);
 		*/
 
-
-
-		RestoreDefaultValue();
+		RestoreValue();
 
 		CaculateHScroll();
 		CaculateVScroll();
 
-		clsWaveAnalyze.Init_Params();
+		m_audioWin = new CAudioWin();
+		m_filttedWin = new CFilttedWin();
+		m_FilterWin = new CFilterWin();
+
+		clsAnalyze.Init_Params();
 
 		MainInit();
 
 		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CWaveFilter::cuda_filter_thread, NULL, 0, NULL);
 		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CWaveFFT::FFT_Thread, NULL, 0, NULL);
 
-		//cuda_FFT_hMutexBuff = CreateMutex(NULL, false, "cuda_FFT_hMutexBuff");
-		m_audioWin = new CAudioWin();
-
 		break;
-
 	case WM_TIMER:
-		//clsWaveData.GeneratorWave();
+		//clsData.GeneratorWave();
 	{
-		if (clsWaveData.AdcGetNew)
+		if (clsData.AdcGetNew)
 		{
 			CaculateHScroll();
-			clsWaveData.AdcGetNew = false;
+			clsData.AdcGetNew = false;
 			InvalidateRect(hWnd, NULL, TRUE);
 			UpdateWindow(hWnd);
 		}
@@ -441,16 +435,22 @@ LRESULT CALLBACK CWinMain::WndProcReal(HWND hWnd, UINT message, WPARAM wParam, L
 
 		clsGetDataSDR.close_SDR_device();
 		
-		Cuda_Filter_UnInit();
+		clscudaFilter.UnInit();
+		clscudaFilter2.UnInit();
+
 		cuda_FFT_UnInit();
 
 		if (clsWinSDR.hWnd) DestroyWindow(clsWinSDR.hWnd);
 		if (clsWinSpect.hWnd) DestroyWindow(clsWinSpect.hWnd);
-		if (clsWinFilter.hWnd) DestroyWindow(clsWinFilter.hWnd);
+		if (m_FilterWin->hWnd) DestroyWindow(m_FilterWin->hWnd);
+		if (m_audioWin->hWnd) DestroyWindow(m_audioWin->hWnd);
+		if (m_filttedWin->hWnd) DestroyWindow(m_filttedWin->hWnd);
 
-		SaveDefaultValue();
+		SaveValue();
 
 		DbgMsg("Main WM_DESTROY\r\n");
+		
+		//system("PAUSE");
 
 		CLOSECONSOLE;
 		PostQuitMessage(0);
@@ -610,7 +610,7 @@ VOID CWinMain::Paint(HWND hWnd)
 		//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
 		SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
 		x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-		PADCDATATYPE pData = clsWaveData.AdcBuff +
+		PADCDATATYPE pData = clsData.AdcBuff +
 			(
 				DrawInfo.iHZoom > 0
 				? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
@@ -627,7 +627,7 @@ VOID CWinMain::Paint(HWND hWnd)
 		{
 			pData += bufStep;
 			x += dwWStep;
-			if (pData == &clsWaveData.AdcBuff[clsWaveData.AdcPos & DATA_BUFFER_MASK])InfolastPos = x;
+			if (pData == &clsData.AdcBuff[clsData.AdcPos & DATA_BUFFER_MASK])InfolastPos = x;
 			y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
 			y = BOUND(y, 0, WAVE_RECT_HEIGHT);
 			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
@@ -646,7 +646,7 @@ VOID CWinMain::Paint(HWND hWnd)
 		//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
 		SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
 		x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-		FILTEDDATATYPE* pFilterData = clsWaveData.FilttedBuff +
+		FILTEDDATATYPE* pFilterData = clsData.FilttedBuff +
 			(
 				DrawInfo.iHZoom > 0
 				? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
@@ -663,7 +663,7 @@ VOID CWinMain::Paint(HWND hWnd)
 			y = DrawInfo.dwVZoomedHeight / 2 - (*pFilterData * vzoom) - DrawInfo.dwVZoomedPos;
 			y = BOUND(y, 0, WAVE_RECT_HEIGHT);
 			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
-			if (pFilterData == &clsWaveData.FilttedBuff[clsWaveData.FilttedPos & DATA_BUFFER_MASK]) {
+			if (pFilterData == &clsData.FilttedBuff[clsData.FilttedBuffPos & DATA_BUFFER_MASK]) {
 				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
 				LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
 				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
@@ -684,22 +684,26 @@ VOID CWinMain::Paint(HWND hWnd)
 	//---------------------------------------
 
 	double z = DrawInfo.iVZoom >= 0 ? (1.0 / ((UINT64)1 << DrawInfo.iVZoom)) : ((UINT64)1 << -DrawInfo.iVZoom);
-	char tstr1[100], tstr2[100], tstradcpos[100], tstrfiltpos[100], tstrfftpos[100];
-	//clsWaveData.NumPerSec = 38400;
-	double TimePreDiv = 32.0 / clsWaveData.AdcSampleRate * 
+	char tstr1[100], tstr2[100], tstradcpos[100], tstrfiltpos[100], tstrfiltbuffpos[100], tstrfftpos[100];
+	//clsData.NumPerSec = 38400;
+	double TimePreDiv = 32.0 / clsData.AdcSampleRate * 
 		( DrawInfo.iHZoom >= 0 ? 1.0 / ((UINT64)1 << DrawInfo.iHZoom) : ((UINT64)1 << -DrawInfo.iHZoom));
 	sprintf(s, "32 / DIV    %sV / DIV    %ss / DIV ÖÐÎÄ\r\n"\
-		"Pos:%s\r\nFilterPos:%s\r\nFFTPos:%s\r\n"\
+		"Pos:%s\r\nFilttedPos:%s\r\nFilttedBuffPos=%s\r\nFFTPos:%s\r\n"\
 		"hBarPos: %d\r\n"\
-		"AdcSampleRate: %d    Real AdcSampleRate: %d",
+		"AdcSampleRate: %d    Real AdcSampleRate: %d\r\n"\
+		"HZoom: %d, %d \t VZoom: %d, %d",
 		formatKKDouble(32.0 * DrawInfo.VotagePerDIV * z, "", tstr1),
 		formatKKDouble(TimePreDiv, "", tstr2),
-		fomatKINT64(clsWaveData.AdcPos, tstradcpos),
-		fomatKINT64(clsWaveData.FilttedPos, tstrfiltpos),
+		fomatKINT64(clsData.AdcPos, tstradcpos),
+		fomatKINT64(clsData.FilttedPos, tstrfiltpos),
+		fomatKINT64(clsData.FilttedBuffPos, tstrfiltbuffpos),
 		fomatKINT64(clsWaveFFT.FFTPos, tstrfftpos),
 		DrawInfo.dwHZoomedPos,
-		clsWaveData.AdcSampleRate, clsWaveData.NumPerSec
-		);
+		clsData.AdcSampleRate, clsData.NumPerSec,
+		DrawInfo.iHZoom, DrawInfo.iHZoom >= 0 ? 1 << DrawInfo.iHZoom : -(1 << -DrawInfo.iHZoom),
+		DrawInfo.iVZoom, DrawInfo.iVZoom >= 0 ? 1 << DrawInfo.iVZoom : -(1 << -DrawInfo.iVZoom)
+	);
 
 	r.top		= WAVE_RECT_BORDER_TOP + DIVLONG;
 	r.left		= WAVE_RECT_BORDER_LEFT + DIVLONG;
@@ -712,17 +716,9 @@ VOID CWinMain::Paint(HWND hWnd)
 
 	DrawText(hdc, s, strlen(s), &r, NULL);
 
-	sprintf(s,
-	"HZoom: %d, %d \t VZoom: %d, %d",
-		DrawInfo.iHZoom, DrawInfo.iHZoom >= 0 ? 1 << DrawInfo.iHZoom : -(1 << -DrawInfo.iHZoom),
-		DrawInfo.iVZoom, DrawInfo.iVZoom >= 0 ? 1 << DrawInfo.iVZoom : -(1 << -DrawInfo.iVZoom)
-	);
-	r.top += FONT_HEIGHT * 6;
-	DrawText(hdc, s, strlen(s), &r, NULL);
-
-	sprintf(s,"vzoom %.40f",vzoom);
-	r.top += FONT_HEIGHT;
-	DrawText(hdc, s, strlen(s), &r, NULL);
+	//sprintf(s,"vzoom %.40f",vzoom);
+	//r.top += FONT_HEIGHT;
+	//DrawText(hdc, s, strlen(s), &r, NULL);
 
 	DeleteObject(SelectObject(hdc, GetStockObject(SYSTEM_FONT)));
 
@@ -759,7 +755,7 @@ VOID CWinMain::CaculateHScroll(void)
 	static UINT iSem = 0;
 
 	GetRealClientRect(hWnd, &rc);
-	DrawInfo.dwDataWidth = DATA_BUFFER_LENGTH;//  clsWaveData.AdcPos;
+	DrawInfo.dwDataWidth = DATA_BUFFER_LENGTH;//  clsData.AdcPos;
 	DrawInfo.dwHZoomedWidth = DrawInfo.dwDataWidth;
 	if (DrawInfo.iHZoom > 0)
 	{
@@ -796,7 +792,7 @@ VOID CWinMain::CaculateHScroll(void)
 	}
 
 	if (DrawInfo.fAutoScroll) {
-		DrawInfo.dwHZoomedPos = (DrawInfo.fFollowByOrignal == true ? clsWaveData.AdcPos : clsWaveData.FilttedPos) * DrawInfo.dbHZoom -
+		DrawInfo.dwHZoomedPos = (DrawInfo.fFollowByOrignal == true ? clsData.AdcPos : clsData.FilttedBuffPos) * DrawInfo.dbHZoom -
 			(rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
 		if (DrawInfo.dwHZoomedPos < 0) DrawInfo.dwHZoomedPos = 0;
 	}
@@ -927,11 +923,11 @@ BOOL CWinMain::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ShowWindow(clsSoundCard.hWndWaveValue, SW_SHOW); 
 		break;
 	case IDM_ANALYZEWAVE:	  
-		clsSoundCard.ClearNoise3();
+		//clsSoundCard.ClearNoise3();
 		//clsSoundCard.MySound(NULL);
 		break;
 	case IDM_ANALYZECLEARNOISE:
-		clsSoundCard.ClearNoise2();
+		//clsSoundCard.ClearNoise2();
 		break;
 	case IDM_ANALYZEGOTO:
 		DialogBox(hInst, (LPCTSTR)IDD_DLGGOTO, hWnd, (DLGPROC)CSoundCard::DlgGotoProc);
@@ -947,7 +943,8 @@ BOOL CWinMain::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		break;
 	case IDM_FILESAVE:
-		clsFile.SaveFile();
+		//clsFile.SaveFile();
+		clsFile.SaveBuffToFile();
 		break;
 	case IDM_FILESAVEAS:
 		clsFile.SaveFileAs();
@@ -1073,22 +1070,17 @@ BOOL CWinMain::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_SPECTRUMWINDOW:
 		clsWinSpect.OpenWindow();
 		break;
-
-//COMMANDS-----------------------
-	case IDM_PMT_WINDOW:
+	case IDM_FILTTEDWINDOW:
+		m_filttedWin->OpenWindow();
 		break;
-
-//COMMANDS-----------------------
 	case IDM_SDR_WINDOW:
 		clsWinSDR.OpenWindow();
 		break;
-		//COMMANDS-----------------------
-	case IDM_SOUND_WINDOW:
+	case IDM_AUDIO_WINDOW:
 		m_audioWin->OpenWindow();
 		break;
-//COMMANDS-----------------------
 	case IDM_FILTERWINDOW:
-		clsWinFilter.OpenWindow();
+		m_FilterWin->OpenWindow();
 		break;
 
 //COMMANDS-----------------------
@@ -1130,7 +1122,7 @@ BOOL CWinMain::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return TRUE;
 }
 
-void CWinMain::SaveDefaultValue(void)
+void CWinMain::SaveValue(void)
 {
 	WritePrivateProfileString("WIN_MAIN", "iHZoom", std::to_string(DrawInfo.iHZoom).c_str(), IniFilePath);
 	WritePrivateProfileString("WIN_MAIN", "iVZoom", std::to_string(DrawInfo.iVZoom).c_str(), IniFilePath);
@@ -1138,7 +1130,7 @@ void CWinMain::SaveDefaultValue(void)
 	WritePrivateProfileString("WIN_MAIN", "dwVZoomedPos", std::to_string(DrawInfo.dwVZoomedPos).c_str(), IniFilePath);
 }
 
-void CWinMain::RestoreDefaultValue(void)
+void CWinMain::RestoreValue(void)
 {
 #define VALUE_LENGTH	100
 	char value[VALUE_LENGTH];

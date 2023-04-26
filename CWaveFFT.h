@@ -14,6 +14,8 @@
 #define FFT_VALUE_MAX 0xFF
 #define FFT_MAX_SIZE 0xFFFF
 
+class cuda_CFFT;
+
 class CWaveFFT
 {
 
@@ -44,7 +46,7 @@ public:
 
 	UINT FFTOrignalBuffNum = 0;
 	UINT FFTFilttedBuffNum = 0;
-
+	UINT FFTDeep = FFT_DEEP;
 
 	double*  FFT_src = NULL;
 	Complex* FFT_src_com = NULL;
@@ -73,9 +75,13 @@ public:
 	bool FFTThreadExit = false;
 
 	double FFTMaxValue;
+	double FFTMaxValue_Filtted;
 
 	int ForwardSignal = 1;
 	int ForwardFFTlog = 1;
+
+	cuda_CFFT* orignal_FFT = NULL;
+	cuda_CFFT* filtted_FFT = NULL;
 
 public:
 	CWaveFFT();
@@ -100,10 +106,8 @@ public:
 	void Add_Complex(Complex* src1, Complex* src2, Complex* dst);
 
 	double GetFFTMaxValue(void);
-	double Get_FFT_Max_Value(void);
 
-
-	void only_FFT(FILTERCOREDATATYPE* pbuf, int size_n, double** ppfft_vs, double** ppfft_log_vs);
+	void FFT_for_FilterCore_Analyze(FILTER_CORE_DATA_TYPE* pbuf, CFilterWin* pFilterWin);
 
 	static LPTHREAD_START_ROUTINE FFT_Thread(LPVOID lp);
 	void FFT_func(void);

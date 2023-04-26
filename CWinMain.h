@@ -12,6 +12,8 @@
 #define MAX_LOADSTRING 100
 
 class CAudioWin;
+class CFilttedWin;
+class CFilterWin;
 
 class CWinMain  
 {
@@ -22,6 +24,8 @@ public:
 	TCHAR szWindowClass[MAX_LOADSTRING];						// The title bar text
 
 	CAudioWin* m_audioWin = NULL;
+	CFilttedWin* m_filttedWin = NULL;
+	CFilterWin* m_FilterWin = NULL;
 
 typedef struct tagDRAWINFO
 {
@@ -60,8 +64,8 @@ public:
 	BOOL OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	VOID KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	LRESULT CALLBACK WndProcReal(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	void SaveDefaultValue(void);
-	void RestoreDefaultValue(void);
+	void SaveValue(void);
+	void RestoreValue(void);
 
 	static LRESULT CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);

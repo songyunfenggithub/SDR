@@ -9,7 +9,7 @@
 
 #include "public.h"
 #include "CSoundCard.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFFT.h"
 #include "CWaveFilter.h"
 #include "CWinFFT.h"
@@ -108,18 +108,18 @@ void CWinFFT::OnMouse(HWND hWnd)
 
 	int i = 0;
 	char s[500], t[100];
-	FILTERCOREDATATYPE* pFilterCore = clsWaveFilter.pCurrentFilterInfo->FilterCore;
+	FILTER_CORE_DATA_TYPE* pFilterCore = clsWaveFilter.pCurrentFilterInfo->FilterCore;
 	int FilterLength = clsWaveFilter.pCurrentFilterInfo->CoreLength;
 	int X = (HScrollPos + MouseX - WAVE_RECT_BORDER_LEFT) / HScrollZoom;
 	X = BOUND(X, 0, (HScrollPos + rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / HScrollZoom);
-	FILTERCOREDATATYPE Y = X > FilterLength ? 0 : pFilterCore[X];
+	FILTER_CORE_DATA_TYPE Y = X > FilterLength ? 0 : pFilterCore[X];
 	sprintf(s, "X: %d, core V: %lf", X, Y);
 	SetTextColor(hDC, COLOR_ORIGNAL_FFT);
 	DrawText(hDC, s, strlen(s), &r, NULL);
 
 	r.left += 200;
 	SetTextColor(hDC, COLOR_ORIGNAL_FFT);
-	FILTERCOREDATATYPE Hz = (double)X * clsWaveData.AdcSampleRate / clsWaveFFT.FFTSize;
+	FILTER_CORE_DATA_TYPE Hz = (double)X * clsData.AdcSampleRate / clsWaveFFT.FFTSize;
 	Y = X > clsWaveFFT.FFTSize / 2 ? 0 : OrignalFFTBuff[X];
 	sprintf(s, "Hz: %.03f, FFT: %s", Hz, formatKDouble(Y, 0.001, "", t));
 	DrawText(hDC, s, strlen(s), &r, NULL);
@@ -314,7 +314,7 @@ VOID CWinFFT::Paint(HWND hWnd)
 		{
 			if (!(i % 5))
 			{
-				sprintf(s, "%.02fhz", (double)(i * 32 + HScrollPos) / HScrollZoom * clsWaveData.AdcSampleRate / clsWaveFFT.FFTSize);
+				sprintf(s, "%.02fhz", (double)(i * 32 + HScrollPos) / HScrollZoom * clsData.AdcSampleRate / clsWaveFFT.FFTSize);
 				r.top = WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT + DIVLONG;
 				r.left = x;
 				SetTextColor(hdc, COLOR_ORIGNAL_FFT);
@@ -509,8 +509,8 @@ VOID CWinFFT::Paint(HWND hWnd)
 	double VotagePerDIV = (FullVotage / (unsigned __int64)((UINT64)1 << (sizeof(ADCDATATYPE) * 8)));
 	double z = DrawInfo.iVZoom >= 0 ? (1.0 / ((UINT64)1 << DrawInfo.iVZoom)) : ((UINT64)1 << -DrawInfo.iVZoom);
 	char tstr1[100], tstr2[100];
-	//clsWaveData.NumPerSec = 38400;
-	double TimePreDiv = 32 * 1.0 / clsWaveData.NumPerSec *
+	//clsData.NumPerSec = 38400;
+	double TimePreDiv = 32 * 1.0 / clsData.NumPerSec *
 		(DrawInfo.iHZoom >= 0 ? 1.0 / ((UINT64)1 << DrawInfo.iHZoom) : ((UINT64)1 << -DrawInfo.iHZoom));
 	r.top = WAVE_RECT_HEIGHT + WAVE_RECT_BORDER_TOP + DIVLONG + 20;
 	r.left = WAVE_RECT_BORDER_TOP;
@@ -522,7 +522,7 @@ VOID CWinFFT::Paint(HWND hWnd)
 		"FFT Size: %d      FFT Step: %d\r\n"\
 		"Sepctrum Hz£º%.03f",
 		CoreLength,
-		clsWaveData.AdcSampleRate, clsWaveData.NumPerSec,
+		clsData.AdcSampleRate, clsData.NumPerSec,
 		clsWaveFFT.FFTSize, clsWaveFFT.FFTStep,
 		clsWinOneSpectrum.Hz
 	);

@@ -8,11 +8,14 @@
 #include <math.h>
 
 #include "CDataFromTcpIp.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFilter.h"
 #include "CWaveFFT.h"
+#include "CFilterWin.h"
+#include "CWinMain.h"
 
-#include "cuda_Filter.cuh"
+#include "cuda_CFilter.cuh"
+#include "cuda_CFilter2.cuh"
 
 using namespace std;
 
@@ -48,13 +51,11 @@ CWaveFilter::CWaveFilter()
 
 	hCoreMutex = CreateMutex(NULL, false, "hCoreMutex");		//创建互斥对象
 
-	hCoreAnalyseMutex = CreateMutex(NULL, false, "hCoreAnalyseMutex");		//创建互斥对象
-
 	//char s[] = "1025, 0, 0; 0, 50, 10; 2, 100, 10";//; 1, 100, 10; 1, 500, 10; 1, 600, 10";
 	//strcpy(FilterCoreDesc, s);
 	
 //	const char h[] = " 65,0,0;0,50000,10000;2,100000,10000;1,150000,10000";
-	const char h[] = " 33,0,0;0,50000,100";
+	const char h[] = "65,0,0;0,10000,100";
 	char filterdes[1024];
 	char t[100];
 	int n, m;
@@ -75,13 +76,16 @@ CWaveFilter::CWaveFilter()
 	sprintf(FilterCoreDesc + m, "%s", t);
 	*/
 
+	RestoreValue();
+
 	pCurrentFilterInfo = &rootFilterInfo;
-	setFilterCoreDesc(&rootFilterInfo, (char*)h);
+	//setFilterCoreDesc(&rootFilterInfo, (char*)h);
 }
 
 CWaveFilter::~CWaveFilter()
 {
-	CLOSECONSOLE;
+	SaveValue();
+	//CLOSECONSOLE;
 }
 
 void CWaveFilter::setFilterCoreDesc(PFILTERINFO pFilterInfo, char* CoreDescStr)
@@ -102,8 +106,8 @@ void CWaveFilter::build_desc_core(PFILTERINFO rootFilterInfo)
 	}
 
 	if (rootFilterInfo->FilterCore != NULL) {delete[] rootFilterInfo->FilterCore; rootFilterInfo->FilterCore = NULL;}
-	rootFilterInfo->FilterCore = new FILTERCOREDATATYPE[rootFilterInfo->CoreLength];
-	memset(rootFilterInfo->FilterCore, 0, rootFilterInfo->CoreLength * sizeof(FILTERCOREDATATYPE));
+	rootFilterInfo->FilterCore = new FILTER_CORE_DATA_TYPE[rootFilterInfo->CoreLength];
+	memset(rootFilterInfo->FilterCore, 0, rootFilterInfo->CoreLength * sizeof(FILTER_CORE_DATA_TYPE));
 
 	pFilterInfo = rootFilterInfo->nextFilter;
 	while (pFilterInfo != NULL)
@@ -124,20 +128,20 @@ void CWaveFilter::build_last_iterate_core(PFILTERINFO rootFilterInfo)
 
 	int tFilterLength, tOrignalFilterLength;
 	int i;
-	FILTERCOREDATATYPE* tFilterCore = NULL;
-	FILTERCOREDATATYPE* tOrignalFilterCore = new FILTERCOREDATATYPE[rootFilterInfo->CoreLength];
-	memcpy(tOrignalFilterCore, rootFilterInfo->FilterCore, rootFilterInfo->CoreLength * sizeof(FILTERCOREDATATYPE));
+	FILTER_CORE_DATA_TYPE* tFilterCore = NULL;
+	FILTER_CORE_DATA_TYPE* tOrignalFilterCore = new FILTER_CORE_DATA_TYPE[rootFilterInfo->CoreLength];
+	memcpy(tOrignalFilterCore, rootFilterInfo->FilterCore, rootFilterInfo->CoreLength * sizeof(FILTER_CORE_DATA_TYPE));
 	tOrignalFilterLength = rootFilterInfo->CoreLength;
 	for (i = 1; i < rootFilterInfo->IterateLevel; i++)
 	{
 		tFilterLength = rootFilterInfo->CoreLength;
 		if (tFilterCore != NULL)delete[] tFilterCore;
-		tFilterCore = new FILTERCOREDATATYPE[tFilterLength];
-		memcpy(tFilterCore, rootFilterInfo->FilterCore, tFilterLength * sizeof(FILTERCOREDATATYPE));
+		tFilterCore = new FILTER_CORE_DATA_TYPE[tFilterLength];
+		memcpy(tFilterCore, rootFilterInfo->FilterCore, tFilterLength * sizeof(FILTER_CORE_DATA_TYPE));
 		rootFilterInfo->CoreLength = tFilterLength + tOrignalFilterLength - 1;
 		delete[] rootFilterInfo->FilterCore;
-		rootFilterInfo->FilterCore = new FILTERCOREDATATYPE[rootFilterInfo->CoreLength];
-		memset(rootFilterInfo->FilterCore, 0, rootFilterInfo->CoreLength * sizeof(FILTERCOREDATATYPE));
+		rootFilterInfo->FilterCore = new FILTER_CORE_DATA_TYPE[rootFilterInfo->CoreLength];
+		memset(rootFilterInfo->FilterCore, 0, rootFilterInfo->CoreLength * sizeof(FILTER_CORE_DATA_TYPE));
 		int i1, i2;
 		for (i2 = 0; i2 < tOrignalFilterLength; i2++)
 		{
@@ -156,7 +160,7 @@ void CWaveFilter::build_iterate_core(void)
 	int tFilterLength = 0;
 	int i;
 	PFILTERINFO pFilterInfo1 = NULL, pFilterInfo2 = NULL;
-	FILTERCOREDATATYPE* tFilterCore, *CoreMatrix;
+	FILTER_CORE_DATA_TYPE* tFilterCore, *CoreMatrix;
 	if (FilterCore != NULL)
 	{
 		delete[] FilterCore;
@@ -174,14 +178,14 @@ void CWaveFilter::build_iterate_core(void)
 				if (FilterCore == NULL)
 				{
 					FilterCoreLength = pFilterInfo1->CoreLength;
-					FilterCore = new FILTERCOREDATATYPE[FilterCoreLength];
-					memcpy(FilterCore, pFilterInfo1->FilterCore, FilterCoreLength * sizeof(FILTERCOREDATATYPE));
+					FilterCore = new FILTER_CORE_DATA_TYPE[FilterCoreLength];
+					memcpy(FilterCore, pFilterInfo1->FilterCore, FilterCoreLength * sizeof(FILTER_CORE_DATA_TYPE));
 				}
 
 				int i1, i2;
-				FILTERCOREDATATYPE*tFilterCore = FilterCore;
+				FILTER_CORE_DATA_TYPE*tFilterCore = FilterCore;
 				int tFilterCoreLength = FilterCoreLength + pFilterInfo2->CoreLength - 1;
-				FilterCore = new FILTERCOREDATATYPE[tFilterCoreLength]{ 0 };
+				FilterCore = new FILTER_CORE_DATA_TYPE[tFilterCoreLength]{ 0 };
 				for (i1 = 0; i1 < tFilterCoreLength; i1++) FilterCore[i1] = 0.0;
 				for (i2 = 0; i2 < pFilterInfo2->CoreLength; i2++) 
 				{
@@ -205,7 +209,7 @@ void CWaveFilter::build_iterate_core(void)
 	*/
 }
 
-void CWaveFilter::invcore(FILTERCOREDATATYPE* pBuf, UINT32 corelen)
+void CWaveFilter::invcore(FILTER_CORE_DATA_TYPE* pBuf, UINT32 corelen)
 {
 	UINT16 i;
 	for (i = 0; i < corelen; i++) pBuf[i] *= -1.0;
@@ -213,12 +217,12 @@ void CWaveFilter::invcore(FILTERCOREDATATYPE* pBuf, UINT32 corelen)
 	//*(double*)(pBuf + (pFilterInfo->CoreLength-1)/2*4) += 1000.0;
 }
 
-void CWaveFilter::lowcore(FILTERCOREDATATYPE fc, FILTERCOREDATATYPE* pBuf, UINT32 corelen)
+void CWaveFilter::lowcore(FILTER_CORE_DATA_TYPE fc, FILTER_CORE_DATA_TYPE* pBuf, UINT32 corelen)
 {
 	UINT16 K = 1;
 	UINT16 i;
-	FILTERCOREDATATYPE* p;
-	FILTERCOREDATATYPE sum;
+	FILTER_CORE_DATA_TYPE* p;
+	FILTER_CORE_DATA_TYPE sum;
 	UINT16 M = corelen - 1;
 	p = pBuf;
 	//(0.42 - 0.5*cos(2*M_PI*i/M) + 0.08*cos(4*M_PI*i/M)) 布莱克曼窗
@@ -239,7 +243,7 @@ void CWaveFilter::lowcore(FILTERCOREDATATYPE fc, FILTERCOREDATATYPE* pBuf, UINT3
 	for (p = pBuf, i = 0; i < corelen; i++)*p++ /= sum;
 }
 
-void CWaveFilter::corepluse(FILTERCOREDATATYPE* pR, FILTERCOREDATATYPE* pS, UINT32 corelen)
+void CWaveFilter::corepluse(FILTER_CORE_DATA_TYPE* pR, FILTER_CORE_DATA_TYPE* pS, UINT32 corelen)
 {
 	//  double *pR = FilterCore;
 	//  double *pS = FilterCore_2;
@@ -254,19 +258,19 @@ freq_width： 通带/阻带 频宽
 */
 void CWaveFilter::core(PFILTERINFO pFilterInfo)
 {
-	FILTERCOREDATATYPE fl = pFilterInfo->FreqCenter - pFilterInfo->BandWidth / 2;
-	FILTERCOREDATATYPE fh = pFilterInfo->FreqCenter + pFilterInfo->BandWidth / 2;
-	UINT32 fs = pFilterInfo->SampleRate / pFilterInfo->decimationFactor;
+	FILTER_CORE_DATA_TYPE fl = pFilterInfo->FreqCenter - pFilterInfo->BandWidth / 2;
+	FILTER_CORE_DATA_TYPE fh = pFilterInfo->FreqCenter + pFilterInfo->BandWidth / 2;
+	UINT32 fs = clsData.AdcSampleRate / (1 << pFilterInfo->decimationFactorBit);
 	UINT32 CoreLength = pFilterInfo->CoreLength;
 
 	pFilterInfo->FreqFallWidth = 4.0 / (CoreLength - 1) * fs;
 	if (pFilterInfo->FilterCore != NULL) delete[] pFilterInfo->FilterCore;
-	pFilterInfo->FilterCore = new FILTERCOREDATATYPE[CoreLength];
-	FILTERCOREDATATYPE* FilterCore = pFilterInfo->FilterCore;
+	pFilterInfo->FilterCore = new FILTER_CORE_DATA_TYPE[CoreLength];
+	FILTER_CORE_DATA_TYPE* FilterCore = pFilterInfo->FilterCore;
 
 	FilterInfoCount++;
 
-	FILTERCOREDATATYPE* TempBuf = new FILTERCOREDATATYPE[CoreLength];
+	FILTER_CORE_DATA_TYPE* TempBuf = new FILTER_CORE_DATA_TYPE[CoreLength];
 
 	switch (pFilterInfo->Type)
 	{
@@ -298,7 +302,7 @@ void CWaveFilter::core(PFILTERINFO pFilterInfo)
 void CWaveFilter::ReBuildFilterCore(void)
 {
 	clsWaveFilter.ParseCoreDesc(&rootFilterInfo);
-	clsWaveFilter.FilterCoreAnalyse(&rootFilterInfo);
+	//clsWaveFilter.FilterCoreAnalyse(clsWinMain.m_FilterWin, &rootFilterInfo);
 }
 
 void CWaveFilter::write_core(PFILTERINFO rootFilterInfo)
@@ -312,7 +316,7 @@ void CWaveFilter::write_core(PFILTERINFO rootFilterInfo)
 	if (!outfile.is_open())	cout << "open file core.txt failure" << endl;
 
 	outfile << "# 滤波器内核 " << endl;
-	outfile << "#   采样频率   " << clsWaveData.AdcSampleRate << endl;
+	outfile << "#   采样频率   " << clsData.AdcSampleRate << endl;
 
 	pFilterInfo = rootFilterInfo->nextFilter;
 
@@ -335,7 +339,7 @@ void CWaveFilter::write_core(PFILTERINFO rootFilterInfo)
 
 	outfile << "# 滤波器内核." << rootFilterInfo->subFilterNum << endl;
 	outfile << "#   滤波器内核长度 " << rootFilterInfo->CoreLength << endl;
-	outfile << "#   采样频率       " << clsWaveData.AdcSampleRate << endl;
+	outfile << "#   采样频率       " << clsData.AdcSampleRate << endl;
 
 	for (int i = 0; i < rootFilterInfo->CoreLength; i++)
 	{
@@ -373,10 +377,10 @@ LPTHREAD_START_ROUTINE CWaveFilter::filter_thread4(LPVOID lp)
 void CWaveFilter::filter_func(UINT32 thread_id)
 {
 	ADCDATATYPE* pbuf1, * pend1, * pbuf2, * pend2;
-	FILTERCOREDATATYPE* pcore = NULL;
-	FILTERCOREDATATYPE* pc = NULL;
-	FILTERCOREDATATYPE* psave = NULL;
-	FILTERCOREDATATYPE r;
+	FILTER_CORE_DATA_TYPE* pcore = NULL;
+	FILTER_CORE_DATA_TYPE* pc = NULL;
+	FILTER_CORE_DATA_TYPE* psave = NULL;
+	FILTER_CORE_DATA_TYPE r;
 	bool iswork;
 	UINT32 work_pos = 0;
 
@@ -384,24 +388,25 @@ void CWaveFilter::filter_func(UINT32 thread_id)
 	{
 		iswork = FALSE;
 		WaitForSingleObject(hFilterMutex, INFINITE);
-		if (clsWaveData.FilttingPos != clsWaveData.AdcPos)
+		if (clsData.FilttingPos != clsData.AdcPos)
 		{
-			work_pos = clsWaveData.FilttingPos;
+			work_pos = clsData.FilttingPos;
 			iswork = TRUE;
-			clsWaveData.FilttingPos++;
-			if (clsWaveData.FilttingPos == DATA_BUFFER_LENGTH)clsWaveData.FilttingPos = 0;
+			clsData.FilttingPos++;
+			if (clsData.FilttingPos == DATA_BUFFER_LENGTH)clsData.FilttingPos = 0;
 		}
-		while (clsWaveData.FilttedFlag[clsWaveData.FilttedPos])
+		while (clsData.FilttedFlag[clsData.FilttedPos])
 		{
-			clsWaveData.FilttedFlag[clsWaveData.FilttedPos] = 0;
-			clsWaveData.FilttedPos++;
-			if (clsWaveData.FilttedPos == DATA_BUFFER_LENGTH)clsWaveData.FilttedPos = 0;
+			clsData.FilttedFlag[clsData.FilttedPos] = 0;
+			clsData.FilttedPos++;
+			if (clsData.FilttedPos == DATA_BUFFER_LENGTH)clsData.FilttedPos = 0;
+			clsData.FilttedBuffPos = clsData.FilttedPos;
 		}
 		/*
-		if (((clsWaveData.FilttedPos - clsWaveData.FilttedForwardPos) & DATA_BUFFER_MASK) > FILTED_FORWORD_PAGE_SIZE) {
-			clsGetDataTcpIp.SendFiltedData((char*)(clsWaveData.FilttedBuff + clsWaveData.FilttedForwardPos), FILTED_FORWORD_PAGE_SIZE * 8);
-			clsWaveData.FilttedForwardPos = clsWaveData.FilttedForwardPos + FILTED_FORWORD_PAGE_SIZE;
-			if (clsWaveData.FilttedForwardPos == DATA_BUFFER_LENGTH)clsWaveData.FilttedForwardPos = 0;
+		if (((clsData.FilttedPos - clsData.FilttedForwardPos) & DATA_BUFFER_MASK) > FILTED_FORWORD_PAGE_SIZE) {
+			clsGetDataTcpIp.SendFiltedData((char*)(clsData.FilttedBuff + clsData.FilttedForwardPos), FILTED_FORWORD_PAGE_SIZE * 8);
+			clsData.FilttedForwardPos = clsData.FilttedForwardPos + FILTED_FORWORD_PAGE_SIZE;
+			if (clsData.FilttedForwardPos == DATA_BUFFER_LENGTH)clsData.FilttedForwardPos = 0;
 		}
 		*/
 		ReleaseMutex(hFilterMutex);
@@ -412,22 +417,22 @@ void CWaveFilter::filter_func(UINT32 thread_id)
 			WaitForSingleObject(hCoreMutex, INFINITE);
 			if (w_pos < pCurrentFilterInfo->CoreLength)
 			{
-				pbuf1 = clsWaveData.AdcBuff + DATA_BUFFER_LENGTH - (pCurrentFilterInfo->CoreLength - w_pos) ;
-				pend1 = clsWaveData.AdcBuff + DATA_BUFFER_LENGTH;
-				pbuf2 = clsWaveData.AdcBuff;
-				pend2 = clsWaveData.AdcBuff + w_pos;
+				pbuf1 = clsData.AdcBuff + DATA_BUFFER_LENGTH - (pCurrentFilterInfo->CoreLength - w_pos) ;
+				pend1 = clsData.AdcBuff + DATA_BUFFER_LENGTH;
+				pbuf2 = clsData.AdcBuff;
+				pend2 = clsData.AdcBuff + w_pos;
 			}
 			else
 			{
-				pbuf1 = clsWaveData.AdcBuff + (w_pos - pCurrentFilterInfo->CoreLength);
-				pend1 = clsWaveData.AdcBuff + w_pos;
+				pbuf1 = clsData.AdcBuff + (w_pos - pCurrentFilterInfo->CoreLength);
+				pend1 = clsData.AdcBuff + w_pos;
 				pbuf2 = pend2 = 0;
 			}
 			if(psave != pCurrentFilterInfo->FilterCore){
 				psave = pCurrentFilterInfo->FilterCore;
 				if (pcore != NULL) delete[] pcore;
-				pcore = new FILTERCOREDATATYPE[pCurrentFilterInfo->CoreLength];
-				memcpy(pcore, pCurrentFilterInfo->FilterCore, sizeof(FILTERCOREDATATYPE) * pCurrentFilterInfo->CoreLength);
+				pcore = new FILTER_CORE_DATA_TYPE[pCurrentFilterInfo->CoreLength];
+				memcpy(pcore, pCurrentFilterInfo->FilterCore, sizeof(FILTER_CORE_DATA_TYPE) * pCurrentFilterInfo->CoreLength);
 			}
 			pc = pcore;
 			ReleaseMutex(hCoreMutex);
@@ -440,9 +445,9 @@ void CWaveFilter::filter_func(UINT32 thread_id)
 			{
 				r += *pc++ * *pbuf2++;
 			}
-			clsWaveData.FilttedBuff[work_pos] = r;
+			clsData.FilttedBuff[work_pos] = r;
 			//filter_ready_poss[thread_id] = work_pos;
-			clsWaveData.FilttedFlag[work_pos] = 1;
+			clsData.FilttedFlag[work_pos] = 1;
 		} else Sleep(0);
 	}
 }
@@ -459,10 +464,12 @@ void CWaveFilter::cuda_filter_func(void)
 {
 	while (isInFiltting == true && Program_In_Process == true)
 	{
-		if (((clsWaveData.AdcPos - clsWaveData.FilttedPos) & DATA_BUFFER_MASK) > CUDA_FILTER_BUFF_STEP_LENGTH)
+		if (((clsData.AdcPos - clsData.FilttedPos) & DATA_BUFFER_MASK) > CUDA_FILTER_BUFF_STEP_LENGTH)
 		{
-
-			cuda_Filtting();
+			if(clsWaveFilter.rootFilterInfo.decimationFactorBit > 0)
+				clscudaFilter2.Filtting();
+			else 
+				clscudaFilter.Filtting();
 		}
 		else Sleep(0);
 	}
@@ -523,10 +530,10 @@ void CWaveFilter::GetCMDFilterDesc(char* pCmd)
 	FilterCoreDesc[n] = '\0';
 }
 
-void CWaveFilter::FilterCoreAnalyse(PFILTERINFO pFilterInfo)
+void CWaveFilter::FilterCoreAnalyse(CFilterWin* pFilterWin, PFILTERINFO pFilterInfo)
 {
 	
-	FILTERCOREDATATYPE* FilterCore = pFilterInfo->FilterCore;
+	FILTER_CORE_DATA_TYPE* FilterCore = pFilterInfo->FilterCore;
 	if (FilterCore)
 	{
 		int CoreLength = pFilterInfo->CoreLength;
@@ -534,12 +541,12 @@ void CWaveFilter::FilterCoreAnalyse(PFILTERINFO pFilterInfo)
 		/*
 		// 生成信号----------------------------------------
 		CoreAnalyseFFTLength = 1;
-		while (CoreAnalyseFFTLength < clsWaveData.AdcSampleRate) CoreAnalyseFFTLength = CoreAnalyseFFTLength << 1;
+		while (CoreAnalyseFFTLength < clsData.AdcSampleRate) CoreAnalyseFFTLength = CoreAnalyseFFTLength << 1;
 		//CoreAnalyseFFTLength <<= 1;
 		int n = CoreAnalyseFFTLength + CoreLength;
 		CoreAnalyseDataBuff = new double[n];
 		long i, j;
-		double amplitude = (double)((long)1 << (ADC_DATA_SAMPLE_BIT - 1) - 1) / (clsWaveData.AdcSampleRate );
+		double amplitude = (double)((long)1 << (ADC_DATA_SAMPLE_BIT - 1) - 1) / (clsData.AdcSampleRate );
 		double d;
 		for (i = 0; i < n; i++)
 		{
@@ -547,10 +554,10 @@ void CWaveFilter::FilterCoreAnalyse(PFILTERINFO pFilterInfo)
 			for (j = 1; j <= CoreAnalyseFFTLength / 2; j += 1)
 			{
 				//if (j == 50)// || j == 501 || j == 521 || j == 511)
-				d += (double)amplitude * sin((double)2 * (double)M_PI / ((double)clsWaveData.AdcSampleRate / (double)j) * (double)i);
+				d += (double)amplitude * sin((double)2 * (double)M_PI / ((double)clsData.AdcSampleRate / (double)j) * (double)i);
 			}
-			//double f = 50;// *clsWaveData.AdcSampleRate / CoreAnalyseFFTLength;
-			//d += (double)amplitude * sin((double)2 * (double)M_PI / ((double)clsWaveData.AdcSampleRate / (double)f) * (double)i);
+			//double f = 50;// *clsData.AdcSampleRate / CoreAnalyseFFTLength;
+			//d += (double)amplitude * sin((double)2 * (double)M_PI / ((double)clsData.AdcSampleRate / (double)f) * (double)i);
 			CoreAnalyseDataBuff[i] = d;
 		}
 		
@@ -570,30 +577,28 @@ void CWaveFilter::FilterCoreAnalyse(PFILTERINFO pFilterInfo)
 
 
 		// FFT信号----------------------------------------
-		CoreAnalyseFFTLength = 1;
-		while (CoreAnalyseFFTLength < CoreLength) CoreAnalyseFFTLength = CoreAnalyseFFTLength << 1;
-		FILTERCOREDATATYPE* CoreFFTBuff = new FILTERCOREDATATYPE[CoreAnalyseFFTLength];
-		memset(CoreFFTBuff, 0, sizeof(FILTERCOREDATATYPE) * CoreAnalyseFFTLength);
-		memcpy(CoreFFTBuff, FilterCore, sizeof(FILTERCOREDATATYPE) * CoreLength);
+		UINT n = 1;
+		while (n < CoreLength) n = n << 1;
+		FILTER_CORE_DATA_TYPE* CoreFFTBuff = new FILTER_CORE_DATA_TYPE[n];
+		memset(CoreFFTBuff, 0, sizeof(FILTER_CORE_DATA_TYPE) * n);
+		memcpy(CoreFFTBuff, FilterCore, sizeof(FILTER_CORE_DATA_TYPE) * CoreLength);
+		pFilterWin->CoreAnalyseFFTLength = n;
 
-		WaitForSingleObject(hCoreAnalyseMutex, INFINITE);
-
-		if (CoreAnalyseFFTBuff != NULL) { delete[] CoreAnalyseFFTBuff;    CoreAnalyseFFTBuff = NULL; }
-		if (CoreAnalyseFFTLogBuff != NULL) { delete[] CoreAnalyseFFTLogBuff; CoreAnalyseFFTLogBuff = NULL; }
-		clsWaveFFT.only_FFT(
+		clsWaveFFT.FFT_for_FilterCore_Analyze(
 			//FilterCore,
 			//CoreAnalyseFilttedDataBuff,
 			CoreFFTBuff,
-			CoreAnalyseFFTLength,// = CoreLength - 1,
-			&CoreAnalyseFFTBuff,
-			&CoreAnalyseFFTLogBuff
+			pFilterWin
 		);
-		ReleaseMutex(hCoreAnalyseMutex);
+		delete[] CoreFFTBuff;
 	}
 }
 
 int CWaveFilter::ParseCoreDesc(PFILTERINFO rootFilterInfo)
 {
+	WaitForSingleObject(hCoreMutex, INFINITE);
+
+	rootFilterInfo->SampleRate = clsData.AdcSampleRate / (1 << rootFilterInfo->decimationFactorBit);
 	if (rootFilterInfo->FilterCore != NULL) delete[] rootFilterInfo->FilterCore;
 	rootFilterInfo->FilterCore = NULL;
 	PFILTERINFO tt, pp = rootFilterInfo->nextFilter;
@@ -605,7 +610,6 @@ int CWaveFilter::ParseCoreDesc(PFILTERINFO rootFilterInfo)
 		delete[] tt;
 	}
 	rootFilterInfo->nextFilter = NULL;
-	rootFilterInfo->SampleRate = clsWaveData.AdcSampleRate;
 	char* str = new char[strlen(rootFilterInfo->CoreDescStr)+1];
 	sprintf(str, "%s", rootFilterInfo->CoreDescStr);
 	int i, m, n;
@@ -674,8 +678,8 @@ int CWaveFilter::ParseCoreDesc(PFILTERINFO rootFilterInfo)
 		PFILTERINFO pFilterInfo = new FILTERINFO;
 		pFilterInfo->subFilteindex = i - 1;
 		pFilterInfo->nextFilter = NULL;
-		pFilterInfo->SampleRate = clsWaveData.AdcSampleRate;
-		pFilterInfo->decimationFactor = rootFilterInfo->decimationFactor;
+		pFilterInfo->decimationFactorBit = rootFilterInfo->decimationFactorBit;
+		pFilterInfo->SampleRate = clsData.AdcSampleRate / (1 << rootFilterInfo->decimationFactorBit);
 
 		//if (i == 1)
 		{
@@ -740,16 +744,47 @@ int CWaveFilter::ParseCoreDesc(PFILTERINFO rootFilterInfo)
 	}
 	rootFilterInfo->subFilterNum = i - 1;
 
-	WaitForSingleObject(hCoreMutex, INFINITE);
-
 	build_desc_core(rootFilterInfo);
 
 	build_last_iterate_core(rootFilterInfo);
 
-	Cuda_ReInitFilterCore(rootFilterInfo);
+	clsWaveFFT.InitAllBuff(clsWaveFFT.FFTSize, clsWaveFFT.FFTStep);
+
+	clscudaFilter.UnInit();
+	clscudaFilter2.UnInit();
+
+	if (clsWaveFilter.rootFilterInfo.decimationFactorBit > 0)
+		clscudaFilter2.Init(rootFilterInfo);
+	else
+		clscudaFilter.Init(rootFilterInfo);
 
 	ReleaseMutex(hCoreMutex);
 
 	//build_iterate_core();
+
+}
+
+
+void CWaveFilter::SaveValue(void)
+{
+#define VALUE_LENGTH	100
+	char section[VALUE_LENGTH];
+	sprintf(section, "CWaveFilter");
+	char value[VALUE_LENGTH];
+	WritePrivateProfileString(section, "FilterCoreDesc", rootFilterInfo.CoreDescStr, IniFilePath);
+	WritePrivateProfileString(section, "decimationFactorBit", std::to_string(rootFilterInfo.decimationFactorBit).c_str(), IniFilePath);
+}
+
+void CWaveFilter::RestoreValue(void)
+{
+#define VALUE_LENGTH	1024
+	char value[VALUE_LENGTH];
+	char section[VALUE_LENGTH];
+	sprintf(section, "CWaveFilter");
+	GetPrivateProfileString(section, "FilterCoreDesc", "65, 0, 0; 0, 10000, 100", value, VALUE_LENGTH, IniFilePath);
+	rootFilterInfo.CoreDescStr = new char[strlen(value) + 1];
+	strcpy(rootFilterInfo.CoreDescStr, value);
+	GetPrivateProfileString(section, "decimationFactorBit", "0", value, VALUE_LENGTH, IniFilePath);
+	rootFilterInfo.decimationFactorBit = atoi(value);
 
 }

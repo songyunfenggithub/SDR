@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string>
 
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWinOneSpectrum.h"
 
 #include "CAudio.h"
@@ -29,20 +29,21 @@
 
 #define TIMEOUT		200
 
+class CDemodulatorAM;
+
 class CAudioWin
 {
 public:
-	CAudio *m_Audio;
-	CFFTWin *m_FFTWin;
-	CSignalWin *m_SignalWin;
+	CAudio *m_Audio = NULL;
+	CFFTWin *m_FFTWin = NULL;
+	CSignalWin *m_SignalWin = NULL;
 
+	CDemodulatorAM* m_DemodulatorAM = NULL;
+	bool bDemodulatorAM = false;
+	
 	HWND hWnd = NULL;
 	HMENU hMenu = NULL;
-
 	RECT WinRect;
-
-	int II = 1;
-
 	UINT SignalWinHeight = 256;
 
 public:
@@ -54,12 +55,8 @@ public:
 
 	void RegisterWindowsClass(void);
 	void OpenWindow(void);
-
-	BOOL OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
-	void InitBuff(void);
-
-	VOID GetRealClientRect(PRECT lprc);
+	bool OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
 
 	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	static LRESULT CALLBACK DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
 };

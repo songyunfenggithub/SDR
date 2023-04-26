@@ -9,40 +9,76 @@
 
 #include "public.h"
 #include "myDebug.h"
-#include "CWaveData.h"
+#include "CWaveFilter.h"
+#include "CData.h"
 
+#include "CAudio.h"
 #include "CFFTWin.h"
 #include "CSignalWin.h"
-#include "CAMWin.h"
+#include "CFilttedWin.h"
 
-#define BOUND(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
-
-CAMWin::CAMWin()
+CFilttedWin::CFilttedWin()
 {
 	OPENCONSOLE;
 	Init();
 }
 
-CAMWin::~CAMWin()
+CFilttedWin::~CFilttedWin()
 {
 	UnInit();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 }
 
-void CAMWin::Init(void)
+const char FilttedWinTag[] = "CFilttedWin";
+
+void CFilttedWin::Init(void)
 {
 	RegisterWindowsClass();
-	m_FFTWin = new CFFTWin();
+	
+	m_Audio = &mAudio;
+
 	m_SignalWin = new CSignalWin();
+	m_SignalWin->Init(ADC_DATA_SAMPLE_BIT, DATA_BUFFER_LENGTH);
+	m_SignalWin->Tag = FilttedWinTag;
+	m_SignalWin->OrignalBuff = clsData.FilttedBuff;
+	m_SignalWin->OrignalBuffPos = &clsData.FilttedBuffPos;
+	m_SignalWin->orignal_buff_type = float_type;
+	m_SignalWin->SampleRate = &clsWaveFilter.rootFilterInfo.SampleRate;
+
+	//m_SignalWin->OrignalBuff = clsData.AdcBuff;
+	//m_SignalWin->OrignalBuffPos = &clsData.AdcPos;
+	//m_SignalWin->orignal_buff_type = short_type;
+
+	//m_SignalWin->FilttedBuff = clsData.FilttedBuff;
+	//m_SignalWin->FilttedBuffPos = &clsData.FilttedBuffPos;
+	//m_SignalWin->filtted_buff_type = float_type;
+
+	m_FFTWin = new CFFTWin();
+
+	m_FFTWin->Tag = FilttedWinTag;
+
+	m_FFTWin->buff_type = BUFF_DATA_TYPE::float_type;
+	m_FFTWin->DataBuff = clsData.FilttedBuff;
+	m_FFTWin->DataBuffPos = &clsData.FilttedBuffPos;
+	m_FFTWin->data_buff_data_bits = ADC_DATA_SAMPLE_BIT;
+	m_FFTWin->data_buff_length_mask = DATA_BUFFER_MASK;
+
+	m_FFTWin->SampleRate = &clsWaveFilter.rootFilterInfo.SampleRate;
+
 }
 
-void CAMWin::UnInit(void)
+void CFilttedWin::UnInit(void)
 {
 	if (m_FFTWin != NULL) free(m_FFTWin);
 	if (m_SignalWin != NULL) free(m_SignalWin);
 }
 
-void CAMWin::RegisterWindowsClass(void)
+void CFilttedWin::AM_Demodulator(void)
+{
+
+}
+
+void CFilttedWin::RegisterWindowsClass(void)
 {
 	static bool registted = false;
 	if (registted == true) return;
@@ -53,82 +89,57 @@ void CAMWin::RegisterWindowsClass(void)
 	wcex.cbSize = sizeof(WNDCLASSEX);
 
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc = (WNDPROC)CAMWin::WndProc;
+	wcex.lpfnWndProc = (WNDPROC)CFilttedWin::WndProc;
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = sizeof(long);
 	wcex.hInstance = hInst;
 	wcex.hIcon = LoadIcon(hInst, (LPCTSTR)IDI_MYWAVE);
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);//(HBRUSH)(COLOR_WINDOW+1);
-	wcex.lpszMenuName = (LPCSTR)IDC_MENU_AUDIO;
-	wcex.lpszClassName = AM_DEMODULATOR_WIN_CLASS;
+	wcex.lpszMenuName = (LPCSTR)IDC_MENU_FILTTED;
+	wcex.lpszClassName = CFILTTED_WIN_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	RegisterClassEx(&wcex);
 }
 
-void CAMWin::OpenWindow(void)
+void CFilttedWin::OpenWindow(void)
 {
 	if (hWnd == NULL) {
-			hWnd = CreateWindow(AM_DEMODULATOR_WIN_CLASS, "调幅解调 （AM Demodulator）", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+			hWnd = CreateWindow(CFILTTED_WIN_CLASS, "滤波后信号 （Filtted Signal）", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			CW_USEDEFAULT, 0, 1400, 1000, NULL, NULL, hInst, this);
 	}
 	ShowWindow(hWnd, SW_SHOW);
 	UpdateWindow(hWnd);
 }
 
-LRESULT CALLBACK CAMWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK CFilttedWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-
-	CAMWin* me;
-	
-	HGLOBAL hMemProp;
-	void* lpMem;
-	hMemProp = (HGLOBAL)GetProp(hWnd, "H");
-	if (hMemProp) {
-		lpMem = GlobalLock(hMemProp);
-		//(void*)me = *(void*)lpMem;
-		memcpy(&me, lpMem, sizeof(UINT64));
-		//me = (CAMWin*)(*lpMem);
-		GlobalUnlock(hMemProp);
-	}
-
+	CFilttedWin* me = (CFilttedWin*)get_WinClass(hWnd);
 	switch (message)
 	{
 	case WM_CREATE:
 	{
 		OPENCONSOLE;
-
-		//PMYDLGDATA pMyDlgdata = (PMYDLGDATA)(((LPCREATESTRUCT)lParam)->lpCreateParams);
-		//me = (CAMWin*)pMyDlgdata->myData.p;
-		me = (CAMWin*)(((LPCREATESTRUCT)lParam)->lpCreateParams);
-		HGLOBAL hMemProp;
-		void* lpMem;
-		hMemProp = GlobalAlloc(GPTR, sizeof(INT64));
-		lpMem = GlobalLock(hMemProp);
-		memcpy(lpMem, &me, sizeof(UINT64));
-		GlobalUnlock(hMemProp);
-		SetProp(hWnd, "H", hMemProp);
+		me = (CFilttedWin*)set_WinClass(hWnd, lParam);
 
 		me->hWnd = hWnd;
-		me->hMenu = GetMenu(hWnd);
-
+		HMENU hMenu = GetMenu(hWnd);
+		me->m_SignalWin->hMenu = hMenu;
+		me->m_FFTWin->hMenu = hMenu;
+		me->m_FFTWin->hMenuSpect = GetSubMenu(hMenu, 3);
 
 		//uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
 		//KillTimer(hWnd, 0);//DrawInfo.uTimerId);
 
 		me->m_SignalWin->hWnd = CreateWindow(SIGNAL_WIN_CLASS, "信号", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-			0, 200, 500, 200, hWnd, NULL, hInst, NULL);
+			0, 200, 500, 200, hWnd, NULL, hInst, me->m_SignalWin);
 		ShowWindow(me->m_SignalWin->hWnd, SW_SHOW);
 		me->m_FFTWin->hWnd = CreateWindow(FFT_WIN_CLASS, "FFT", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-			0, 0, 500, 200, hWnd, NULL, hInst, NULL);
+			0, 0, 500, 200, hWnd, NULL, hInst, me->m_FFTWin);
 		ShowWindow(me->m_FFTWin->hWnd, SW_SHOW);
 	}
 	break;
-	case WM_TIMER:
-		InvalidateRect(hWnd, NULL, TRUE);
-		UpdateWindow(hWnd);
-		break;
 	case WM_SIZE:
 	{
 		GetClientRect(hWnd, &me->WinRect);
@@ -137,7 +148,7 @@ LRESULT CALLBACK CAMWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 	}
 	break;
 	case WM_CHAR:
-		printf("char:%c\r\n", wParam);
+		DbgMsg("WM_CHAR:%c\r\n", wParam);
 		switch (wParam)
 		{
 		case '1':
@@ -164,15 +175,6 @@ LRESULT CALLBACK CAMWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 	case WM_COMMAND:
 		return me->OnCommand(message, wParam, lParam);
 		break;
-	case WM_SYSCOMMAND:
-		if (LOWORD(wParam) == SC_CLOSE)
-		{
-			ShowWindow(hWnd, SW_HIDE);
-			break;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
-		break;
-
 	case WM_ERASEBKGND:
 		//不加这条消息屏幕刷新会闪烁
 		break;
@@ -185,7 +187,10 @@ LRESULT CALLBACK CAMWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 	}
 		break;
 	case WM_DESTROY:
-		DbgMsg("CAMWin WM_DESTROY\r\n");
+		DbgMsg("CFilttedWin WM_DESTROY\r\n");
+		DestroyWindow(me->m_SignalWin->hWnd);
+		DestroyWindow(me->m_FFTWin->hWnd);
+		me->hWnd = NULL;
 		break;
 
 	default:
@@ -195,7 +200,7 @@ LRESULT CALLBACK CAMWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 	return 0;
 }
 
-BOOL CAMWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
+BOOL CFilttedWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	wmId = LOWORD(wParam);
@@ -215,30 +220,17 @@ BOOL CAMWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 		PostMessage(m_SignalWin->hWnd, message, wParam, lParam);
 		break;
 
-	case IDM_SPECTRUM_PAUSE_BREAK:
-		break;
-	case IDM_FFT_SET:
-		break;
-	case IDM_SPECTRUM_HORZ_ZOOM_INCREASE:
-		break;
-	case IDM_SPECTRUM_HORZ_ZOOM_DECREASE:
-		break;
-	case IDM_SPECTRUM_HORZ_ZOOM_HOME:
-		break;
-	case IDM_SPECTRUM_VERT_ZOOM_INCREASE:
-		break;
-	case IDM_SPECTRUM_VERT_ZOOM_DECREASE:
-		break;
-	case IDM_SPECTRUM_VERT_ZOOM_HOME:
-		break;
-	case IDM_SPECTRUM_FOLLOW:
-		break;
+	case IDM_SPECTRUM_ORIGNAL_SHOW:
+	case IDM_SPECTRUM_ORIGNAL_LOG_SHOW:
+	case IDM_SPECTRUM_ZOOMED_SHOW:
+
 	case IDM_FFT_HORZ_ZOOM_INCREASE:
 	case IDM_FFT_HORZ_ZOOM_DECREASE:
 	case IDM_FFT_HORZ_ZOOM_HOME:
 	case IDM_FFT_VERT_ZOOM_INCREASE:
 	case IDM_FFT_VERT_ZOOM_DECREASE:
 	case IDM_FFT_VERT_ZOOM_HOME:
+	case IDM_FFT_SET:
 		PostMessage(m_FFTWin->hWnd, message, wParam, lParam);
 		break;
 	case IDM_EXIT:

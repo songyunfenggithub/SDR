@@ -30,6 +30,8 @@ public:
 	BOOL SaveFile(VOID);
 	BOOL SaveFileAs(VOID);
 	
+	BOOL SaveBuffToFile(VOID);
+
 	BOOL GetSaveFile(HWND hWnd, const BOOL fSaveAs);
 	BOOL GetOpenFile(HWND hWnd);
 	VOID SetFilter(LPTSTR szFilter);

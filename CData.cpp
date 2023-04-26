@@ -2,38 +2,38 @@
 #include <stdio.h>
 #include "public.h"
 #include "CSDR.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFFT.h"
-#include "CWaveAnalyze.h"
+#include "CAnalyze.h"
 
 
 #define _USE_MATH_DEFINES
 #include "math.h"
 
 #define TIMEOUT	1000
-CWaveData clsWaveData;
+CData clsData;
 
-CWaveData::CWaveData()
+CData::CData()
 {
-	clsWaveData.AdcSampleRate = ADC_SAMPLE_RATE;
+	clsData.AdcSampleRate = ADC_SAMPLE_RATE;
 	for (int i = 0; i < DATA_BUFFER_LENGTH; i++) FilttedFlag[i] = 0;
 
-	SetTimer(NULL, 0, TIMEOUT, (TIMERPROC)CWaveData::NumPerSecTimer_Func);
+	SetTimer(NULL, 0, TIMEOUT, (TIMERPROC)CData::NumPerSecTimer_Func);
 }
 
-CWaveData::~CWaveData()
+CData::~CData()
 {
 
 }
 
-void CWaveData::GeneratorWave(void)
+void CData::GeneratorWave(void)
 {
 	return;
 	int size = 1024;
 	double i;
-	double amplitude = (double)(((UINT32)1 << (ADC_DATA_SAMPLE_BIT - 1)) - 1) / (clsWaveData.AdcSampleRate / 2);
+	double amplitude = (double)(((UINT32)1 << (ADC_DATA_SAMPLE_BIT - 1)) - 1) / (clsData.AdcSampleRate / 2);
 	double d;
-	double doubleAdcSampleRate = (double)clsWaveData.AdcSampleRate;
+	double doubleAdcSampleRate = (double)clsData.AdcSampleRate;
 
 	static bool g = false;
 	static int fg = 60;
@@ -70,10 +70,10 @@ void CWaveData::GeneratorWave(void)
 	AdcGetNew = true;
 }
 
-TIMERPROC CWaveData::NumPerSecTimer_Func(void)
+TIMERPROC CData::NumPerSecTimer_Func(void)
 {
-//	clsWaveData.NumPerSec = clsWaveData.NumPerSecInProcess / sizeof(ADCDATATYPE) / TIMEOUT * 1000;
-//	clsWaveData.NumPerSecInProcess = 0;
+//	clsData.NumPerSec = clsData.NumPerSecInProcess / sizeof(ADCDATATYPE) / TIMEOUT * 1000;
+//	clsData.NumPerSecInProcess = 0;
 	static UINT SaveAdcPos = 0, SaveFFTCount = 0;
 	static UINT tick = 0;
 	tick++;
@@ -83,8 +83,8 @@ TIMERPROC CWaveData::NumPerSecTimer_Func(void)
 		SaveFFTCount = clsWaveFFT.FFTCount;
 	}
 	
-	clsWaveData.NumPerSec = (clsWaveData.AdcPos - SaveAdcPos) & DATA_BUFFER_MASK;
-	SaveAdcPos = clsWaveData.AdcPos;
-	//printf("NumPreSec:%d\r\n", clsWaveData.NumPerSec);
+	clsData.NumPerSec = (clsData.AdcPos - SaveAdcPos) & DATA_BUFFER_MASK;
+	SaveAdcPos = clsData.AdcPos;
+	//printf("NumPreSec:%d\r\n", clsData.NumPerSec);
 	return 0;
 }

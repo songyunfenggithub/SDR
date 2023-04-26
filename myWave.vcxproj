@@ -23,7 +23,7 @@
     <SccLocalPath />
     <ProjectGuid>{317647A5-1559-4B4A-9160-24AC351477CB}</ProjectGuid>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>myWave</ProjectName>
+    <ProjectName>myWave.SDR</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -217,7 +217,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_USE_CUDA;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_USE_CUDA;_AMD64_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AssemblerListingLocation>.\Debug\</AssemblerListingLocation>
       <PrecompiledHeaderOutputFile>.\Debug\myWave.pch</PrecompiledHeaderOutputFile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -246,8 +246,10 @@
       <SubSystem>Windows</SubSystem>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalDependencies>cufft.lib;odbc32.lib;odbccp32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <StackReserveSize>1000000000</StackReserveSize>
-      <HeapReserveSize>1000000000</HeapReserveSize>
+      <StackReserveSize>200000000</StackReserveSize>
+      <HeapReserveSize>200000000</HeapReserveSize>
+      <HeapCommitSize>200000000</HeapCommitSize>
+      <StackCommitSize>200000000</StackCommitSize>
     </Link>
     <CudaCompile>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
@@ -269,16 +271,16 @@
     <ClCompile Include="CMessage.cpp" />
     <ClCompile Include="CScreenButton.cpp" />
     <ClCompile Include="CSDR.cpp" />
-    <ClCompile Include="CAMWin.cpp" />
+    <ClCompile Include="CFilttedWin.cpp" />
     <ClCompile Include="CSignalWin.cpp" />
     <ClCompile Include="CSoundCard.cpp" />
-    <ClCompile Include="CWaveAnalyze.cpp" />
-    <ClCompile Include="CWaveData.cpp" />
+    <ClCompile Include="CAnalyze.cpp" />
+    <ClCompile Include="CData.cpp" />
     <ClCompile Include="CWaveFFT.cpp" />
     <ClCompile Include="CWaveFilter.cpp" />
     <ClCompile Include="CWaveFunc.cpp" />
     <ClCompile Include="CWinFFT.cpp" />
-    <ClCompile Include="CWinFilter.cpp" />
+    <ClCompile Include="CFilterWin.cpp" />
     <ClCompile Include="CWinOneFFT.cpp" />
     <ClCompile Include="CWinOneSpectrum.cpp" />
     <ClCompile Include="CWinSDR.cpp" />
@@ -318,24 +320,24 @@
     <ClInclude Include="CMessage.h" />
     <ClInclude Include="CScreenButton.h" />
     <ClInclude Include="CSDR.h" />
-    <ClInclude Include="CAMWin.h" />
+    <ClInclude Include="CFilttedWin.h" />
     <ClInclude Include="CSignalWin.h" />
     <ClInclude Include="CSoundCard.h" />
-    <ClInclude Include="CWaveAnalyze.h" />
-    <ClInclude Include="CWaveData.h" />
+    <ClInclude Include="CAnalyze.h" />
+    <ClInclude Include="CData.h" />
     <ClInclude Include="CWaveFFT.h" />
     <ClInclude Include="CWaveFilter.h" />
     <ClInclude Include="CWaveFunc.h" />
     <ClInclude Include="CWinFFT.h" />
-    <ClInclude Include="CWinFilter.h" />
+    <ClInclude Include="CFilterWin.h" />
     <ClInclude Include="CWinOneFFT.h" />
     <ClInclude Include="CWinOneSpectrum.h" />
     <ClInclude Include="CWinSDR.h" />
     <ClInclude Include="CWinSDRScan.h" />
     <ClInclude Include="CWinSpectrum.h" />
-    <ClInclude Include="cuda_Filter.cuh" />
+    <ClInclude Include="cuda_CFilter.cuh" />
     <ClInclude Include="cuda_FFT.cuh" />
-    <ClInclude Include="cuda_AM_Filter.cuh" />
+    <ClInclude Include="cuda_CFilter2.cuh" />
     <ClInclude Include="cuda_CFFT.cuh" />
     <ClInclude Include="myDebug.h" />
     <ClInclude Include="myWave.h" />
@@ -352,9 +354,9 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="cuda_Filter.cu" />
+    <CudaCompile Include="cuda_CFilter.cu" />
     <CudaCompile Include="cuda_FFT.cu" />
-    <CudaCompile Include="cuda_AM_Filter.cu" />
+    <CudaCompile Include="cuda_CFilter2.cu" />
     <CudaCompile Include="cuda_CFFT.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

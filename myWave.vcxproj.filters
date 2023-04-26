@@ -36,10 +36,10 @@
     <ClCompile Include="CDataFromTcpIp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CWaveData.cpp">
+    <ClCompile Include="CData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CWaveAnalyze.cpp">
+    <ClCompile Include="CAnalyze.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CWaveFilter.cpp">
@@ -66,7 +66,7 @@
     <ClCompile Include="CDataFromUsart.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CWinFilter.cpp">
+    <ClCompile Include="CFilterWin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CWinOneSpectrum.cpp">
@@ -126,7 +126,7 @@
     <ClCompile Include="CFFT.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CAMWin.cpp">
+    <ClCompile Include="CFilttedWin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -146,13 +146,13 @@
     <ClInclude Include="CDataFromTcpIp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CWaveData.h">
+    <ClInclude Include="CData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="public.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CWaveAnalyze.h">
+    <ClInclude Include="CAnalyze.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CWaveFilter.h">
@@ -182,7 +182,7 @@
     <ClInclude Include="CWinFFT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CWinFilter.h">
+    <ClInclude Include="CFilterWin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CFile.h">
@@ -215,7 +215,7 @@
     <ClInclude Include="CScreenButton.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cuda_Filter.cuh">
+    <ClInclude Include="cuda_CFilter.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CWinSDRScan.h">
@@ -227,7 +227,7 @@
     <ClInclude Include="CDemodulatorAM.h">
       <Filter>Header Files\Demodulator</Filter>
     </ClInclude>
-    <ClInclude Include="cuda_AM_Filter.cuh">
+    <ClInclude Include="cuda_CFilter2.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CAudio.h">
@@ -248,7 +248,7 @@
     <ClInclude Include="cuda_CFFT.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CAMWin.h">
+    <ClInclude Include="CFilttedWin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -269,13 +269,13 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="cuda_Filter.cu">
+    <CudaCompile Include="cuda_CFilter.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="cuda_FFT.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="cuda_AM_Filter.cu">
+    <CudaCompile Include="cuda_CFilter2.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="cuda_CFFT.cu">

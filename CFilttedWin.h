@@ -9,7 +9,7 @@
 #include "CFFTWin.h"
 #include "CSignalWin.h"
 
-#define AM_DEMODULATOR_WIN_CLASS		"AM_DEMODULATOR_WIN_CLASS"
+#define CFILTTED_WIN_CLASS		"CFILTTED_WIN_CLASS"
 
 #define SPECTRUM_WIDTH	0x400
 #define SPECTRUM_WIN_WIDTH	800
@@ -26,36 +26,29 @@
 #define TIMEOUT		200
 
 
-class CAMWin
+class CFilttedWin
 {
 public:
-	CFFTWin *m_FFTWin;
-	CSignalWin *m_SignalWin;
+	CFFTWin *m_FFTWin = NULL;
+	CSignalWin *m_SignalWin = NULL;
+	CAudio* m_Audio = NULL;
 
 	HWND hWnd = NULL;
-	HMENU hMenu = NULL;
-
 	RECT WinRect;
-
-	int II = 1;
-
 	UINT SignalWinHeight = 256;
 
 public:
-	CAMWin();
-	~CAMWin();
+	CFilttedWin();
+	~CFilttedWin();
 
 	void Init(void);
 	void UnInit(void);
 
 	void RegisterWindowsClass(void);
 	void OpenWindow(void);
-
 	BOOL OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
-	void InitBuff(void);
-
-	VOID GetRealClientRect(PRECT lprc);
 
 	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	static LRESULT CALLBACK DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
+	void AM_Demodulator(void);
 };

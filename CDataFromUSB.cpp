@@ -28,7 +28,7 @@ Environment:
 
 #pragma comment(lib,"setupapi.lib")  
 
-#include "CWaveData.h"
+#include "CData.h"
 #include "CDataFromUSB.h"
 
 CDataFromUSB clsGetDataUSB;
@@ -1097,7 +1097,7 @@ LPTHREAD_START_ROUTINE CDataFromUSB::GetDataUSBThreadFun(LPVOID lp)
 {
 	OPENCONSOLE;
 	clsGetDataUSB.USBGetData();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 	return 0;
 }
 
@@ -1132,7 +1132,7 @@ void CDataFromUSB::USBGetData(void)
 	while (Program_In_Process)
 	{
 
-		success = ReadFile(hRead, (char*)(clsWaveData.AdcBuff) + clsWaveData.AdcGetCharLength, 64, (PULONG)&nBytesRead, NULL);
+		success = ReadFile(hRead, (char*)(clsData.AdcBuff) + clsData.AdcGetCharLength, 64, (PULONG)&nBytesRead, NULL);
 
 		if (success)
 		{
@@ -1153,11 +1153,11 @@ void CDataFromUSB::USBGetData(void)
 			ecount++;
 			if(ecount % 2560000 == 0) printf("usb read data error! %d\n", GetLastError());
 		}
-		clsWaveData.NumPerSecInProcess += nBytesRead;
-		clsWaveData.AdcGetCharLength += nBytesRead;
-		if (clsWaveData.AdcGetCharLength == (DATA_BUFFER_LENGTH<<2)) clsWaveData.AdcGetCharLength = 0;
-		clsWaveData.AdcPos = clsWaveData.AdcGetCharLength >> 2;
-		clsWaveData.AdcGetNew = true;
+		clsData.NumPerSecInProcess += nBytesRead;
+		clsData.AdcGetCharLength += nBytesRead;
+		if (clsData.AdcGetCharLength == (DATA_BUFFER_LENGTH<<2)) clsData.AdcGetCharLength = 0;
+		clsData.AdcPos = clsData.AdcGetCharLength >> 2;
+		clsData.AdcGetNew = true;
 	}
 
 	// close devices if needed

@@ -9,55 +9,66 @@
 
 #include "public.h"
 #include "myDebug.h"
-#include "CWaveData.h"
+#include "CData.h"
 #include "CWaveFFT.h"
 
+#include "CWinMain.h"
+#include "CDemodulatorAM.h"
+#include "CAudio.h"
 #include "CFFTWin.h"
 #include "CSignalWin.h"
 #include "CAudioWin.h"
 
-#define BOUND(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
-
 CAudioWin::CAudioWin()
 {
 	OPENCONSOLE;
-	RegisterWindowsClass();
 	Init();
 }
 
 CAudioWin::~CAudioWin()
 {
 	UnInit();
-	CLOSECONSOLE;
+	//CLOSECONSOLE;
 }
+
+const char AudioWinTag[] = "CAudioWin";
 
 void CAudioWin::Init(void)
 {
-	m_Audio = new CAudio();
+	RegisterWindowsClass();
+
+	m_Audio = &mAudio;
 
 	m_SignalWin = new CSignalWin();
-
-	m_SignalWin->Init(ADC_DATA_SAMPLE_BIT, DATA_BUFFER_LENGTH);
-	
-	m_SignalWin->OrignalBuff = clsWaveData.AdcBuff;
-	m_SignalWin->OrignalBuffPos = &clsWaveData.AdcPos;
+	m_SignalWin->Tag = AudioWinTag;
+	m_SignalWin->Init(SOUNDCARD_BUFF_DATA_BIT, SOUNDCARD_BUFF_LENGTH);
+	m_SignalWin->OrignalBuff = m_Audio->outBuff;
+	m_SignalWin->OrignalBuffPos = &m_Audio->outBuffPos;
 	m_SignalWin->orignal_buff_type = short_type;
+	m_SignalWin->SampleRate = &m_Audio->SampleRate;
 
-	m_SignalWin->FilttedBuff = clsWaveData.FilttedBuff;
-	m_SignalWin->FilttedBuffPos = &clsWaveData.FilttedPos;
-	m_SignalWin->filtted_buff_type = float_type;
+	m_SignalWin->FilttedBuff = m_Audio->inBuff;
+	m_SignalWin->FilttedBuffPos = &m_Audio->inBuffPos;
+	m_SignalWin->filtted_buff_type = short_type;
 
 	m_FFTWin = new CFFTWin();
+	m_FFTWin->Tag = AudioWinTag;
 	m_FFTWin->buff_type = BUFF_DATA_TYPE::short_type;
-	m_FFTWin->DataBuff = clsWaveData.AdcBuff;
-	m_FFTWin->DataBuffPos = &clsWaveData.AdcPos;
-	m_FFTWin->data_buff_data_bits = 12;
-	m_FFTWin->data_buff_length_mask = DATA_BUFFER_MASK;
+	m_FFTWin->DataBuff = m_Audio->outBuff;
+	m_FFTWin->DataBuffPos = &m_Audio->outBuffPos;
+	m_FFTWin->data_buff_data_bits = SOUNDCARD_BUFF_DATA_BIT;
+	m_FFTWin->data_buff_length_mask = SOUNDCARD_BUFF_LENGTH_MASK;
+	m_FFTWin->SampleRate = &m_Audio->SampleRate;
+	m_FFTWin->FFTSize = 2048;
+	m_FFTWin->HalfFFTSize = m_FFTWin->FFTSize / 2;
+	m_FFTWin->FFTStep = 2048;
+
+
+	m_DemodulatorAM = new CDemodulatorAM();
 }
 
 void CAudioWin::UnInit(void)
 {
-	if (m_Audio != NULL) free(m_Audio);
 	if (m_FFTWin != NULL) free(m_FFTWin);
 	if (m_SignalWin != NULL) free(m_SignalWin);
 }
@@ -87,23 +98,6 @@ void CAudioWin::RegisterWindowsClass(void)
 	RegisterClassEx(&wcex);
 }
 
-/*
-typedef struct tagMyData
-{
-	void* p;
-	// Define creation data here. 
-} MYDATA;
-
-
-typedef struct tagMyDlgData
-{
-	SHORT   cbExtra;
-	MYDATA  myData;
-} MYDLGDATA, UNALIGNED* PMYDLGDATA;
-
-MYDLGDATA mydata;
-*/
-
 void CAudioWin::OpenWindow(void)
 {
 	if (hWnd == NULL) {
@@ -116,43 +110,20 @@ void CAudioWin::OpenWindow(void)
 
 LRESULT CALLBACK CAudioWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-
-	CAudioWin* me;
+	CAudioWin* me = (CAudioWin*)get_WinClass(hWnd);
 	
-	HGLOBAL hMemProp;
-	void* lpMem;
-	hMemProp = (HGLOBAL)GetProp(hWnd, "H");
-	if (hMemProp) {
-		lpMem = GlobalLock(hMemProp);
-		//(void*)me = *(void*)lpMem;
-		memcpy(&me, lpMem, sizeof(UINT64));
-		//me = (CAudioWin*)(*lpMem);
-		GlobalUnlock(hMemProp);
-	}
-
 	switch (message)
 	{
 	case WM_CREATE:
 	{
 		OPENCONSOLE;
-
-		//PMYDLGDATA pMyDlgdata = (PMYDLGDATA)(((LPCREATESTRUCT)lParam)->lpCreateParams);
-		//me = (CAudioWin*)pMyDlgdata->myData.p;
-		me = (CAudioWin*)(((LPCREATESTRUCT)lParam)->lpCreateParams);
-		HGLOBAL hMemProp;
-		void* lpMem;
-		hMemProp = GlobalAlloc(GPTR, sizeof(INT64));
-		lpMem = GlobalLock(hMemProp);
-		memcpy(lpMem, &me, sizeof(UINT64));
-		GlobalUnlock(hMemProp);
-		SetProp(hWnd, "H", hMemProp);
+		me = (CAudioWin*)set_WinClass(hWnd, lParam);
 
 		me->hWnd = hWnd;
 		me->hMenu = GetMenu(hWnd);
-
-
-		//uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
-		//KillTimer(hWnd, 0);//DrawInfo.uTimerId);
+		me->m_SignalWin->hMenu = me->hMenu;
+		me->m_FFTWin->hMenu = me->hMenu;
+		me->m_FFTWin->hMenuSpect = GetSubMenu(me->hMenu, 8);
 
 		me->m_SignalWin->hWnd = CreateWindow(SIGNAL_WIN_CLASS, "信号", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			0, 200, 500, 200, hWnd, NULL, hInst, me->m_SignalWin);
@@ -162,10 +133,6 @@ LRESULT CALLBACK CAudioWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 		ShowWindow(me->m_FFTWin->hWnd, SW_SHOW);
 	}
 	break;
-	case WM_TIMER:
-		InvalidateRect(hWnd, NULL, TRUE);
-		UpdateWindow(hWnd);
-		break;
 	case WM_SIZE:
 	{
 		GetClientRect(hWnd, &me->WinRect);
@@ -174,7 +141,7 @@ LRESULT CALLBACK CAudioWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 	}
 	break;
 	case WM_CHAR:
-		printf("char:%c\r\n", wParam);
+		DbgMsg("WM_CHAR:%c\r\n", wParam);
 		switch (wParam)
 		{
 		case '1':
@@ -201,15 +168,6 @@ LRESULT CALLBACK CAudioWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 	case WM_COMMAND:
 		return me->OnCommand(message, wParam, lParam);
 		break;
-	case WM_SYSCOMMAND:
-		if (LOWORD(wParam) == SC_CLOSE)
-		{
-			ShowWindow(hWnd, SW_HIDE);
-			break;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
-		break;
-
 	case WM_ERASEBKGND:
 		//不加这条消息屏幕刷新会闪烁
 		break;
@@ -222,6 +180,13 @@ LRESULT CALLBACK CAudioWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 	}
 		break;
 	case WM_DESTROY:
+		me->m_DemodulatorAM->AM_Demodulator_Doing = false;
+		while (me->m_DemodulatorAM->h_AM_Demodulator_Thread != NULL);
+
+		DestroyWindow(me->m_SignalWin->hWnd);
+		DestroyWindow(me->m_FFTWin->hWnd);
+		me->hWnd = NULL;
+
 		DbgMsg("CAudioWin WM_DESTROY\r\n");
 		break;
 
@@ -232,7 +197,7 @@ LRESULT CALLBACK CAudioWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 	return 0;
 }
 
-BOOL CAudioWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
+bool CAudioWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	wmId = LOWORD(wParam);
@@ -240,7 +205,22 @@ BOOL CAudioWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 
 	switch (wmId)
 	{
-
+	case IDM_DEMODULATOR_AM:
+		m_DemodulatorAM->AM_Demodulator_Doing = false;
+		bDemodulatorAM = !bDemodulatorAM;
+		CheckMenuItem(hMenu, IDM_SPECTRUM_ZOOMED_SHOW,
+			(bDemodulatorAM ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		if (bDemodulatorAM == true) {
+			while (m_DemodulatorAM->h_AM_Demodulator_Thread != NULL);
+			m_DemodulatorAM->h_AM_Demodulator_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CDemodulatorAM::AM_Demodulator_Thread, m_DemodulatorAM, 0, NULL);
+		}
+		break;
+	case IDM_STARTPLAY:
+		m_Audio->StartOpenOut();
+		break;
+	case IDM_STOPPLAY:
+		m_Audio->StopOpenOut();
+		break;
 	case IDM_WAVEHZOOMRESET:
 	case IDM_WAVEHZOOMINCREASE:
 	case IDM_WAVEHZOOMDECREASE:
@@ -252,30 +232,17 @@ BOOL CAudioWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 		PostMessage(m_SignalWin->hWnd, message, wParam, lParam);
 		break;
 
-	case IDM_SPECTRUM_PAUSE_BREAK:
-		break;
-	case IDM_FFT_SET:
-		break;
-	case IDM_SPECTRUM_HORZ_ZOOM_INCREASE:
-		break;
-	case IDM_SPECTRUM_HORZ_ZOOM_DECREASE:
-		break;
-	case IDM_SPECTRUM_HORZ_ZOOM_HOME:
-		break;
-	case IDM_SPECTRUM_VERT_ZOOM_INCREASE:
-		break;
-	case IDM_SPECTRUM_VERT_ZOOM_DECREASE:
-		break;
-	case IDM_SPECTRUM_VERT_ZOOM_HOME:
-		break;
-	case IDM_SPECTRUM_FOLLOW:
-		break;
+	case IDM_SPECTRUM_ORIGNAL_SHOW:
+	case IDM_SPECTRUM_ORIGNAL_LOG_SHOW:
+	case IDM_SPECTRUM_ZOOMED_SHOW:
+
 	case IDM_FFT_HORZ_ZOOM_INCREASE:
 	case IDM_FFT_HORZ_ZOOM_DECREASE:
 	case IDM_FFT_HORZ_ZOOM_HOME:
 	case IDM_FFT_VERT_ZOOM_INCREASE:
 	case IDM_FFT_VERT_ZOOM_DECREASE:
 	case IDM_FFT_VERT_ZOOM_HOME:
+	case IDM_FFT_SET:
 		PostMessage(m_FFTWin->hWnd, message, wParam, lParam);
 		break;
 	case IDM_EXIT:
