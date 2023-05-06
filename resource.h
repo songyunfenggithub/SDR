@@ -225,6 +225,10 @@
 #define IDM_AUDIO_FILT_OUT_SEL          32945
 #define IDM_AUDIO_IN_SEL                32946
 #define IDM_AUDIO_FILT_IN_SEL           32947
+#define ID_32948                        32948
+#define ID_32949                        32949
+#define ID_DEMODULATOR_FM               32950
+#define IDM_DEMODULATOR_FM              32951
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -232,7 +236,7 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        152
-#define _APS_NEXT_COMMAND_VALUE         32948
+#define _APS_NEXT_COMMAND_VALUE         32952
 #define _APS_NEXT_CONTROL_VALUE         1025
 #define _APS_NEXT_SYMED_VALUE           110
 #endif

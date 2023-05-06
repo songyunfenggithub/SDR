@@ -13,10 +13,12 @@
 #include "public.h"
 #include "myDebug.h"
 
-#include "CWaveFilter.h"
+#include "CFilter.h"
 #include "CData.h"
 #include "cuda_CFilter.cuh"
 #include "CAudio.h"
+
+using namespace DEVICES;
 
 CAudio mAudio;
 
@@ -48,6 +50,7 @@ void CAudio::Init(void)
 	FormatEx.wBitsPerSample = 16;
 	FormatEx.nBlockAlign = FormatEx.wBitsPerSample / 8 * FormatEx.nChannels;
 	FormatEx.nAvgBytesPerSec = FormatEx.nBlockAlign * FormatEx.nSamplesPerSec;
+
 	/*
 		FormatEx.nChannels = 1;
 		FormatEx.nSamplesPerSec = 44100L;
@@ -109,13 +112,14 @@ void CALLBACK CAudio::waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, D
 			mAudio.CloseIn();
 			break;
 		}
-		pWaveHdr->lpData = (char*)(mAudio.inBuff + mAudio.inBeginPos);
+		CData* cData = mAudio.inData;
+		pWaveHdr->lpData = (char*)cData->Buff + mAudio.FormatEx.nBlockAlign * mAudio.inBeginPos;
 		pWaveHdr->dwBufferLength = mAudio.FormatEx.nBlockAlign * 
 			((mAudio.inEndPos - mAudio.inBeginPos) < SOUNDCARD_STEP_LENGTH ? (mAudio.inEndPos - mAudio.inBeginPos) : SOUNDCARD_STEP_LENGTH);
 		waveInAddBuffer(hwi, pWaveHdr, sizeof(WAVEHDR));
 
 		mAudio.inBeginPos += pWaveHdr->dwBufferLength / mAudio.FormatEx.nBlockAlign;
-		mAudio.inBuffPos = mAudio.inBeginPos;
+		cData->Pos = mAudio.inBeginPos;
 		break;
 	}
 }
@@ -137,7 +141,7 @@ void CALLBACK CAudio::waveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance,
 		}
 		else {
 			LPWAVEHDR pWaveHdr = (LPWAVEHDR)dwParam1;
-			pWaveHdr->lpData = (char*)(mAudio.outBuff + mAudio.outBeginPos);
+			pWaveHdr->lpData = (char*)mAudio.outData->Buff + mAudio.FormatEx.nBlockAlign * mAudio.outBeginPos;
 			pWaveHdr->dwBufferLength = mAudio.FormatEx.nBlockAlign * 
 				((mAudio.outEndPos - mAudio.outBeginPos) < SOUNDCARD_STEP_LENGTH ? (mAudio.outEndPos - mAudio.outBeginPos) : SOUNDCARD_STEP_LENGTH);
 			waveOutPrepareHeader(mAudio.OutData.hWaveOut, pWaveHdr, sizeof(WAVEHDR));
@@ -190,11 +194,14 @@ void CAudio::OpenIn(UINT pos, UINT endPos)
 	}
 
 	InData.fInOpen = TRUE;
+	if (pos > endPos) endPos = inData->Len;
+	if (pos > endPos) pos = 0;
+	endPos &= inData->Mask;
 
 	inBeginPos = pos;
 	inEndPos = endPos;
 
-	InData.WaveInHdr1.lpData = (char*)(inBuff + inBeginPos);
+	InData.WaveInHdr1.lpData = (char*)inData->Buff + mAudio.FormatEx.nBlockAlign * inBeginPos;
 	InData.WaveInHdr1.dwBufferLength = mAudio.FormatEx.nBlockAlign * 
 		((inEndPos - inBeginPos) < SOUNDCARD_STEP_LENGTH ? (inEndPos - inBeginPos) : SOUNDCARD_STEP_LENGTH);
 	InData.WaveInHdr1.dwFlags = WHDR_DONE;
@@ -206,7 +213,7 @@ void CAudio::OpenIn(UINT pos, UINT endPos)
 	inBeginPos += InData.WaveInHdr1.dwBufferLength / mAudio.FormatEx.nBlockAlign;
 	if ((inEndPos - inBeginPos) <= 0) return;
 
-	InData.WaveInHdr2.lpData = (char*)(inBuff + inBeginPos);
+	InData.WaveInHdr2.lpData = (char*)inData->Buff + mAudio.FormatEx.nBlockAlign * inBeginPos;
 	InData.WaveInHdr2.dwBufferLength = mAudio.FormatEx.nBlockAlign * 
 		((inEndPos - inBeginPos) < SOUNDCARD_STEP_LENGTH ? (inEndPos - inBeginPos) : SOUNDCARD_STEP_LENGTH);
 	InData.WaveInHdr2.dwFlags = WHDR_DONE;
@@ -223,8 +230,6 @@ void CAudio::OpenOut(UINT dwBeginPos, UINT dwEndPos)
 
 	UINT  wResult;
 
-	if (dwEndPos < dwBeginPos || dwEndPos > SOUNDCARD_BUFF_LENGTH)dwEndPos = SOUNDCARD_BUFF_LENGTH;
-
 	if (waveOutOpen((LPHWAVEOUT)&OutData.hWaveOut, WAVE_MAPPER,
 		(LPWAVEFORMATEX)&FormatEx,
 		(DWORD_PTR)waveOutProc, 0L, CALLBACK_FUNCTION))
@@ -233,13 +238,16 @@ void CAudio::OpenOut(UINT dwBeginPos, UINT dwEndPos)
 		printf("Failed to open waveform output device.\r\n");
 		return;
 	}
+	if (dwBeginPos > dwEndPos) dwEndPos = outData->Len;
+	if (dwBeginPos > dwEndPos) dwBeginPos = 0;
+	dwEndPos &= outData->Mask;
 
 	outBeginPos = dwBeginPos;
 	outEndPos = dwEndPos;
 
 	OutData.fOutOpen = TRUE;
 
-	OutData.WaveOutHdr1.lpData = (char*)(outBuff + outBeginPos);// * FormatEx.nBlockAlign; 
+	OutData.WaveOutHdr1.lpData = (char*)outData->Buff + mAudio.FormatEx.nBlockAlign * outBeginPos;// * FormatEx.nBlockAlign; 
 	OutData.WaveOutHdr1.dwBufferLength = mAudio.FormatEx.nBlockAlign * 
 		((outEndPos - outBeginPos) < SOUNDCARD_STEP_LENGTH ? (outEndPos - outBeginPos) : SOUNDCARD_STEP_LENGTH);
 	OutData.WaveOutHdr1.dwFlags = 0L;
@@ -250,7 +258,7 @@ void CAudio::OpenOut(UINT dwBeginPos, UINT dwEndPos)
 	outBeginPos += OutData.WaveOutHdr1.dwBufferLength / mAudio.FormatEx.nBlockAlign;
 	if (outBeginPos >= outEndPos) return;
 
-	OutData.WaveOutHdr2.lpData = (char*)(outBuff + outBeginPos);// * FormatEx.nBlockAlign; 
+	OutData.WaveOutHdr2.lpData = (char*)outData->Buff + mAudio.FormatEx.nBlockAlign * outBeginPos;// * FormatEx.nBlockAlign; 
 	OutData.WaveOutHdr2.dwBufferLength = mAudio.FormatEx.nBlockAlign * 
 		((outEndPos - outBeginPos) < SOUNDCARD_STEP_LENGTH ? (outEndPos - outBeginPos) : SOUNDCARD_STEP_LENGTH);
 	OutData.WaveOutHdr2.dwFlags = 0L;
@@ -269,19 +277,20 @@ void CALLBACK CAudio::waveOutProc2(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance
 	case WOM_OPEN:
 		break;
 	case WOM_CLOSE:
+		DbgMsg("Audio WOM_CLOSE\r\n");
 		for (int i = 0; i < SOUNDCARD_WAVEHDR_DEEP; i++)
 		{
-			waveOutUnprepareHeader(mAudio.hWaveOut, &mAudio.WaveOutHdrs[i], sizeof(WAVEHDR));
+			//waveOutUnprepareHeader(mAudio.hWaveOut, &mAudio.WaveOutHdrs[i], sizeof(WAVEHDR));
 		}
+		mAudio.waveHDRUsed = 0;
 		break;
 	case WOM_DONE:
-		mAudio.waveHDRPosTail++;
-		mAudio.waveHDRPosTail &= SOUNDCARD_WAVEHDR_DEEP_MASK;
+		mAudio.waveHDRUsed--;
 		break;
 	}
 }
 
-void CAudio::StartOpenOut(void)
+void CAudio::StartOut(void)
 {
 	if (boutOpened == true) return;
 	UINT  wResult;
@@ -297,16 +306,16 @@ void CAudio::StartOpenOut(void)
 		printf("Failed to open waveform output device.\r\n");
 		return;
 	}
-	waveHDRPosHead = 0;
-	waveHDRPosTail = 0;
+	waveHDRPos = 0;
+	waveHDRUsed= 0;
 	boutOpened = true;
 }
 
-void CAudio::StopOpenOut(void)
+void CAudio::StopOut(void)
 {
 	if (boutOpened == true) {
-		//waveOutPause(hWaveOut);
-		//waveOutReset(hWaveOut);	
+		waveOutPause(hWaveOut);
+		waveOutReset(hWaveOut);	
 		boutOpened = false;
 		waveOutClose(hWaveOut);	
 	}
@@ -315,11 +324,15 @@ void CAudio::StopOpenOut(void)
 INT CAudio::WriteToOut(UINT pos)
 {
 	if (boutOpened == false) return -1;
+	if (waveHDRUsed == SOUNDCARD_WAVEHDR_DEEP) {
+		DbgMsg("waveHDRUsed: %d\r\n", waveHDRUsed);
+		return waveHDRUsed;
+	}
+	WAVEHDR* wavehdr = &WaveOutHdrs[waveHDRPos++];
+	waveHDRPos &= SOUNDCARD_WAVEHDR_DEEP_MASK;
+	waveHDRUsed++;
 
-	WAVEHDR* wavehdr = &WaveOutHdrs[waveHDRPosHead++];
-	waveHDRPosHead &= SOUNDCARD_WAVEHDR_DEEP_MASK;
-
-	wavehdr->lpData = (char*)(outBuff + pos);// * FormatEx.nBlockAlign; 
+	wavehdr->lpData = (char*)outData->Buff + mAudio.FormatEx.nBlockAlign * pos;// * FormatEx.nBlockAlign; 
 	wavehdr->dwBufferLength = mAudio.FormatEx.nBlockAlign * SOUNDCARD_STEP_LENGTH;
 	wavehdr->dwFlags = 0L;
 	wavehdr->dwLoops = 0L;
@@ -328,7 +341,31 @@ INT CAudio::WriteToOut(UINT pos)
 	
 	//if (((waveHDRPosHead - waveHDRPosTail) & SOUNDCARD_WAVEHDR_DEEP_MASK) > 2) DbgMsg("waveHDRPos=%d\r\n", (waveHDRPosHead - waveHDRPosTail) & SOUNDCARD_WAVEHDR_DEEP_MASK);
 
-	return (waveHDRPosHead - waveHDRPosTail) & SOUNDCARD_WAVEHDR_DEEP_MASK;
+	return waveHDRUsed;
+}
+
+INT CAudio::WriteToOut(void* buff)
+{
+	if (boutOpened == false) return -1;
+
+	if (waveHDRUsed == SOUNDCARD_WAVEHDR_DEEP) {
+		DbgMsg("waveHDRUsed: %d\r\n", waveHDRUsed);
+		return waveHDRUsed;
+	}
+	WAVEHDR* wavehdr = &WaveOutHdrs[waveHDRPos++];
+	waveHDRPos &= SOUNDCARD_WAVEHDR_DEEP_MASK;
+	waveHDRUsed++;
+
+	wavehdr->lpData = (char*)buff;
+	wavehdr->dwBufferLength = mAudio.FormatEx.nBlockAlign * SOUNDCARD_STEP_LENGTH;
+	wavehdr->dwFlags = 0L;
+	wavehdr->dwLoops = 0L;
+	waveOutPrepareHeader(hWaveOut, wavehdr, sizeof(WAVEHDR));
+	waveOutWrite(hWaveOut, wavehdr, sizeof(WAVEHDR));
+
+	//if (((waveHDRPosHead - waveHDRPosTail) & SOUNDCARD_WAVEHDR_DEEP_MASK) > 2) DbgMsg("waveHDRPos=%d\r\n", (waveHDRPosHead - waveHDRPosTail) & SOUNDCARD_WAVEHDR_DEEP_MASK);
+
+	return waveHDRUsed;
 }
 
 void CAudio::GeneratorWave(void)
@@ -351,11 +388,11 @@ void CAudio::GeneratorWave(void)
 	dbStep2 = dbHz2 * 2 * pi / Sample11;
 
 
-	CHAR* p = (CHAR*)outBuff;
+	AUDIODATATYPE* p = (AUDIODATATYPE*)outData->Buff;
 
 	for (dwI = 0; dwI < SOUNDCARD_BUFF_LENGTH; dwI++)
 	{
-		*(p++) = (CHAR)(sin(dbW1 += dbStep1) * 0x4F + 0x80 +
+		*(p++) = (AUDIODATATYPE)(sin(dbW1 += dbStep1) * 0x4F + 0x80 +
 			sin(dbW2 += dbStep2) * 0x1F);
 	}
 }

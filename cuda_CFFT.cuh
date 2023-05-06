@@ -9,33 +9,40 @@
 
 #include "public.h"
 
-class cuda_CFFT
-{
-public:
-	char* TAG = NULL;
+class CData;
 
-	UINT FFTSize, FFTStep;
-	cufftDoubleComplex* cuda_FFT_CompiData = NULL;
-	cufftDoubleComplex* cuda_FFT_CompoData = NULL;
-	cufftDoubleComplex* cuda_FFT_d_fftData = NULL;
-	cufftDoubleComplex* cuda_FFT_d_outfftData = NULL;
-	cufftHandle cuda_FFT_fft_plan = 0;// cuda library function handle
+namespace METHOD {
 
-	double FFTMaxValue;
+	class cuda_CFFT
+	{
+	public:
+		char* TAG = NULL;
 
-public:
+		CData* Data = NULL;
+		FFT_INFO* FFTInfo;
 
-	cuda_CFFT();
-	~cuda_CFFT();
+		cufftDoubleComplex* cuda_FFT_CompiData = NULL;
+		cufftDoubleComplex* cuda_FFT_CompoData = NULL;
+		cufftDoubleComplex* cuda_FFT_d_fftData = NULL;
+		cufftDoubleComplex* cuda_FFT_d_outfftData = NULL;
+		cufftHandle cuda_FFT_fft_plan = 0;// cuda library function handle
 
-	void cuda_FFT_Init(UINT fftsize, UINT fftstep, UINT data_bits);
-	void cuda_FFT_UnInit(void);
+		double FFTMaxValue;
 
-	void cuda_FFT_Prepare_Data(void* Buff, BUFF_DATA_TYPE type, UINT pos, UINT mask);
+	public:
 
-	void cuda_FFT(void);
-	void cuda_FFT(void* Buff, BUFF_DATA_TYPE type, UINT pos, UINT mask);
+		cuda_CFFT();
+		~cuda_CFFT();
 
-	void cuda_FFT_Prepare_Data_for_MaxValue(double* buff);
-	double Get_FFT_Max_Value(UINT data_bits);
-};
+		void cuda_FFT_Init(CData* data);
+		void cuda_FFT_UnInit(void);
+
+		void cuda_FFT_Prepare_Data(UINT pos);
+
+		void cuda_FFT(void);
+		void cuda_FFT(UINT pos);
+
+		void cuda_FFT_Prepare_Data_for_MaxValue(double* buff);
+		double Get_FFT_Max_Value(void);
+	};
+}

@@ -7,9 +7,6 @@
 // Helper functions for CUDA
 #include "device_launch_parameters.h"
 
-#include "CData.h"
-#include "CWaveFFT.h"
-
 extern cufftDoubleComplex* cuda_FFT_CompoData;
 extern cufftDoubleComplex* cuda_FFT_CompoData_filtted;
 

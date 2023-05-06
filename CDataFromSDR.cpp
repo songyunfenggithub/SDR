@@ -7,8 +7,7 @@
 
 #include "public.h"
 #include "CData.h"
-#include "CWaveFilter.h"
-#include "CWaveFFT.h"
+#include "CFilter.h"
 #include "CWinFFT.h"
 #include "CWinSpectrum.h"
 
@@ -18,7 +17,7 @@
 
 #pragma comment(lib,"SDRPlay_API.3.09/API/x64/sdrplay_api.lib")
 
-
+using namespace DEVICES;
 
 CDataFromSDR clsGetDataSDR;
 
@@ -60,43 +59,51 @@ void CDataFromSDR::StreamACallback(short* xi, short* xq, sdrplay_api_StreamCbPar
 	);
 	*/
 
-	int m1 = (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) - clsData.AdcGetCharLength;
+	int m1 = (AdcData->Len << AdcData->MoveBit) - AdcData->CharPos;
 	int m2 = 0;
 	if (m1 > numSamples) {
 		m1 = numSamples;
-		memcpy((char*)clsData.AdcBuff + clsData.AdcGetCharLength, xi, m1);
-		clsData.AdcGetCharLength += m1;
+		memset(AdcBuffMarks + (AdcData->CharPos >> AdcData->MoveBit), 0, m1 >> AdcData->MoveBit);
+		memcpy((char*)AdcData->Buff + AdcData->CharPos, xi, m1);
+		AdcData->CharPos += m1;
 	}
 	else {
 		m2 = numSamples - m1;
-		memcpy((char*)clsData.AdcBuff + clsData.AdcGetCharLength, xi, m1);
-		memcpy((char*)clsData.AdcBuff, xi, m2);
-		clsData.AdcGetCharLength = m2;
+		memset(AdcBuffMarks + (AdcData->CharPos >> AdcData->MoveBit), 0, m1 >> AdcData->MoveBit);
+		memset(AdcBuffMarks, 0, m2 >> AdcData->MoveBit);
+		memcpy((char*)AdcData->Buff + AdcData->CharPos, xi, m1);
+		memcpy((char*)AdcData->Buff, xi + m1, m2);
+		AdcData->CharPos = m2;
 	}
+	AdcBuffMarks[((AdcData->CharPos - numSamples) >> AdcData->MoveBit) & AdcData->Mask] = 1;
 
-	m1 = (DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) - clsData.AdcGetCharLength;
+	m1 = (AdcData->Len << AdcData->MoveBit) - AdcData->CharPos;
 	m2 = 0;
 	if (m1 > numSamples) {
 		m1 = numSamples;
-		memcpy((char*)clsData.AdcBuff + clsData.AdcGetCharLength, xq, m1);
-		clsData.AdcGetCharLength += m1;
+		memset(AdcBuffMarks + (AdcData->CharPos >> AdcData->MoveBit), 0, m1 >> AdcData->MoveBit);
+		memcpy((char*)AdcData->Buff + AdcData->CharPos, xq, m1);
+		AdcData->CharPos += m1;
 	}
 	else {
 		m2 = numSamples - m1;
-		memcpy((char*)clsData.AdcBuff + clsData.AdcGetCharLength, xq, m1);
-		memcpy((char*)clsData.AdcBuff, xq, m2);
-		clsData.AdcGetCharLength = m2;
+		memset(AdcBuffMarks + (AdcData->CharPos >> AdcData->MoveBit), 0, m1 >> AdcData->MoveBit);
+		memset(AdcBuffMarks, 0, m2 >> AdcData->MoveBit);
+		memcpy((char*)AdcData->Buff + AdcData->CharPos, xq, m1);
+		memcpy((char*)AdcData->Buff, xq + m1, m2);
+		AdcData->CharPos = m2;
 	}
+	AdcBuffMarks[((AdcData->CharPos - numSamples) >> AdcData->MoveBit) & AdcData->Mask] = 2;
 
-	//StringToHex((char*)(clsData.AdcBuff) + clsData.AdcGetCharLength, 20);
+	//StringToHex((char*)(AdcData->Buff) + AdcData->CharPos, 20);
 	//printf("%d\n", len);
 
-	
-	if ((DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) == clsData.AdcGetCharLength) clsData.AdcGetCharLength = 0;
+	if ((AdcData->Len << AdcData->MoveBit) == AdcData->CharPos)AdcData->CharPos = 0;
+	//if ((DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) == AdcData->CharPos) AdcData->CharPos = 0;
 
-	clsData.AdcPos = clsData.AdcGetCharLength >> DATA_BYTE_TO_POSITION_MOVEBIT;
-	//printf("pos:%d\n", clsData.AdcPos);
-	clsData.AdcGetNew = true;
+	AdcData->Pos = AdcData->CharPos >> AdcData->MoveBit;
+	//printf("pos:%d\n", AdcData->Pos);
+	AdcData->GetNew = true;
 
 	return;
 }
@@ -262,7 +269,7 @@ void CDataFromSDR::open_SDR_device(void)
 			if (deviceParams->devParams != NULL)
 			{
 				// Change from default Fs to 8MHz
-				deviceParams->devParams->fsFreq.fsHz = clsData.AdcSampleRate;
+				deviceParams->devParams->fsFreq.fsHz = 8000000;
 			}
 			// Configure tuner parameters (depends on selected Tuner which parameters to use)
 			chParams = (chosenDevice->tuner == sdrplay_api_Tuner_B) ? deviceParams->rxChannelB :
@@ -289,11 +296,11 @@ void CDataFromSDR::open_SDR_device(void)
 			CDataFromSDR::cbFns.StreamACbFn = CDataFromSDR::StreamACallback;
 			CDataFromSDR::cbFns.StreamBCbFn = CDataFromSDR::StreamBCallback;
 			CDataFromSDR::cbFns.EventCbFn = CDataFromSDR::EventCallback;
-			// Now we're ready to start by calling the initialisation function
+			// Now we're ready to start by calling the initialisation function 
 			// This will configure the device and start streaming
 			if ((err = sdrplay_api_Init(chosenDevice->dev, &CDataFromSDR::cbFns, NULL)) != sdrplay_api_Success)
 			{
-				printf("sdrplay_api_Init failed %s\n", err, sdrplay_api_GetErrorString(err));
+				printf("sdrplay_api_Init failed %d %s\n", err, sdrplay_api_GetErrorString(err));
 				if (err == sdrplay_api_StartPending) // This can happen if we're starting in master / slave mode as a slave and the master is not yet running
 				{
 					while (1)

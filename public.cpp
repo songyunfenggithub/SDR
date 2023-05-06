@@ -8,8 +8,14 @@
 
 #include "CWinSpectrum.h"
 #include "CAudioWin.h"
+#include "public.h"
 
 HINSTANCE	hInst;
+
+FFT_INFO FFTInfo_Signal;
+FFT_INFO FFTInfo_Filtted;
+FFT_INFO FFTInfo_Audio;
+FFT_INFO FFTInfo_AudioFiltted;
 
 //HANDLE  cuda_FFT_hMutexBuff;
 
@@ -17,7 +23,6 @@ BOOLEAN Program_In_Process = true;
 BOOLEAN isGetDataExited = false;
 
 CHAR IniFilePath[] = "./default.ini";
-
 
 void* get_WinClass(HWND hWnd)
 {

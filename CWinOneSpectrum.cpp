@@ -9,13 +9,15 @@
 
 #include "public.h"
 #include "CData.h"
-#include "CWaveFFT.h"
+#include "CFFT.h"
 #include "CWinSpectrum.h"
 #include "CWinOneSpectrum.h"
 
 #include "CFFTWin.h"
 
 using namespace std;
+using namespace WINS; 
+//using namespace DEVICES;
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -120,21 +122,18 @@ LRESULT CALLBACK CWinOneSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam
 	case WM_MOUSEMOVE:
 		MouseX = GET_X_LPARAM(lParam);
 		MouseY = GET_Y_LPARAM(lParam);
-		Hz = ((double)(MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom + clsWinSpect.HScrollPos) * clsData.AdcSampleRate / clsWaveFFT.FFTSize;
+		Hz = ((double)(MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom + clsWinSpect.HScrollPos) * AdcData->SampleRate / FFTInfo_Signal.FFTSize;
 		//OnMouse(hWnd);
 		break;
-
 	case WM_TIMER:
 		InvalidateRect(hWnd, NULL, TRUE);
 		UpdateWindow(hWnd);
 		break;
-
 	case WM_SIZE:
 		InitDrawBuff();
 		GetRealClientRect(&rt);
 		WinWidth = rt.right;
 		break;
-
 	case WM_COMMAND:
 		return OnCommand(message, wParam, lParam);
 		break;
@@ -216,15 +215,66 @@ void CWinOneSpectrum::Paint(void)
 
 #define FFT_MAX_SAMPLING 16
 
-void CWinOneSpectrum::PaintSpectrum(void)
+void CWinOneSpectrum::PaintSpectrum(void* fft)
 {
-	WaitForSingleObject(clsWinOneSpectrum.hDrawMutex, INFINITE);
-	WaitForSingleObject(clsWinSpect.hMutexBuff, INFINITE);
+	CFFT* FFTOrignal = (CFFT*)clsWinSpect.FFTOrignal;
+	CFFT* FFTFiltted = (CFFT*)clsWinSpect.FFTFiltted;
+	CFFT* cFFT = (CFFT*)fft;
 
-	double* pBuf = clsWinOneSpectrum.bSpectrumZoomedShow == true ? 
-		clsWinSpect.BrieflyBuffs[clsWinOneSpectrum.whichSignel] : clsWinSpect.Buffs[clsWinOneSpectrum.whichSignel];
+	if (
+		(cFFT == FFTOrignal && whichSignel > 1)
+		||
+		(cFFT == FFTFiltted && whichSignel < 2)
+		)return;
 
-	UINT32 halfFFTSize = clsWaveFFT.HalfFFTSize;
+	WaitForSingleObject(hDrawMutex, INFINITE);
+	WaitForSingleObject(cFFT->hMutexDraw, INFINITE);
+	
+	CFFT* cfft = (CFFT*)fft;
+	double* pBuf;
+	UINT32 halfFFTSize;
+
+	if (bSpectrumBrieflyShow == true) {
+		switch (whichSignel) {
+		case 0:
+			pBuf = FFTOrignal->FFTBrieflyBuff;
+			halfFFTSize = FFTInfo_Signal.HalfFFTSize;
+			break;
+		case 1:
+			pBuf = FFTOrignal->FFTBrieflyLogBuff;
+			halfFFTSize = FFTInfo_Signal.HalfFFTSize;
+			break;
+		case 2:
+			pBuf = FFTFiltted->FFTBrieflyBuff;
+			halfFFTSize = FFTInfo_Filtted.HalfFFTSize;
+			break;
+		case 3:
+			pBuf = FFTFiltted->FFTBrieflyLogBuff;
+			halfFFTSize = FFTInfo_Filtted.HalfFFTSize;
+			break;
+		}
+	}
+	else {
+		switch (whichSignel) {
+		case 0:
+			pBuf = FFTOrignal->FFTOutBuff;
+			halfFFTSize = FFTInfo_Signal.HalfFFTSize;
+			break;
+		case 1:
+			pBuf = FFTOrignal->FFTOutLogBuff;
+			halfFFTSize = FFTInfo_Signal.HalfFFTSize;
+			break;
+		case 2:
+			pBuf = FFTFiltted->FFTOutBuff;
+			halfFFTSize = FFTInfo_Filtted.HalfFFTSize;
+			break;
+		case 3:
+			pBuf = FFTFiltted->FFTOutLogBuff;
+			halfFFTSize = FFTInfo_Filtted.HalfFFTSize;
+			break;
+		}
+	}
+
 	UINT DrawLen = clsWinOneSpectrum.WinWidth - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT;
 	RECT rt;
 	UINT64 color;
@@ -398,7 +448,7 @@ void CWinOneSpectrum::PaintSpectrum(void)
 			}
 			*/
 //			color = (UINT)(((double)(1.0 * 0xFFFFFFFF) / fftmaxdiff) * (pBuf[i] - fftminv));
-			color = (UINT)(((double)(1.0 * 0xFFFFFFFF) / clsWaveFFT.FFTMaxValue) * (pBuf[i]));
+			color = (UINT)(((double)(1.0 * 0xFFFFFFFF) / ((CFFT*)clsWinSpect.FFTOrignal)->FFTMaxValue) * (pBuf[i]));
 			if (C = (BYTE)(color >> 24)) cx = RGB(255, ~C, ~C);
 			else {
 				if (C = (BYTE)(color >> 16)) cx = RGB(C, C, 255);
@@ -455,8 +505,8 @@ void CWinOneSpectrum::PaintSpectrum(void)
 
 	clsWinOneSpectrum.inPaintSpectrumThread = false;
 
-	ReleaseMutex(clsWinSpect.hMutexBuff);
-	ReleaseMutex(clsWinOneSpectrum.hDrawMutex);
+	ReleaseMutex(cFFT->hMutexDraw);
+	ReleaseMutex(hDrawMutex);
 
 }
 

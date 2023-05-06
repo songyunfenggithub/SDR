@@ -10,15 +10,15 @@
 #include "public.h"
 #include "CSoundCard.h"
 #include "CData.h"
-#include "CWaveFFT.h"
-#include "CWaveFilter.h"
+#include "CFilter.h"
 #include "CWinFFT.h"
 #include "CWinSDR.h"
 
 #include "CWinSDRScan.h"
 
-
 using namespace std;
+using namespace WINS; 
+//using namespace DEVICES;
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -121,7 +121,7 @@ LRESULT CALLBACK CWinSDRScan::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 	case WM_MOUSEMOVE:
 		MouseX = GET_X_LPARAM(lParam);
 		MouseY = GET_Y_LPARAM(lParam);
-		//Hz = ((double)MouseY / clsWinSpect.WinOneSpectrumVScrollZoom + clsWinSpect.WinOneSpectrumVScrollPos) * clsData.AdcSampleRate / clsWaveFFT.FFTSize;
+		//Hz = ((double)MouseY / clsWinSpect.WinOneSpectrumVScrollZoom + clsWinSpect.WinOneSpectrumVScrollPos) * AdcData->SampleRate / clsWaveFFT.FFTSize;
 		OnMouse(hWnd);
 		break;
 
@@ -205,15 +205,15 @@ void CWinSDRScan::OnMouse(HWND hWnd)
 
 	int i = 0;
 	char s[500], t[100];
-	FILTER_CORE_DATA_TYPE* pFilterCore = clsWaveFilter.pCurrentFilterInfo == NULL ? clsWaveFilter.FilterCore : clsWaveFilter.pCurrentFilterInfo->FilterCore;
-	int FilterLength = clsWaveFilter.pCurrentFilterInfo == NULL ? clsWaveFilter.FilterCoreLength : clsWaveFilter.pCurrentFilterInfo->CoreLength;
+	FILTER_CORE_DATA_TYPE* pFilterCore = clsFilter.pCurrentFilterInfo == NULL ? clsFilter.FilterCore : clsFilter.pCurrentFilterInfo->FilterCore;
+	int FilterLength = clsFilter.pCurrentFilterInfo == NULL ? clsFilter.FilterCoreLength : clsFilter.pCurrentFilterInfo->CoreLength;
 	int X = (clsWinSpect.HScrollPos + MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
 	X = BOUND(X, 0, (clsWinSpect.HScrollPos + rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / clsWinSpect.HScrollZoom);
 	double Y = X > FilterLength ? 0 : pFilterCore[X];
 	int n = 0;
 	n += sprintf(strMouse + n, "X: %d, core V: %lf", X, Y);
 
-	double Hz = (double)X * clsData.AdcSampleRate / clsWaveFFT.FFTSize;
+	double Hz = (double)X * AdcData->SampleRate / clsWaveFFT.FFTSize;
 	Y = X > clsWaveFFT.FFTSize / 2 ? 0 : clsWinSpect.OrignalFFTBuff[X];
 	n += sprintf(strMouse + n, " | ");
 	n += sprintf(strMouse + n, "Hz: %.03f, FFT: %s", Hz, formatKDouble(Y, 0.001, "", t));
@@ -276,7 +276,7 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 		{
 			if (!(i % 5))
 			{
-				sprintf(s, "%.02fhz", (double)(i * 32 + HScrollPos) / HScrollZoom * clsData.AdcSampleRate / clsWaveFFT.FFTSize);
+				sprintf(s, "%.02fhz", (double)(i * 32 + HScrollPos) / HScrollZoom * AdcData->SampleRate / FFTInfo_Signal.FFTSize);
 				r.top = WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT + DIVLONG;
 				r.left = x;
 				SetTextColor(hdc, COLOR_ORIGNAL_FFT);
@@ -331,7 +331,7 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 	double Y = 0;
 	int X;
 	double CoreCenter = 256;
-	int FFTLength = clsWaveFFT.FFTSize / 2;
+	int FFTLength = FFTInfo_Signal.HalfFFTSize;
 
 	WaitForSingleObject(hMutexUseBuff, INFINITE);
 
@@ -471,7 +471,7 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 #define DRAW_TEXT_X		(WAVE_RECT_BORDER_LEFT + 10)	
 #define DRAW_TEXT_Y		(WAVE_RECT_BORDER_TOP + DIVLONG + 20)
 		double FullVotage = 5.0;
-		double VotagePerDIV = (FullVotage / (unsigned __int64)((UINT64)1 << (sizeof(ADCDATATYPE) * 8)));
+		double VotagePerDIV = (FullVotage / (unsigned __int64)((UINT64)1 << (sizeof(ADC_DATA_TYPE) * 8)));
 		char tstr1[100], tstr2[100];
 		r.top = DRAW_TEXT_Y;
 		r.left = DRAW_TEXT_X;
@@ -483,8 +483,8 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 			"FFT Size: %d      FFT Step: %d\r\n"\
 			"Sepctrum Hz£º%.03f",
 			CoreLength,
-			clsData.AdcSampleRate, clsData.NumPerSec,
-			clsWaveFFT.FFTSize, clsWaveFFT.FFTStep,
+			AdcData->SampleRate, AdcData->NumPerSec,
+			FFTInfo_Signal.FFTSize, FFTInfo_Signal.FFTStep,
 			clsWinOneSpectrum.Hz
 		);
 		SetBkMode(hdc, TRANSPARENT);

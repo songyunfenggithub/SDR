@@ -1,27 +1,4 @@
 
-/*++
-
-Copyright (c) Microsoft Corporation.  All rights reserved.
-
-	THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY
-	KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-	IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR
-	PURPOSE.
-
-Module Name:
-
-	TESTAPP.C
-
-Abstract:
-
-	Console test app for usbsamp.SYS driver
-
-Environment:
-
-	user mode only
-
---*/
-
 #include "stdafx.h"
 #include <iostream>
 #include "public.h"
@@ -30,6 +7,8 @@ Environment:
 
 #include "CData.h"
 #include "CDataFromUSB.h"
+
+using namespace DEVICES;
 
 CDataFromUSB clsGetDataUSB;
 
@@ -1132,7 +1111,7 @@ void CDataFromUSB::USBGetData(void)
 	while (Program_In_Process)
 	{
 
-		success = ReadFile(hRead, (char*)(clsData.AdcBuff) + clsData.AdcGetCharLength, 64, (PULONG)&nBytesRead, NULL);
+		success = ReadFile(hRead, (char*)(AdcData->Buff) + AdcData->CharPos, 64, (PULONG)&nBytesRead, NULL);
 
 		if (success)
 		{
@@ -1153,11 +1132,10 @@ void CDataFromUSB::USBGetData(void)
 			ecount++;
 			if(ecount % 2560000 == 0) printf("usb read data error! %d\n", GetLastError());
 		}
-		clsData.NumPerSecInProcess += nBytesRead;
-		clsData.AdcGetCharLength += nBytesRead;
-		if (clsData.AdcGetCharLength == (DATA_BUFFER_LENGTH<<2)) clsData.AdcGetCharLength = 0;
-		clsData.AdcPos = clsData.AdcGetCharLength >> 2;
-		clsData.AdcGetNew = true;
+		AdcData->CharPos += nBytesRead;
+		if (AdcData->CharPos == (AdcData->Len << AdcData->MoveBit)) AdcData->CharPos = 0;
+		AdcData->Pos = AdcData->CharPos >> 2;
+		AdcData->GetNew = true;
 	}
 
 	// close devices if needed

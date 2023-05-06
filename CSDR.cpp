@@ -11,7 +11,7 @@
 
 #include <map>
 
-#include "CWaveFilter.h"
+#include "CFilter.h"
 #include "CDataFromSDR.h"
 #include "CWinSDR.h"
 
@@ -20,6 +20,8 @@
 #include "SDRPlay_API.3.09/API/inc/sdrplay_api.h"
 
 #pragma comment(lib,"SDRPlay_API.3.09/API/x64/sdrplay_api.lib")
+
+using namespace DEVICES;
 
 CSDR clsSDR;
 
@@ -952,13 +954,13 @@ void CSDR::edit_check_range(void)
 void CSDR::set_params_SampleRate(int index)
 {
 	//clsSDR.SdrSampleRate = *(double*)SDR_params[index].pValue;
-	//clsData.AdcSampleRate = clsSDR.DecimationFactorEnable != 0 ? clsSDR.SdrSampleRate / clsSDR.DecimationFactor : clsSDR.SdrSampleRate;
+	//AdcData->SampleRate = clsSDR.DecimationFactorEnable != 0 ? clsSDR.SdrSampleRate / clsSDR.DecimationFactor : clsSDR.SdrSampleRate;
 	
-	clsData.AdcSampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ? 
+	AdcData->SampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ? 
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz / clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor : 
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz;
-	clsWaveFilter.rootFilterInfo.SampleRate = clsData.AdcSampleRate / (1 << clsWaveFilter.rootFilterInfo.decimationFactorBit);
-	clsWaveFilter.ReBuildFilterCore();
+	clsMainFilter.rootFilterInfo.SampleRate = AdcData->SampleRate / (1 << clsMainFilter.rootFilterInfo.decimationFactorBit);
+	clsMainFilter.ReBuildFilterCore();
 	printf("set_params_SampleRate\r\n");
 }
 

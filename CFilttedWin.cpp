@@ -9,13 +9,17 @@
 
 #include "public.h"
 #include "myDebug.h"
-#include "CWaveFilter.h"
+#include "CFilter.h"
 #include "CData.h"
+#include "CFFT.h"
 
 #include "CAudio.h"
 #include "CFFTWin.h"
 #include "CSignalWin.h"
 #include "CFilttedWin.h"
+
+using namespace WINS;
+using namespace METHOD;
 
 CFilttedWin::CFilttedWin()
 {
@@ -35,35 +39,26 @@ void CFilttedWin::Init(void)
 {
 	RegisterWindowsClass();
 	
-	m_Audio = &mAudio;
-
 	m_SignalWin = new CSignalWin();
-	m_SignalWin->Init(ADC_DATA_SAMPLE_BIT, DATA_BUFFER_LENGTH);
 	m_SignalWin->Tag = FilttedWinTag;
-	m_SignalWin->OrignalBuff = clsData.FilttedBuff;
-	m_SignalWin->OrignalBuffPos = &clsData.FilttedBuffPos;
-	m_SignalWin->orignal_buff_type = float_type;
-	m_SignalWin->SampleRate = &clsWaveFilter.rootFilterInfo.SampleRate;
-
-	//m_SignalWin->OrignalBuff = clsData.AdcBuff;
-	//m_SignalWin->OrignalBuffPos = &clsData.AdcPos;
-	//m_SignalWin->orignal_buff_type = short_type;
-
-	//m_SignalWin->FilttedBuff = clsData.FilttedBuff;
-	//m_SignalWin->FilttedBuffPos = &clsData.FilttedBuffPos;
-	//m_SignalWin->filtted_buff_type = float_type;
+	m_SignalWin->DataOrignal = AdcDataFiltted;
+	m_SignalWin->Init();
 
 	m_FFTWin = new CFFTWin();
-
 	m_FFTWin->Tag = FilttedWinTag;
+	m_FFTWin->Data = AdcDataFiltted;
+//	FFTInfo_Audio.FFTSize = 2048;
+//	FFTInfo_Audio.HalfFFTSize = FFTInfo_Audio.FFTSize / 2;
+//	FFTInfo_Audio.FFTStep = 2048;
+	((CFFT*)(m_FFTWin->fft))->FFTInfo = &FFTInfo_Filtted;
 
-	m_FFTWin->buff_type = BUFF_DATA_TYPE::float_type;
-	m_FFTWin->DataBuff = clsData.FilttedBuff;
-	m_FFTWin->DataBuffPos = &clsData.FilttedBuffPos;
-	m_FFTWin->data_buff_data_bits = ADC_DATA_SAMPLE_BIT;
-	m_FFTWin->data_buff_length_mask = DATA_BUFFER_MASK;
+	//m_FFTWin->buff_type = BUFF_DATA_TYPE::float_type;
+	//m_FFTWin->DataBuff = AdcData->FilttedBuff;
+	//m_FFTWin->DataBuffPos = &AdcData->FilttedBuffPos;
+	//m_FFTWin->data_buff_data_bits = ADC_DATA_SAMPLE_BIT;
+	//m_FFTWin->data_buff_length_mask = DATA_BUFFER_MASK;
 
-	m_FFTWin->SampleRate = &clsWaveFilter.rootFilterInfo.SampleRate;
+	//m_FFTWin->SampleRate = &clsFilter.rootFilterInfo.SampleRate;
 
 }
 

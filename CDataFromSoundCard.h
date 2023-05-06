@@ -5,42 +5,45 @@
 #include <msacm.h>
 #include <commdlg.h>
 
-class CDataFromSoundCard
-{
-public:
+namespace DEVICES {
 
-	WAVEFORMATEX	FormatEx;
+	class CDataFromSoundCard
+	{
+	public:
 
-	typedef struct INDATATAG {
-		BOOL		fInOpen;
-		HWAVEIN		hWaveIn;
-		WAVEHDR		WaveInHdr;
-	} INDATA, * PINDATA;
+		WAVEFORMATEX	FormatEx;
 
-	INDATA InData;
+		typedef struct INDATATAG {
+			BOOL		fInOpen;
+			HWAVEIN		hWaveIn;
+			WAVEHDR		WaveInHdr;
+		} INDATA, * PINDATA;
 
-	typedef struct OUTDATATAG {
-		BOOL		fOutOpen;
-		HWAVEOUT	hWaveOut;
-		WAVEHDR		WaveOutHdr;
-	} OUTDATA, * POUTDATA;
+		INDATA InData;
 
-	OUTDATA	OutData;
+		typedef struct OUTDATATAG {
+			BOOL		fOutOpen;
+			HWAVEOUT	hWaveOut;
+			WAVEHDR		WaveOutHdr;
+		} OUTDATA, * POUTDATA;
 
-public:
-	CDataFromSoundCard();
-	~CDataFromSoundCard();
+		OUTDATA	OutData;
 
-	void OpenIn(void);
-	void CloseIn(void);
+	public:
+		CDataFromSoundCard();
+		~CDataFromSoundCard();
 
-	void OpenOut(DWORD dwPos, DWORD dwEndPos);
-	void PauseOut(void);
-	void CloseOut(void);
+		void OpenIn(void);
+		void CloseIn(void);
 
-	static void CALLBACK waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
-	static void CALLBACK waveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
+		void OpenOut(DWORD dwPos, DWORD dwEndPos);
+		void PauseOut(void);
+		void CloseOut(void);
 
-};
+		static void CALLBACK waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
+		static void CALLBACK waveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
 
-extern CDataFromSoundCard clsGetDataSDC;
+	};
+}
+
+extern DEVICES::CDataFromSoundCard clsGetDataSDC;

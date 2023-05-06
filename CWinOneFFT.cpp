@@ -13,15 +13,17 @@
 #include "myDebug.h"
 #include "CSoundCard.h"
 #include "CData.h"
-#include "CWaveFFT.h"
-#include "CWaveFilter.h"
+#include "CFFT.h"
+#include "CFilter.h"
 #include "CWinFFT.h"
 #include "CWinSpectrum.h"
 #include "CDataFromSDR.h"
 #include "CWinOneFFT.h"
+#include "CWinOneSpectrum.h"
 #include "CAnalyze.h"
 
 using namespace std;
+using namespace WINS; using namespace DEVICES;
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -113,9 +115,6 @@ LRESULT CALLBACK CWinOneFFT::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 	{
 		OPENCONSOLE;
 		clsWinOneFFT.hWnd = hWnd;
-		uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
-		//KillTimer(hWnd, uTimerId);
-		
 
 		rfButton->ButtonInit(hWnd);
 		rfStepButton->ButtonInit(hWnd);
@@ -126,8 +125,20 @@ LRESULT CALLBACK CWinOneFFT::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 		clsAnalyze.set_SDR_rfHz(rfButton->Button->value);
 		rfButton->RefreshMouseNumButton(rfButton->Button->value);
 		rfStepButton->RefreshMouseNumButton(rfStepButton->Button->value);
+
+		uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
+		//KillTimer(hWnd, uTimerId);
 	}
 	break;
+	case WM_TIMER:
+		if (((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->FFTNew == true || 
+			((CFFT*)clsWinSpect.FFTFiltted)->FFTInfo->FFTNew == true) {
+			InvalidateRect(hWnd, NULL, TRUE);
+			UpdateWindow(hWnd);
+			((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->FFTNew = false;
+			((CFFT*)clsWinSpect.FFTFiltted)->FFTInfo->FFTNew = false;
+		}
+		break;
 	case WM_CHAR:
 		printf("WinOneFFT WM_CHAR\r\n");
 		PostMessage(clsWinSpect.hWnd, message, wParam, lParam);
@@ -165,13 +176,6 @@ LRESULT CALLBACK CWinOneFFT::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 		break;
 	case WM_LBUTTONDBLCLK:
 			DbgMsg("WM_LBUTTONDBLCLK\r\n");
-		break;
-	case WM_TIMER:
-		if (bFFTHold == false && FFTNeedReDraw == false) {
-			FFTNeedReDraw = true;
-		}
-		//InvalidateRect(hWnd, NULL, TRUE);
-		//UpdateWindow(hWnd);
 		break;
 	case WM_SIZE:
 		GetRealClientRect(&WinRect);
@@ -247,26 +251,20 @@ void CWinOneFFT::OnMouse(void)
 	RECT rt;
 	GetClientRect(hWnd, &rt);
 
-	int i = 0;
+	int i = 0, n = 0;
 	char s[500], t[100];
-	FILTER_CORE_DATA_TYPE* pFilterCore = clsWaveFilter.pCurrentFilterInfo->FilterCore;
-	int FilterLength = clsWaveFilter.pCurrentFilterInfo->CoreLength;
 	int X = (clsWinSpect.HScrollPos + MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
 	X = BOUND(X, 0, (clsWinSpect.HScrollPos + rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / clsWinSpect.HScrollZoom);
-	double Y = X > FilterLength ? 0 : pFilterCore[X];
-	int n = 0;
-	n += sprintf(strMouse + n, "X: %d, core V: %lf", X, Y);
 
-	double Hz = (double)X * clsData.AdcSampleRate / clsWaveFFT.FFTSize;
-	Y = X > clsWaveFFT.FFTSize / 2 ? 0 : clsWinSpect.OrignalFFTBuff[X];
+	double Hz = (double)X * AdcData->SampleRate / FFTInfo_Signal.FFTSize;
+	double Y = X > FFTInfo_Signal.HalfFFTSize? 0 : ((CFFT*)clsWinSpect.FFTOrignal)->FFTOutBuff[X];
 	n += sprintf(strMouse + n, " | ");
 	n += sprintf(strMouse + n, "Hz: %.03f, FFT: %s", Hz, formatKDouble(Y, 0.001, "", t));
 
 	int Ypos = BOUND(MouseY - WAVE_RECT_BORDER_TOP, 0, WAVE_RECT_HEIGHT);
-	double Ylog = 20 * (X > clsWaveFFT.FFTSize / 2 ? 0 : clsWinSpect.FilttedFFTBuffLog[X]);
+	double Ylog = 20 * (X > FFTInfo_Filtted.HalfFFTSize ? 0 : ((CFFT*)clsWinSpect.FFTFiltted)->FFTOutLogBuff[X]);
 	n += sprintf(strMouse + n, " | ");
 	n += sprintf(strMouse + n, "Y: %.03fdb, logFFT: %fdb", -(double)Ypos / 64 * 20, Ylog);
-
 }
 
 void CWinOneFFT::Paint(void)
@@ -337,7 +335,7 @@ void CWinOneFFT::Paint(void)
 				DrawText(hdc, s, strlen(s), &r, NULL);
 				//sprintf(s, "%.6fs", (double)pos / *SampleRate);
 				//formatKKDouble((double)pos / *SampleRate, "s", s);
-				sprintf(s, "%.03fhz", (double)(pos * clsData.AdcSampleRate / clsWaveFFT.FFTSize));
+				sprintf(s, "%.03fhz", (double)(pos * AdcData->SampleRate / FFTInfo_Signal.FFTSize));
 				r.top = WAVE_RECT_BORDER_TOP + (FFTDrawHeight)+DIVLONG;
 				DrawText(hdc, s, strlen(s), &r, NULL);
 			}
@@ -389,20 +387,25 @@ void CWinOneFFT::Paint(void)
 	double Y = 0;
 	int X;
 	//double CoreCenter = 256;
-	int FFTLength = clsWaveFFT.FFTSize / 2;
+	int FFTLength = FFTInfo_Signal.HalfFFTSize;
+	int FFTLengthFiltted = FFTInfo_Filtted.HalfFFTSize;
 
-	WaitForSingleObject(clsWinSpect.hMutexBuff, INFINITE);
+	CFFT* oFFT = (CFFT*)clsWinSpect.FFTOrignal;
+	CFFT* fFFT = (CFFT*)clsWinSpect.FFTFiltted;
+
+	WaitForSingleObject(oFFT->hMutexDraw, INFINITE);
+	WaitForSingleObject(fFFT->hMutexDraw, INFINITE);
 
 	PaintBriefly(hdc);
 
 	//»æÖÆÂË²¨ FFT ÐÅºÅ--------------------------------------------------
-	double* pOriBuf = clsWinSpect.OrignalFFTBuff;
-	double* pFilBuf = clsWinSpect.FilttedFFTBuff;
+	double* pOriBuf = oFFT->FFTOutBuff;
+	double* pFilBuf = fFFT->FFTOutBuff;
 	double fftvmax;
 	double fftvmin;
-	if (pOriBuf && pFilBuf) fftvmax = max(pOriBuf[FFTLength], pFilBuf[FFTLength]);
+	if (pOriBuf && pFilBuf) fftvmax = max(pOriBuf[FFTLength], pFilBuf[FFTLengthFiltted]);
 //	double scale = WAVE_RECT_HEIGHT / fftvmax;
-	double scale = WAVE_RECT_HEIGHT / clsWaveFFT.FFTMaxValue * 100;
+	double scale = WAVE_RECT_HEIGHT / ((CFFT*)clsWinSpect.FFTOrignal)->FFTMaxValue * 100;
 	int Xstep = clsWinSpect.HScrollZoom > 1.0 ? clsWinSpect.HScrollZoom : 1;
 	int istep = clsWinSpect.HScrollZoom < 1.0 ? ((double)1.0 / clsWinSpect.HScrollZoom) : 1;
 	int averagei = 0;
@@ -444,7 +447,7 @@ void CWinOneFFT::Paint(void)
 		minFiltted = DBL_MAX;;
 		maxFiltted = -1.0 * DBL_MAX;
 		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
-		if (i < FFTLength)
+		if (i < FFTLengthFiltted)
 			Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
 		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
 		averageFiltted += Y;
@@ -455,7 +458,7 @@ void CWinOneFFT::Paint(void)
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
 		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT);
 		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
 			Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
@@ -473,7 +476,7 @@ void CWinOneFFT::Paint(void)
 	averageOrignalLog = 0.0;
 	minOrignalLog = DBL_MAX;;
 	maxOrignalLog = -1.0 * DBL_MAX;
-	double* pOriLogBuf = clsWinSpect.OrignalFFTBuffLog;
+	double* pOriLogBuf = oFFT->FFTOutLogBuff;
 	if (bFFTOrignalLogShow && pOriLogBuf) {
 		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
 		averagei = 0;
@@ -511,11 +514,11 @@ void CWinOneFFT::Paint(void)
 	averageFilttedLog = 0.0;
 	minFilttedLog = DBL_MAX;;
 	maxFilttedLog = -1.0 * DBL_MAX;
-	double* pFilLogBuf = clsWinSpect.FilttedFFTBuffLog;
+	double* pFilLogBuf = fFFT->FFTOutLogBuff;
 	if (bFFTFilttedLogShow && pFilLogBuf) {
 		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
 		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
-		if (i < FFTLength)
+		if (i < FFTLengthFiltted)
 			Y = pFilLogBuf[i] * -64 * VScrollZoom - VScrollPos;
 		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
 		averageFilttedLog += Y;
@@ -526,7 +529,7 @@ void CWinOneFFT::Paint(void)
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
 		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT_LOG);
 		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
 			Y = pFilLogBuf[i] * -64 * VScrollZoom - VScrollPos;
@@ -592,7 +595,7 @@ void CWinOneFFT::Paint(void)
 #define DRAW_TEXT_X		(WAVE_RECT_BORDER_LEFT + 10)	
 #define DRAW_TEXT_Y		(WAVE_RECT_BORDER_TOP + DIVLONG + 50)
 		double FullVotage = 5.0;
-		double VotagePerDIV = (FullVotage / (unsigned __int64)((UINT64)1 << (sizeof(ADCDATATYPE) * 8)));
+		double VotagePerDIV = (FullVotage / (unsigned __int64)((UINT64)1 << (sizeof(ADC_DATA_TYPE) * 8)));
 		char tstr1[100], tstr2[100];
 		r.top = DRAW_TEXT_Y;
 		r.left = DRAW_TEXT_X;
@@ -600,26 +603,26 @@ void CWinOneFFT::Paint(void)
 		r.bottom = rt.bottom;
 		char t1[100], t2[100], t3[100], t4[100], t5[100], t6[100], t7[100], t8[100];
 		sprintf(s, "32pix/DIV %.03fHz/Div\r\n"\
-			"Filter: Desc=%s, decimationFactorBit=%d, SampleRate=%d\r\n"\
-			"AdcSampleRate: %s    Real AdcSampleRate: %s\r\n"\
 			"FFT Size: %s  FFT Step: %s  FFTPerSec:%.03f\r\n"\
 			"Sepctrum Hz£º%s\r\n"\
 			"HZoom=%f VZoom=%f\r\n"\
 			"SDR SampleRate:%s  decimationFactor: %d, %d  BW:%dkHZ\r\n"\
+			"AdcSampleRate: %s    Real AdcSampleRate: %s\r\n"\
+			"Filter: Desc=%s, decimationFactorBit=%d, SampleRate=%d\r\n"\
 			"rfHz = %s"
 			,
-			clsData.AdcSampleRate * (32 / clsWinSpect.HScrollZoom) / clsWaveFFT.FFTSize,
-			clsWaveFilter.rootFilterInfo.CoreDescStr, 
-			clsWaveFilter.rootFilterInfo.decimationFactorBit, 
-			clsWaveFilter.rootFilterInfo.SampleRate,
-			fomatKINT64(clsData.AdcSampleRate, t2), fomatKINT64(clsData.NumPerSec, t3),
-			fomatKINT64(clsWaveFFT.FFTSize, t4), fomatKINT64(clsWaveFFT.FFTStep, t5), clsWaveFFT.FFTPerSec,
+			AdcData->SampleRate * (32 / clsWinSpect.HScrollZoom) / FFTInfo_Signal.FFTSize,
+			fomatKINT64(FFTInfo_Signal.FFTSize, t4), fomatKINT64(FFTInfo_Signal.FFTStep, t5), FFTInfo_Signal.FFTPerSec,
 			formatKDouble(clsWinOneSpectrum.Hz, 0.001, "", t6),
 			clsWinSpect.HScrollZoom, VScrollZoom,
 			formatKDouble(clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz, 0.001, "", t7),
 			(INT)clsGetDataSDR.chParams->ctrlParams.decimation.enable,
 			(INT)clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor,
 			(INT)clsGetDataSDR.chParams->tunerParams.bwType,
+			fomatKINT64(AdcData->SampleRate, t2), fomatKINT64(AdcData->NumPerSec, t3),
+			clsMainFilter.rootFilterInfo.CoreDescStr,
+			clsMainFilter.rootFilterInfo.decimationFactorBit,
+			clsMainFilter.rootFilterInfo.SampleRate,
 			formatKDouble(clsGetDataSDR.chParams->tunerParams.rfFreq.rfHz, 0.001, "", t8)
 			
 		);
@@ -665,7 +668,8 @@ void CWinOneFFT::Paint(void)
 	DeleteObject(hdc);
 	DeleteObject(hbmp);
 
-	ReleaseMutex(clsWinSpect.hMutexBuff);
+	ReleaseMutex(oFFT->hMutexDraw);	
+	ReleaseMutex(fFFT->hMutexDraw);
 
 	EndPaint(hWnd, &ps);
 }
@@ -716,29 +720,24 @@ void CWinOneFFT::GetRealClientRect(PRECT lprc)
 		lprc->right += GetSystemMetrics(SM_CXVSCROLL);
 }
 
-VOID CWinOneFFT::BrieflyBuff(WHICHSIGNAL which)
+VOID CWinOneFFT::BrieflyBuff(void* fft)
 {
-
-	WaitForSingleObject(clsWinSpect.hMutexBuff, INFINITE);
+	CFFT* cFFT = (CFFT*)fft;
+	WaitForSingleObject(cFFT->hMutexDraw, INFINITE);
 
 	double* pfft, * pfftlog;
 	double* pbrifft, * pbrifftlog;
-	if (which == WHICHSIGNAL::SIGNAL_ORIGNAL) {
-		pfft = clsWinSpect.OrignalFFTBuff;
-		pfftlog = clsWinSpect.OrignalFFTBuffLog;
-		pbrifft = clsWinSpect.BrieflyOrigFFTBuff;
-		pbrifftlog = clsWinSpect.BrieflyOrigFFTBuffLog;
-	}
-	else {
-		pfft = clsWinSpect.FilttedFFTBuff;
-		pfftlog = clsWinSpect.FilttedFFTBuffLog;
-		pbrifft = clsWinSpect.BrieflyFiltFFTBuff;
-		pbrifftlog = clsWinSpect.BrieflyFiltFFTBuffLog;
-	}
+	
+	FFT_INFO* fftInfo = cFFT->FFTInfo;
+
+	pfft = cFFT->FFTOutBuff;
+	pfftlog = cFFT->FFTOutLogBuff;
+	pbrifft = cFFT->FFTBrieflyBuff;
+	pbrifftlog = cFFT->FFTBrieflyLogBuff;
 
 	int stepn = 1 / clsWinSpect.HScrollZoom;
 	if (stepn == 0)stepn = 1;
-	int N = clsWaveFFT.HalfFFTSize / stepn;
+	int N = fftInfo->HalfFFTSize / stepn;
 	double maxd;
 	double maxdlog;
 	double mind = DBL_MAX;
@@ -759,12 +758,12 @@ VOID CWinOneFFT::BrieflyBuff(WHICHSIGNAL which)
 		if (mind > maxd) mind = maxd;
 		if (minlogd > maxdlog) minlogd = maxdlog;
 	}
-	pbrifft[clsWaveFFT.HalfFFTSize] = pfft[clsWaveFFT.HalfFFTSize];
-	pbrifft[clsWaveFFT.HalfFFTSize + 1] = mind;// pfft[clsWaveFFT.HalfFFTSize + 1];
-	pbrifftlog[clsWaveFFT.HalfFFTSize] = pfftlog[clsWaveFFT.HalfFFTSize];
-	pbrifftlog[clsWaveFFT.HalfFFTSize + 1] = minlogd;// pfftlog[clsWaveFFT.HalfFFTSize + 1];
+	pbrifft[fftInfo->HalfFFTSize] = pfft[fftInfo->HalfFFTSize];
+	pbrifft[fftInfo->HalfFFTSize + 1] = mind;// pfft[clsWaveFFT.HalfFFTSize + 1];
+	pbrifftlog[fftInfo->HalfFFTSize] = pfftlog[fftInfo->HalfFFTSize];
+	pbrifftlog[fftInfo->HalfFFTSize + 1] = minlogd;// pfftlog[clsWaveFFT.HalfFFTSize + 1];
 
-	ReleaseMutex(clsWinSpect.hMutexBuff);
+	ReleaseMutex(cFFT->hMutexDraw);
 }
 
 void CWinOneFFT::PaintBriefly(HDC hdc)
@@ -772,18 +771,22 @@ void CWinOneFFT::PaintBriefly(HDC hdc)
 	HPEN hPen;
 	double Y = 0;
 	int X;
-	int FFTLength = clsWaveFFT.HalfFFTSize;
+	int FFTLength = FFTInfo_Signal.HalfFFTSize;
+	int FFTLengthFiltted = FFTInfo_Filtted.HalfFFTSize;
 	int i;
 	RECT	rt;
 	GetClientRect(hWnd, &rt);
 
+	CFFT* FFTOrignal = (CFFT*)clsWinSpect.FFTOrignal;
+	CFFT* FFTFiltted = (CFFT*)clsWinSpect.FFTFiltted;
+
 	//»æÖÆÂË²¨ FFT ÐÅºÅ--------------------------------------------------
-	double* pOriBuf = clsWinSpect.BrieflyOrigFFTBuff;
-	double* pFilBuf = clsWinSpect.BrieflyFiltFFTBuff;
+	double* pOriBuf = FFTOrignal->FFTBrieflyBuff;
+	double* pFilBuf = FFTFiltted->FFTBrieflyBuff;
 	double fftvmax;
 	double fftvmin;
-	if (pOriBuf && pFilBuf) fftvmax = max(pOriBuf[FFTLength], pFilBuf[FFTLength]);
-	double scale = WAVE_RECT_HEIGHT / clsWaveFFT.FFTMaxValue * 100;
+	if (pOriBuf && pFilBuf) fftvmax = max(pOriBuf[FFTLength], pFilBuf[FFTLengthFiltted]);
+	double scale = WAVE_RECT_HEIGHT / FFTOrignal->FFTMaxValue * 100;
 	int Xstep = clsWinSpect.HScrollZoom > 1.0 ? clsWinSpect.HScrollZoom : 1;
 	int istep = clsWinSpect.HScrollZoom < 1.0 ? ((double)1.0 / clsWinSpect.HScrollZoom) : 1;
 	if (bFFTOrignalShow && pOriBuf)
@@ -805,12 +808,12 @@ void CWinOneFFT::PaintBriefly(HDC hdc)
 	if (bFFTFilttedShow && pFilBuf)
 	{
 		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
-		if (i < FFTLength) Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
+		if (i < FFTLengthFiltted) Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
 		X = WAVE_RECT_BORDER_LEFT;
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
 		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT);
 		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
 			Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
@@ -819,7 +822,7 @@ void CWinOneFFT::PaintBriefly(HDC hdc)
 		DeleteObject(hPen);
 	}
 
-	double* pOriLogBuf = clsWinSpect.BrieflyOrigFFTBuffLog;
+	double* pOriLogBuf = FFTOrignal->FFTBrieflyLogBuff;
 	if (bFFTOrignalLogShow && pOriLogBuf) {
 		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
 		fftvmax = pOriLogBuf[FFTLength];
@@ -841,18 +844,18 @@ void CWinOneFFT::PaintBriefly(HDC hdc)
 		DeleteObject(hPen);
 	}
 
-	double* pFilLogBuf = clsWinSpect.BrieflyFiltFFTBuffLog;
+	double* pFilLogBuf = FFTFiltted->FFTBrieflyLogBuff;
 	if (bFFTFilttedLogShow && pFilLogBuf) {
 		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
 		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
-		if (i < FFTLength)
+		if (i < FFTLengthFiltted)
 			Y = pFilLogBuf[i] * -64 * VScrollZoom - VScrollPos;
 		Y = BOUND(Y, 0, 64 * 12);
 		X = WAVE_RECT_BORDER_LEFT;
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
 		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT_LOG);
 		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
 			Y = pFilLogBuf[i] * -64 * VScrollZoom - VScrollPos;
@@ -1055,21 +1058,10 @@ void CWinOneFFT::RestoreValue(void)
 
 void CWinOneFFT::averageFilterButtonFunc(CScreenButton* button)
 {
-	WaitForSingleObject(clsWaveFFT.hMutexBuff, INFINITE);
-	WaitForSingleObject(clsWinSpect.hMutexBuff, INFINITE);
-
-	int memsize = (clsWaveFFT.HalfFFTSize + 2) * (FFT_DEEP + 1);
-	memset(clsWaveFFT.FFTOrignalBuff, 0, memsize * sizeof(double));
-	memset(clsWaveFFT.FFTOrignalLogBuff, 0, memsize * sizeof(double));
-	memset(clsWaveFFT.FFTFilttedBuff, 0, memsize * sizeof(double));
-	memset(clsWaveFFT.FFTFilttedLogBuff, 0, memsize * sizeof(double));
-
-	clsWaveFFT.FFTOrignalBuffNum = 0;
-	clsWaveFFT.FFTFilttedBuffNum = 0;
-	clsWaveFFT.FFTDeep = button->Button->value;
-
-	ReleaseMutex(clsWaveFFT.hMutexBuff);
-	ReleaseMutex(clsWinSpect.hMutexBuff);
+	clsWinSpect.FFTOrignal->FFTInfo->AverageDeep = button->Button->value;
+	clsWinSpect.FFTOrignal->Init();
+	clsWinSpect.FFTFiltted->FFTInfo->AverageDeep = button->Button->value;
+	clsWinSpect.FFTFiltted->Init();
 }
 
 void CWinOneFFT::confirmP1RfGoButtonFunc(CScreenButton* button)
@@ -1078,7 +1070,7 @@ void CWinOneFFT::confirmP1RfGoButtonFunc(CScreenButton* button)
 	if (P->x > WAVE_RECT_BORDER_LEFT && P->x < clsWinOneFFT.WinRect.right - WAVE_RECT_BORDER_RIGHT
 		&& P->y > WAVE_RECT_BORDER_TOP && P->y < clsWinOneFFT.WinRect.bottom - WAVE_RECT_BORDER_BOTTON)	{
 
-		double Hz = (double)(clsWinSpect.HScrollPos + P->x - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom * clsData.AdcSampleRate / clsWaveFFT.FFTSize;
+		double Hz = (double)(clsWinSpect.HScrollPos + P->x - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom * AdcData->SampleRate / FFTInfo_Signal.FFTSize;
 		if (button->Button->mouse_action == CScreenButton::Button_Mouse_Left) {
 			clsWinOneFFT.rfButton->RefreshMouseNumButton(clsWinOneFFT.rfButton->Button->value + Hz);
 		}
@@ -1094,27 +1086,29 @@ void CWinOneFFT::P2SubP1(void)
 	int n = 0, i = 0;
 	int X;
 	double Y, Ylog, YF, YFlog, YB, YBlog, YFB, YFBlog;
-	char sX[50], sHZ[50], sY[50], sYlog[50], sYF[50], sYFlog[50], sYB[50], sYBlog[50], sYFB[50], sYFBlog[50];
+	char sX[200], sHZ[200], sY[200], sYlog[200], sYF[200], sYFlog[200], sYB[200], sYBlog[200], sYFB[200], sYFBlog[200];
 	double P1Hz;
 	double P2Hz;
 	POINT *P;
 	*strPP = '\0';
 	bool P1Eanble = false;
+	CFFT* FFTOrignal = (CFFT*)clsWinSpect.FFTOrignal;
+	CFFT* FFTFiltted = (CFFT*)clsWinSpect.FFTFiltted;
 	if (P1_Use == true) {
 		P = &ScreenP1;
 		X = (clsWinSpect.HScrollPos + P->x - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
-		if (X < clsWaveFFT.HalfFFTSize) {
-			Y = clsWinSpect.OrignalFFTBuff[X];
-			Ylog = clsWinSpect.OrignalFFTBuffLog[X];
-			YF = clsWinSpect.FilttedFFTBuff[X];
-			YFlog = clsWinSpect.FilttedFFTBuffLog[X];
-			YB = clsWinSpect.BrieflyOrigFFTBuff[X];
-			YBlog = clsWinSpect.BrieflyOrigFFTBuffLog[X];
-			YFB = clsWinSpect.BrieflyFiltFFTBuff[X];
-			YFBlog = clsWinSpect.BrieflyFiltFFTBuffLog[X];
+		if (X < FFTInfo_Signal.HalfFFTSize) {
+			Y = FFTOrignal->FFTOutBuff[X];
+			Ylog = FFTOrignal->FFTOutLogBuff[X];
+			YF = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTOutBuff[X]: 0;
+			YFlog = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTOutLogBuff[X] : 0;
+			YB = FFTOrignal->FFTBrieflyBuff[X];
+			YBlog = FFTOrignal->FFTBrieflyLogBuff[X];
+			YFB = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTBrieflyBuff[X] : 0;
+			YFBlog = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTBrieflyLogBuff[X] : 0;
 			n += sprintf(strPP + n, "P1 X=%s, Hz=%s, Y=%s, Ylog=%sdb, YF=%s, YFlog=%sdb, YB=%s, YBlog=%sdb, YFB=%s, YFBlog=%sdb\r\n",
 				fomatKINT64(X, sX),
-				formatKDouble(P1Hz = (double)X * clsData.AdcSampleRate / clsWaveFFT.FFTSize, 0.001, "", sHZ),
+				formatKDouble(P1Hz = (double)X * AdcData->SampleRate / FFTInfo_Signal.FFTSize, 0.001, "", sHZ),
 				fomatKINT64(Y, sY),
 				formatKDouble(Ylog * 20, 0.001, "", sYlog),
 				formatKDouble(YF, 0.001, "", sYF),
@@ -1131,18 +1125,18 @@ void CWinOneFFT::P2SubP1(void)
 	if (P2_Use == true) {
 		P = &ScreenP2;
 		X = (clsWinSpect.HScrollPos + P->x - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
-		if (X < clsWaveFFT.HalfFFTSize) {
-			Y = clsWinSpect.OrignalFFTBuff[X];
-			Ylog = clsWinSpect.OrignalFFTBuffLog[X];
-			YF = clsWinSpect.FilttedFFTBuff[X];
-			YFlog = clsWinSpect.FilttedFFTBuffLog[X];
-			YB = clsWinSpect.BrieflyOrigFFTBuff[X];
-			YBlog = clsWinSpect.BrieflyOrigFFTBuffLog[X];
-			YFB = clsWinSpect.BrieflyFiltFFTBuff[X];
-			YFBlog = clsWinSpect.BrieflyFiltFFTBuffLog[X];
+		if (X < FFTInfo_Signal.HalfFFTSize) {
+			Y = FFTOrignal->FFTOutBuff[X];
+			Ylog = FFTOrignal->FFTOutLogBuff[X];
+			YF = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTOutBuff[X] : 0;
+			YFlog = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTOutLogBuff[X] : 0;
+			YB = FFTOrignal->FFTBrieflyBuff[X];
+			YBlog = FFTOrignal->FFTBrieflyLogBuff[X];
+			YFB = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTBrieflyBuff[X] : 0;
+			YFBlog = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTBrieflyLogBuff[X] : 0;
 			n += sprintf(strPP + n, "P2 X=%s, Hz=%s, Y=%s, Ylog=%sdb, YF=%s, YFlog=%sdb, YB=%s, YBlog=%sdb, YFB=%s, YFBlog=%sdb\r\n",
 				fomatKINT64(X, sX),
-				formatKDouble(P2Hz = (double)X * clsData.AdcSampleRate / clsWaveFFT.FFTSize, 0.001, "", sHZ),
+				formatKDouble(P2Hz = (double)X * AdcData->SampleRate / FFTInfo_Signal.FFTSize, 0.001, "", sHZ),
 				fomatKINT64(Y, sY),
 				formatKDouble(Ylog * 20, 0.001, "", sYlog),
 				formatKDouble(YF, 0.001, "", sYF),

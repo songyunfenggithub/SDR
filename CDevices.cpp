@@ -16,9 +16,9 @@
 #include "CWinMain.h"
 #include "CDevices.h"
 
-extern CWinMain	clsWinMain;
+using namespace DEVICES;
 
-CDevices	clsDevices;
+CDevices clsDevices;
 
 #define APP_MAX_STRING_RC_CHARS     512
 

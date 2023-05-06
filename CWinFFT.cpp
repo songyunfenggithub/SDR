@@ -11,7 +11,7 @@
 #include "CSoundCard.h"
 #include "CData.h"
 #include "CWaveFFT.h"
-#include "CWaveFilter.h"
+#include "CFilter.h"
 #include "CWinFFT.h"
 #include "CWinSpectrum.h"
 

@@ -15,86 +15,98 @@
 
 #define SOUNDCARD_WAVEHDR_DEEP		0x8
 #define SOUNDCARD_WAVEHDR_DEEP_MASK	(SOUNDCARD_WAVEHDR_DEEP - 1)
+namespace METHOD {
+	class cuda_CFilter;
+}
+using namespace METHOD;
 
-class cuda_CFilter;
+class CData;
 
-class CAudio
-{
-public:
+namespace DEVICES {
 
-	typedef struct INDATATAG
+	class CAudio
 	{
-		BOOL		fInOpen;
-		HWAVEIN		hWaveIn;
-		WAVEHDR		WaveInHdr1;
-		WAVEHDR		WaveInHdr2;
-	} INDATA, * PINDATA;
+	public:
 
-	INDATA InData;
+		typedef struct INDATATAG
+		{
+			BOOL		fInOpen;
+			HWAVEIN		hWaveIn;
+			WAVEHDR		WaveInHdr1;
+			WAVEHDR		WaveInHdr2;
+		} INDATA, * PINDATA;
 
-	typedef struct OUTDATATAG
-	{
-		BOOL		fOutOpen;
-		HWAVEOUT	hWaveOut;
-		WAVEHDR		WaveOutHdr1;
-		WAVEHDR		WaveOutHdr2;
-	} OUTDATA, * POUTDATA;
+		INDATA InData;
 
-	OUTDATA	OutData;
+		typedef struct OUTDATATAG
+		{
+			BOOL		fOutOpen;
+			HWAVEOUT	hWaveOut;
+			WAVEHDR		WaveOutHdr1;
+			WAVEHDR		WaveOutHdr2;
+		} OUTDATA, * POUTDATA;
 
-	typedef short AUDIODATATYPE;
+		OUTDATA	OutData;
 
-	AUDIODATATYPE inBuff[SOUNDCARD_BUFF_LENGTH];
-	UINT	inBuffPos = 0;
-	UINT	inBeginPos = 0, inEndPos = 0;;
+		typedef short AUDIODATATYPE;
 
-	AUDIODATATYPE inFilttedBuff[SOUNDCARD_BUFF_LENGTH];
-	UINT inFilttedPos = 0;
+		CData* inData = NULL;
+		//	AUDIODATATYPE inBuff[SOUNDCARD_BUFF_LENGTH];
+		//	UINT	inBuffPos = 0;
+		UINT	inBeginPos = 0, inEndPos = 0;;
 
-	AUDIODATATYPE outBuff[SOUNDCARD_BUFF_LENGTH];
-	UINT	outBuffPos = 0;
-	UINT	outBeginPos = 0, outEndPos = 0;
+		CData* inDataFiltted = NULL;
+		//	AUDIODATATYPE inFilttedBuff[SOUNDCARD_BUFF_LENGTH];
+		//	UINT inFilttedPos = 0;
 
-	AUDIODATATYPE outFilttedBuff[SOUNDCARD_BUFF_LENGTH];
-	UINT outFilttedPos = 0;
+		//	AUDIODATATYPE outBuff[SOUNDCARD_BUFF_LENGTH];
+		//	UINT	outBuffPos = 0;
+		CData* outData = NULL;
+		UINT	outBeginPos = 0, outEndPos = 0;
 
-	cuda_CFilter* cudafilter = NULL;
+		CData* outDataFiltted = NULL;
+		//	AUDIODATATYPE outFilttedBuff[SOUNDCARD_BUFF_LENGTH];
+		//	UINT outFilttedPos = 0;
 
-	WAVEFORMATEX	FormatEx;
-	HWAVEOUT		hWaveOut;
-	WAVEHDR			WaveOutHdrs[SOUNDCARD_WAVEHDR_DEEP];
-	UINT			waveHDRPosHead, waveHDRPosTail;
-	bool			boutOpened = false;
+		cuda_CFilter* cudafilter = NULL;
 
-	UINT SampleRate;
-	double Am_zoom = 20.0;
+		WAVEFORMATEX	FormatEx;
+		HWAVEOUT		hWaveOut;
+		WAVEHDR			WaveOutHdrs[SOUNDCARD_WAVEHDR_DEEP];
+		UINT			waveHDRPos, waveHDRUsed;
+		bool			boutOpened = false;
 
-	bool bPlay = true;
+		UINT SampleRate;
+		double Am_zoom = 10.0;
 
-public:
-	CAudio();
-	~CAudio();
+		bool bPlay = true;
 
-	void Init(void);
-	void UnInit(void);
+	public:
+		CAudio();
+		~CAudio();
 
-	void OpenIn(UINT pos, UINT endPos);
-	void CloseIn(void);
+		void Init(void);
+		void UnInit(void);
 
-	void OpenOut(UINT dwBeginPos, UINT dwEndPos);
-	void PauseOut(void);
-	void CloseOut(void);
+		void OpenIn(UINT pos, UINT endPos);
+		void CloseIn(void);
 
-	void GeneratorWave(void);
-	
-	void StartOpenOut(void);
-	void StopOpenOut(void);
-	INT WriteToOut(UINT pos);
-	static void CALLBACK waveOutProc2(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
+		void OpenOut(UINT dwBeginPos, UINT dwEndPos);
+		void PauseOut(void);
+		void CloseOut(void);
 
-	static void CALLBACK waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
-	static void CALLBACK waveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
+		void GeneratorWave(void);
 
-};
+		void StartOut(void);
+		void StopOut(void);
+		INT WriteToOut(UINT pos);
+		INT WriteToOut(void* buff);
+		static void CALLBACK waveOutProc2(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
 
-extern CAudio mAudio;
+		static void CALLBACK waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
+		static void CALLBACK waveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
+
+	};
+}
+
+extern DEVICES::CAudio mAudio;

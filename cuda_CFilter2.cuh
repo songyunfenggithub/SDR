@@ -1,29 +1,42 @@
 #pragma once
 
-class cuda_CFilter2 
-{
+class CData;
 
-public:
-	FILTER_CORE_DATA_TYPE* d_Filter_Core = NULL;
-	ADCDATATYPE* d_SrcData = NULL;
-	FILTEDDATATYPE* d_Decimation_Cache = NULL;
-	FILTEDDATATYPE* d_Filtted_Result = NULL;
-	FILTEDDATATYPE* d_Demodulator_Result = NULL;
+namespace METHOD {
+	class CFilter;
 
-	ADCDATATYPE* h_SrcData = NULL;
-	FILTEDDATATYPE* h_Filtted_Result = NULL;
-	FILTEDDATATYPE* h_Demodulator_Result = NULL;
+	class cuda_CFilter2
+	{
 
-	CWaveFilter::PFILTERINFO rootFilterInfo = NULL;
+	public:
 
-public:
-	cuda_CFilter2();
-	~cuda_CFilter2();
+		CData* SrcData;
+		CData* TargetData;
 
-	void Filtting(void);
-	void UnInit(void);
-	void Init(CWaveFilter::PFILTERINFO pFilterInfo);
+		FILTER_CORE_DATA_TYPE* d_Filter_Core = NULL;
+		ADC_DATA_TYPE* d_SrcData = NULL;
+		FILTTED_DATA_TYPE* d_Decimation_Cache = NULL;
+		FILTTED_DATA_TYPE* d_Filtted_Result = NULL;
+		FILTTED_DATA_TYPE* d_Demodulator_Result = NULL;
 
-};
+		ADC_DATA_TYPE* h_SrcData = NULL;
+		FILTTED_DATA_TYPE* h_Filtted_Result = NULL;
+		FILTTED_DATA_TYPE* h_Demodulator_Result = NULL;
 
-extern cuda_CFilter2 clscudaFilter2;
+		CFilter::PFILTER_INFO rootFilterInfo = NULL;
+
+		UINT SrcLen;
+
+	public:
+		cuda_CFilter2();
+		~cuda_CFilter2();
+
+		void Filtting(void);
+		void UnInit(void);
+		void Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CData* targetData, UINT srcLen);
+
+	};
+}
+
+extern METHOD::cuda_CFilter2 clscudaMainFilter2;
+extern METHOD::cuda_CFilter2 clscudaAudioFilter2;

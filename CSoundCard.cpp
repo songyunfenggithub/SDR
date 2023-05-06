@@ -20,16 +20,12 @@
 #include "CAudio.h"
 #include "CSoundCard.h"
 
+using namespace DEVICES;
+
 CSoundCard clsSoundCard;
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
-
 
 CSoundCard::CSoundCard()
 {
-
 	hWndWaveValue = NULL;
 
 	OutData.fOutOpen	= FALSE;

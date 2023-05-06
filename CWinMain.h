@@ -1,76 +1,69 @@
-// CWinMain.h: interface for the CWinMain class.
-//
-//////////////////////////////////////////////////////////////////////
 
-#if !defined(AFX_WINMAIN_H__67392A91_423D_41F4_96FA_D01F57838552__INCLUDED_)
-#define AFX_WINMAIN_H__67392A91_423D_41F4_96FA_D01F57838552__INCLUDED_
-
-#if _MSC_VER > 1000
 #pragma once
-#endif // _MSC_VER > 1000
+
+namespace WINS {
 
 #define MAX_LOADSTRING 100
 
-class CAudioWin;
-class CFilttedWin;
-class CFilterWin;
+	class CAudioWin;
+	class CFilttedWin;
+	class CFilterWin;
 
-class CWinMain  
-{
-public:
-	HWND		hWnd;
-	HMENU		hMyMenu;
-	TCHAR szTitle[MAX_LOADSTRING];								// The title bar text
-	TCHAR szWindowClass[MAX_LOADSTRING];						// The title bar text
+	class CWinMain
+	{
+	public:
+		HWND hWnd = NULL;
+		HMENU hMenu = NULL;
+		TCHAR szTitle[MAX_LOADSTRING];								// The title bar text
+		TCHAR szWindowClass[MAX_LOADSTRING];						// The title bar text
 
-	CAudioWin* m_audioWin = NULL;
-	CFilttedWin* m_filttedWin = NULL;
-	CFilterWin* m_FilterWin = NULL;
+		CAudioWin* m_audioWin = NULL;
+		CFilttedWin* m_filttedWin = NULL;
+		CFilterWin* m_FilterWin = NULL;
 
-typedef struct tagDRAWINFO
-{
+		typedef struct tagDRAWINFO
+		{
 
-	int			iHZoom, iHOldZoom, iVZoom, iVOldZoom, iHFit, iVFit;
-	UINT64		dwDataWidth, dwDataHeight;
-	INT64		dwHZoomedWidth, dwHZoomedPos, dwVZoomedHeight, dwVZoomedPos;
-	UINT16		wHSclPos, wVSclPos, wHSclMin, wHSclMax, wVSclMin, wVSclMax;
-	
-	double		dbVZoom;
-	double		dbHZoom;
-	double		FullVotage;
-	double		VotagePerDIV;
-	BOOL		fAutoScroll;
-	UINT		uTimerId;
+			int			iHZoom, iHOldZoom, iVZoom, iVOldZoom, iHFit, iVFit;
+			UINT64		dwDataWidth, dwDataHeight;
+			INT64		dwHZoomedWidth, dwHZoomedPos, dwVZoomedHeight, dwVZoomedPos;
+			UINT16		wHSclPos, wVSclPos, wHSclMin, wHSclMax, wVSclMin, wVSclMax;
 
-	BOOL		bOrignalSignalShow, bFilttedSignalShow;
-	
-	bool		fFollowByOrignal = true;
+			double		dbVZoom;
+			double		dbHZoom;
+			double		FullVotage;
+			double		VotagePerDIV;
+			BOOL		fAutoScroll;
+			UINT		uTimerId;
 
-} DRAWINFO, *PDRAWINFO;
+			BOOL		bOrignalSignalShow, bFilttedSignalShow;
 
-	DRAWINFO	DrawInfo;
+			bool		fFollowByOrignal = true;
 
-public:
-	CWinMain();
-	~CWinMain();
+		} DRAWINFO, * PDRAWINFO;
 
-	BOOL InitInstance(HINSTANCE hInstance, int nCmdShow);
-	ATOM MyRegisterClass(HINSTANCE hInstance);
-	VOID Paint(HWND hWnd);
-	VOID CaculateHScroll(void);
-	VOID CaculateVScroll(void);
-	VOID GetRealClientRect (HWND hwnd, PRECT lprc);
-	VOID SetScrollRanges(HWND hwnd);
-	BOOL OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	VOID KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	LRESULT CALLBACK WndProcReal(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	void SaveValue(void);
-	void RestoreValue(void);
+		DRAWINFO	DrawInfo;
 
-	static LRESULT CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
-	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+	public:
+		CWinMain();
+		~CWinMain();
 
-};
+		BOOL InitInstance(HINSTANCE hInstance, int nCmdShow);
+		ATOM MyRegisterClass(HINSTANCE hInstance);
+		VOID Paint(void);
+		VOID CaculateHScroll(void);
+		VOID CaculateVScroll(void);
+		VOID GetRealClientRect(PRECT lprc);
+		BOOL OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
+		VOID KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
+		void SaveValue(void);
+		void RestoreValue(void);
 
-extern CWinMain	clsWinMain;
-#endif // !defined(AFX_WINMAIN_H__67392A91_423D_41F4_96FA_D01F57838552__INCLUDED_)
+		LRESULT CALLBACK WndProcReal(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		static LRESULT CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+		static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+	};
+}
+extern WINS::CWinMain clsWinMain;
+

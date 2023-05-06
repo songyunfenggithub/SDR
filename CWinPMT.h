@@ -3,7 +3,7 @@
 #include "stdafx.h"
 #include "stdint.h"
 
-#include "CWaveFilter.h"
+#include "CFilter.h"
 
 
 #define PMT_WIN_CLASS	"PMT_WIN"

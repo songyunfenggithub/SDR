@@ -4,87 +4,68 @@
 
 #include "cuda_CFFT.cuh"
 
-#define FFT_SIZE	0x100000
-#define FFT_STEP	0x040000
+class CData;
 
+namespace METHOD {
 
-#define FFT_DEEP		0x10
-#define FFT_DEEP_MASK	(FFT_DEEP - 1)
+#define WM_FFT	(WM_USER + 1)
 
-#define FFT_VALUE_MAX	0xFF
-#define FFT_MAX_SIZE	0xFFFF
-
-class CFFTWin;
-
-class CFFT:public cuda_CFFT
-{
-
-public:
-
-	typedef struct Complex_
+	class CFFT :public cuda_CFFT
 	{
-		double real;
-		double imagin;
-	} Complex;
+	public:
+		typedef struct Complex_
+		{
+			double real;
+			double imagin;
+		} Complex;
 
-	HANDLE hMutexBuff;
-	HANDLE hFFT_Thread = NULL;
+		HANDLE hMutexBuff = NULL;
+		HANDLE hMutexDraw = NULL;
 
-	CFFTWin *fftWin = NULL;
+		HANDLE hFFT_Thread = NULL;
 
-	//cuda_CFFT *cuda_fft = NULL;
-	
-	void*	DataBuff;
-	UINT32* DataBuffPos = NULL;
-	UINT	data_buff_data_bits = 12;
-	UINT	data_buff_length_mask;
-	
-	double* FFTBuff =  NULL;
-	double* FFTLogBuff = NULL;
+		HWND hWnd = NULL;
+		CData* Data;
 
-	double* FFTOutBuff = NULL ;
-	double* FFTOutLogBuff = NULL;
-	double* FFTBrieflyBuff = NULL;
-	double* FFTBrieflyLogBuff = NULL;
+		COLORREF Color;		
+		COLORREF ColorLog;
 
-	UINT average_Deep = FFT_DEEP;
-	UINT average_Deep_mask = average_Deep - 1;
-	UINT average_Deep_num = 0;
+		double* FFTBuff = NULL;
+		double* FFTLogBuff = NULL;
 
-	double*  FFT_src = NULL;
-	Complex* FFT_src_com = NULL;
+		double* FFTOutBuff = NULL;
+		double* FFTOutLogBuff = NULL;
+		double* FFTBrieflyBuff = NULL;
+		double* FFTBrieflyLogBuff = NULL;
 
-	UINT32 FFTPos = 0;
-	UINT32 FFTStep = FFT_SIZE;
-	UINT32 FFTSize = FFT_SIZE;
-	UINT32 HalfFFTSize = FFT_SIZE / 2;
-	UINT32 FFTCount = 0;
-	float	FFTPerSec = 0.0;
+		double* FFT_src = NULL;
+		Complex* FFT_src_com = NULL;
 
-	bool FFTlog = true;
-	bool FFTDoing = true;
-	bool FFTNext = false;
-	bool bFFT_Thread_Exitted = true;
+		bool FFTlog = true;
+		bool FFTDoing = true;
+		bool FFTNext = false;
+		bool bFFT_Thread_Exitted = true;
 
-public:
-	CFFT();
-	~CFFT();
+	public:
+		CFFT();
+		~CFFT();
 
-	void Init(CFFTWin* fftwin);
-	void UnInit(void);
+		void Init(void);
+		void UnInit(void);
 
-	void FFT(void* Buff, BUFF_DATA_TYPE type, uint32_t pos, UINT mask);
-	void NormalFFT(void* Buff, BUFF_DATA_TYPE type, uint32_t pos, UINT mask);
-	int  FFT_remap(double* src, int size_n);
-	void IDFT(Complex* src, Complex* dst, int size);
-	void DFT(double* src, Complex* dst, int size);
-	void getWN(double n, double size_n, Complex* dst);
-	void Multy_Complex(Complex* src1, Complex* src2, Complex* dst);
-	void Sub_Complex(Complex* src1, Complex* src2, Complex* dst);
-	void Add_Complex(Complex* src1, Complex* src2, Complex* dst);
+		void FFT(UINT pos);
+		void NormalFFT(void* buff, BUFF_DATA_TYPE type, uint32_t pos, UINT mask);
+		int  FFT_remap(double* src, int size_n);
+		void IDFT(Complex* src, Complex* dst, int size);
+		void DFT(double* src, Complex* dst, int size);
+		void getWN(double n, double size_n, Complex* dst);
+		void Multy_Complex(Complex* src1, Complex* src2, Complex* dst);
+		void Sub_Complex(Complex* src1, Complex* src2, Complex* dst);
+		void Add_Complex(Complex* src1, Complex* src2, Complex* dst);
 
-	double GetFFTMaxValue(void);
+		double GetFFTMaxValue(void);
 
-	static LPTHREAD_START_ROUTINE FFT_Thread(LPVOID lp);
-	void FFT_func(void);
-};
+		static LPTHREAD_START_ROUTINE FFT_Thread(LPVOID lp);
+		void FFT_func(void);
+	};
+}

@@ -4,6 +4,7 @@
 #include "CSDR.h"
 #include "SDRPlay_API.3.09/API/inc/sdrplay_api.h"
 
+using namespace DEVICES;
 
 class CAnalyze
 {

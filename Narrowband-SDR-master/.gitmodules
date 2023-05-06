@@ -1,0 +1,6 @@
+[submodule "host/libfx2mirisdr"]
+	path = host/libfx2mirisdr
+	url = https://github.com/BillyWoods/libfx2mirisdr.git
+[submodule "host/gr-osmosdr"]
+	path = host/gr-osmosdr
+	url = https://github.com/BillyWoods/gr-osmosdr.git

@@ -1,33 +1,40 @@
 
 #pragma once
 
+class CData;
 
-class cuda_CFilter {
+namespace METHOD {
+	class CFilter;
 
-public:
-	FILTER_CORE_DATA_TYPE* d_Filter_Core = NULL;
-	ADCDATATYPE* d_SrcData = NULL;
-	FILTEDDATATYPE* d_Result = NULL;
+	class cuda_CFilter {
 
-	//FILTER_CORE_DATA_TYPE* h_Filter_Core = NULL;
-	ADCDATATYPE* h_SrcData = NULL;
-	FILTEDDATATYPE* h_Result = NULL;
+	public:
+		CData* SrcData;
+		CData* TargetData;
 
-	size_t thread_size;
-	size_t result_size;
-	size_t src_step_size;
+		char* d_SrcData = NULL;
+		FILTER_CORE_DATA_TYPE* d_Filter_Core = NULL;
+		FILTTED_DATA_TYPE* d_Result = NULL;
 
-	CWaveFilter::PFILTERINFO rootFilterInfo = NULL;
+		char* h_SrcData = NULL;
+		FILTTED_DATA_TYPE* h_Result = NULL;
 
-	CWaveFilter::PFILTERINFO FilterInfo;
+		size_t thread_size;
+		size_t result_size;
+		size_t src_step_size;
 
-public:
-	
-	void Filtting(void);
-	void UnInit(void);
-	void Init(CWaveFilter::PFILTERINFO pFilterInfo);
+		CFilter::PFILTER_INFO rootFilterInfo = NULL;
 
-	void cuda_CFilter::getThreadNum(void);
-};
+		UINT SrcLen = 0;
 
-extern cuda_CFilter clscudaFilter;
+	public:
+
+		void Filtting(void);
+		void UnInit(void);
+		void Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CData* targetData, UINT srcLen);
+
+		void getThreadNum(void);
+	};
+}
+extern METHOD::cuda_CFilter clscudaMainFilter;
+extern METHOD::cuda_CFilter clscudaAudioFilter;

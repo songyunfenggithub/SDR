@@ -217,6 +217,8 @@ BEGIN
     BEGIN
         MENUITEM "显示原信号频率谱",                    IDM_SPECTRUM_ORIGNAL_SHOW
         MENUITEM "显示原信号频率谱Log",                 IDM_SPECTRUM_ORIGNAL_LOG_SHOW
+        MENUITEM "显示滤波后信号频率谱",                  IDM_SPECTRUM_FILTTED_SHOW
+        MENUITEM "显示滤波后信号频率谱Log",               IDM_SPECTRUM_FILTTED_LOG_SHOW
         MENUITEM SEPARATOR
         MENUITEM "显示缩放后频率谱",                    IDM_SPECTRUM_ZOOMED_SHOW
     END
@@ -237,6 +239,7 @@ BEGIN
     POPUP "Demodulator"
     BEGIN
         MENUITEM "AM",                          IDM_DEMODULATOR_AM
+        MENUITEM "FM",                          IDM_DEMODULATOR_FM
     END
     POPUP "音频滤波"
     BEGIN

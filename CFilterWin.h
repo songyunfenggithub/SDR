@@ -2,65 +2,71 @@
 
 #include "stdafx.h"
 #include "stdint.h"
+namespace METHOD {
+	class CFilter;
+}
+using namespace METHOD;
 
-#include "CWaveFilter.h"
+namespace WINS {
 
+#define FILTER_WIN_CLASS	"FILTERCORE_WIN"
 
-#define FILTER_WIN_CLASS "FILTERCORE_WIN"
+	class CFilterWin
+	{
+	public:
+		CFilter* cFilter = NULL;
+		CFilter::PFILTER_INFO rootFilterInfo = NULL, pFilterInfo = NULL;
 
-class CFilterWin
-{
-public:
+		HWND	hWnd = NULL;
+		HDC		hdcCache = NULL;
+		HBITMAP hbmpCache = NULL;
+		UINT32  WinWidth, WinHeight;
 
-	CWaveFilter::PFILTERINFO rootFilterInfo = NULL, pFilterInfo = NULL;
+		HMENU hMenuMain = NULL;
+		HMENU hMenuFilterItems = NULL;
 
-	HWND	hWnd = NULL;
-	HDC		hdcCache = NULL;
-	HBITMAP hbmpCache = NULL;
-	UINT32  WinWidth, WinHeight;
+		int HOriginalWidth = 0;
+		int HScrollPos = 0, HScrollWidth = 0;
+		double HScrollZoom = 1.0;
 
-	HMENU hMenuMain = NULL;
-	HMENU hMenuFilterItems = NULL;
+		FILTER_CORE_DATA_TYPE* pCore = NULL;
 
-	int HOriginalWidth = 0;
-	int HScrollPos = 0, HScrollWidth = 0;
-	double HScrollZoom = 1.0;
+		bool filterCoreShow = true;
+		bool filterCoreSpectrumShow = true;
+		bool filterCoreSpectrumLogShow = true;
 
-	FILTER_CORE_DATA_TYPE* pCore = NULL;
+		typedef struct {
+			CFilterWin* pFilterWin;
+			CFilter::PFILTER_INFO pFilterInfo;
+		}CORE_ANALYSE_DATA;
 
-	bool filterCoreShow = true;
-	bool filterCoreSpectrumShow = true;
-	bool filterCoreSpectrumLogShow = true;
+		CORE_ANALYSE_DATA CoreAnalyse = { 0 };
 
-	typedef struct {
-		CFilterWin* pFilterWin;
-		CWaveFilter::PFILTERINFO pFilterInfo;
-	}CORE_ANALYSE_DATA;
+		HANDLE hCoreAnalyseMutex;	//定义互斥对象句柄
 
-	CORE_ANALYSE_DATA CoreAnalyse = { 0 };
+		UINT   CoreAnalyseFFTLength = 0;
+		double* CoreAnalyseFFTBuff = NULL;
+		double* CoreAnalyseFFTLogBuff = NULL;
 
-	HANDLE hCoreAnalyseMutex;	//定义互斥对象句柄
+	public:
+		CFilterWin();
+		~CFilterWin();
 
-	UINT   CoreAnalyseFFTLength = 0;
-	double *CoreAnalyseFFTBuff = NULL;
-	double *CoreAnalyseFFTLogBuff = NULL;
+		void RegisterWindowsClass(void);
+		void OpenWindow(void);
 
-public:
-	CFilterWin();
-	~CFilterWin();
+		void Paint(void);
+		bool OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
+		void GetRealClientRect(PRECT lprc);
+		void KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
+		void InitFilterCoreAnalyse(CFilter::PFILTER_INFO pFilterInfo);
+		void set_CoreAnalyse_root_Filter(void);
 
-	void RegisterWindowsClass(void);
-	void OpenWindow(void);
+		void FilterCoreAnalyse(CFilterWin* pFilterWin, CFilter::PFILTER_INFO pFilterInfo);
 
-	void Paint(void);
-	bool OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
-	void GetRealClientRect(PRECT lprc);
-	void KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
-	void InitFilterCoreAnalyse(CWaveFilter::PFILTERINFO pFilterInfo);
-	void set_CoreAnalyse_root_Filter(CWaveFilter::PFILTERINFO pFilterInfo);
+		static LPTHREAD_START_ROUTINE FilterCoreAnalyse_thread(LPVOID lp);
 
-	static LPTHREAD_START_ROUTINE FilterCoreAnalyse(LPVOID lp);
-
-	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	static LRESULT CALLBACK DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
-};
+		static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		static LRESULT CALLBACK DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+	};
+}

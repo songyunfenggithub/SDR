@@ -181,11 +181,11 @@ BOOL CFile::SaveBuffToFile(VOID)
 	}
 	else
 	{
-		DWORD dwLen = (dwSaveEndPos - dwSaveStartPos) * sizeof(ADCDATATYPE);
+		DWORD dwLen = (dwSaveEndPos - dwSaveStartPos) * AdcData->SizeOfType;
 		//WriteFile(hFile, "wa", 2, &NumberOfBytesWritten, NULL);
 		//WriteFile(hFile, &clsSoundCard.FormatEx, sizeof(WAVEFORMATEX), &NumberOfBytesWritten, NULL);
 		//WriteFile(hFile, &dwLen, 8, &NumberOfBytesWritten, NULL);
-		WriteFile(hFile, (char*)(clsData.AdcBuff + dwSaveStartPos), dwLen, &NumberOfBytesWritten, NULL);
+		WriteFile(hFile, (char*)AdcData->Buff + dwSaveStartPos * AdcData->SizeOfType, dwLen, &NumberOfBytesWritten, NULL);
 		CloseHandle(hFile);
 	}
 	return TRUE;

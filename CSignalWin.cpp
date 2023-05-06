@@ -10,10 +10,11 @@
 #include "public.h"
 #include "myDebug.h"
 #include "CData.h"
-#include "CWaveFFT.h"
 
 #include "CAudioWin.h"
 #include "CSignalWin.h"
+
+using namespace WINS;
 
 #define WAVE_RECT_BORDER_TOP		25
 #define WAVE_RECT_BORDER_LEFT		20
@@ -56,8 +57,14 @@ CSignalWin::CSignalWin()
 {
 	OPENCONSOLE;
 
-	Init(ADC_DATA_SAMPLE_BIT, DATA_BUFFER_LENGTH);
+	//Init();
 	RegisterWindowsClass();
+
+	DrawInfo.iHZoom = 0;
+	DrawInfo.iHOldZoom = 0;
+	DrawInfo.iVZoom = 0;
+	DrawInfo.iVOldZoom = 0;
+	DrawInfo.dwHZoomedPos = 0;
 }
 
 CSignalWin::~CSignalWin()
@@ -66,25 +73,10 @@ CSignalWin::~CSignalWin()
 	//CLOSECONSOLE;
 }
 
-void CSignalWin::Init(UINT data_bit, UINT data_length)
+void CSignalWin::Init(void)
 {
-	BuffDataBit = data_bit;
-
-	DataLength = data_length;
-	DataLengthMask = DataLength - 1;
-	
 	DrawInfo.FullVotage = FULL_VOTAGE;
-	DrawInfo.VotagePerDIV = DrawInfo.FullVotage / ((UINT64)1 << (BuffDataBit - 1));
-
-	static bool firstInit = false;
-	if (firstInit == true) return;
-	firstInit = true;
-
-	DrawInfo.iHZoom = 0;
-	DrawInfo.iHOldZoom = 0;
-	DrawInfo.iVZoom = -2;
-	DrawInfo.iVOldZoom = 0;
-	DrawInfo.dwHZoomedPos = 0;
+	DrawInfo.VotagePerDIV = DrawInfo.FullVotage / ((UINT64)1 << (((CData*)DataOrignal)->DataBits-1));
 }
 
 void CSignalWin::UnInit(void)
@@ -252,8 +244,8 @@ void CSignalWin::CaculateScrolls(void)
 		havebar
 	} barstate;
 	barstate hbar, vbar;
-
-	DrawInfo.dwHZoomedWidth = DataLength;
+	CData* Data = (CData*)DataOrignal;
+	DrawInfo.dwHZoomedWidth = Data->Len;
 	if (DrawInfo.iHZoom > 0) {
 		DrawInfo.dwHZoomedWidth = DrawInfo.dwHZoomedWidth << DrawInfo.iHZoom;
 		DrawInfo.dbHZoom = (double)(1 << DrawInfo.iHZoom);
@@ -267,7 +259,7 @@ void CSignalWin::CaculateScrolls(void)
 	else if (DrawInfo.dwHZoomedWidth - (DrawInfo.DrawWidth - GetSystemMetrics(SM_CYHSCROLL)) < 0) hbar = nobar;
 	else hbar = notsure;
 
-	DrawInfo.dwVZoomedFullHeight = MoveBits(MoveBits(1, BuffDataBit), DrawInfo.iVZoom);
+	DrawInfo.dwVZoomedFullHeight = MoveBits(MoveBits(1, Data->DataBits), DrawInfo.iVZoom);
 	DrawInfo.dwVZoomedHeight = DrawInfo.dwVZoomedFullHeight;
 	DrawInfo.dbVZoom = DrawInfo.iVZoom > 0 ? (UINT64)1 << DrawInfo.iVZoom : (double)1.0 / ((UINT64)1 << -DrawInfo.iVZoom);
 
@@ -303,8 +295,11 @@ void CSignalWin::CaculateHScroll(void)
 	//	DrawInfo.dbHZoom = (double)1.0 / (1 << -DrawInfo.iHZoom);
 	//}
 
+	CData* oData = (CData*)DataOrignal;
+	CData* fData = (CData*)DataFiltted;
+
 	if (bAutoScroll) {
-		DrawInfo.dwHZoomedPos = (bFollowByOrignal == true ? *OrignalBuffPos : *FilttedBuffPos) * DrawInfo.dbHZoom - DrawInfo.DrawWidth;
+		DrawInfo.dwHZoomedPos = (bFollowByOrignal == true ? oData->Pos : fData->Pos) * DrawInfo.dbHZoom - DrawInfo.DrawWidth;
 		if (DrawInfo.dwHZoomedPos < 0) DrawInfo.dwHZoomedPos = 0;
 	}
 	else {
@@ -375,6 +370,9 @@ void CSignalWin::Paint(void)
 	RECT	rt, r;
 	HPEN	hPen, hPenLighter;
 
+	CData* oData = (CData*)DataOrignal;
+	CData* fData = (CData*)DataFiltted;
+
 	hDC = BeginPaint(hWnd, &ps);
 
 	GetClientRect(hWnd, &rt);
@@ -425,7 +423,7 @@ void CSignalWin::Paint(void)
 				r.top = WAVE_RECT_BORDER_TOP - DIVLONG - FONT_HEIGHT;
 				DrawText(hdc, s, strlen(s), &r, NULL);
 				//sprintf(s, "%.6fs", (double)pos / *SampleRate);
-				formatKKDouble((double)pos / *SampleRate, "s", s);
+				formatKKDouble((double)pos / oData->SampleRate, "s", s);
 				r.top = WAVE_RECT_BORDER_TOP + DrawInfo.DrawHeight + DIVLONG;
 				DrawText(hdc, s, strlen(s), &r, NULL);
 			}
@@ -466,23 +464,23 @@ void CSignalWin::Paint(void)
 	DeleteObject(hPen);
 	DeleteObject(hPenLighter);
 
-	if (bDrawOrignalSignal) {
-		if (OrignalBuff != NULL) {
-			if (orignal_buff_type == short_type) DrawSignal_short(hdc, &rt, (short*)OrignalBuff, OrignalBuffPos, RGB(0, 255, 0));
-			if (orignal_buff_type == float_type) DrawSignal_float(hdc, &rt, (float*)OrignalBuff, OrignalBuffPos, RGB(0, 255, 0));
+	if (bDrawOrignalSignal && oData != NULL) {
+		if (oData->Buff != NULL) {
+			if (oData->DataType == short_type) DrawSignal_short(hdc, &rt, oData, RGB(0, 255, 0));
+			if (oData->DataType == float_type) DrawSignal_float(hdc, &rt, oData, RGB(0, 255, 0));
 		}
 	}
-	if (bDrawFilttedSignal) {
-		if (FilttedBuff != NULL) {
-			if (filtted_buff_type == short_type) DrawSignal_short(hdc, &rt, (short*)FilttedBuff, FilttedBuffPos, RGB(255, 255, 0));
-			if (filtted_buff_type == float_type) DrawSignal_float(hdc, &rt, (float*)FilttedBuff, FilttedBuffPos, RGB(255, 255, 0));
+	if (bDrawFilttedSignal && fData != NULL) {
+		if (fData->Buff != NULL) {
+			if (fData->DataType == short_type) DrawSignal_short(hdc, &rt, fData, RGB(255, 255, 0));
+			if (fData->DataType == float_type) DrawSignal_float(hdc, &rt, fData, RGB(255, 255, 0));
 		}
 	}
 
 	double z = DrawInfo.iVZoom >= 0 ? (1.0 / ((UINT64)1 << DrawInfo.iVZoom)) : ((UINT64)1 << -DrawInfo.iVZoom);
 	char tstr1[100], tstr2[100], tstradcpos[100], tstrfiltpos[100], tstrhbarpos[100], tstrfs[100];
-	//clsData.NumPerSec = 38400;
-	double TimePreDiv = 32.0 / *SampleRate *
+	//AdcData->NumPerSec = 38400;
+	double TimePreDiv = 32.0 / oData->SampleRate *
 		(DrawInfo.iHZoom >= 0 ? 1.0 / ((UINT64)1 << DrawInfo.iHZoom) : ((UINT64)1 << -DrawInfo.iHZoom));
 	sprintf(s, "32/DIV %sV/DIV %ss/DIV\r\n"\
 		"Pos:%s\r\nFilttedPos:%s\r\n"\
@@ -491,10 +489,10 @@ void CSignalWin::Paint(void)
 		"HZoom: %d, %d \t VZoom: %d, %d",
 		formatKKDouble(32.0 * DrawInfo.VotagePerDIV * z, "", tstr1),
 		formatKKDouble(TimePreDiv, "", tstr2),
-		fomatKINT64(*OrignalBuffPos, tstradcpos),
-		fomatKINT64(FilttedBuffPos ? *FilttedBuffPos : 0, tstrfiltpos),
+		fomatKINT64(oData != NULL ? oData->Pos : 0, tstradcpos),
+		fomatKINT64(fData != NULL ? fData->Pos : 0, tstrfiltpos),
 		fomatKINT64(DrawInfo.dwHZoomedPos, tstrhbarpos),
-		fomatKINT64(*SampleRate, tstrfs), 0,
+		fomatKINT64(oData->SampleRate, tstrfs), oData->NumPerSec,
 		DrawInfo.iHZoom, DrawInfo.iHZoom >= 0 ? 1 << DrawInfo.iHZoom : -(1 << -DrawInfo.iHZoom),
 		DrawInfo.iVZoom, DrawInfo.iVZoom >= 0 ? 1 << DrawInfo.iVZoom : -(1 << -DrawInfo.iVZoom)
 	);
@@ -537,9 +535,10 @@ void CSignalWin::Paint(void)
 	EndPaint(hWnd, &ps);
 }
 
-void CSignalWin::DrawSignal_short(HDC hdc, RECT *rt, short* Buff, UINT* BuffPos, COLORREF Color)
+void CSignalWin::DrawSignal_short(HDC hdc, RECT *rt, void* Data, COLORREF Color)
 {
 	HPEN hPen;
+	CData* cData = (CData*)Data;
 
 	UINT dwWStep, dwXOffSet, bufStep, dwMark;
 	if (DrawInfo.iHZoom > 0)
@@ -568,7 +567,7 @@ void CSignalWin::DrawSignal_short(HDC hdc, RECT *rt, short* Buff, UINT* BuffPos,
 	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
 	SelectObject(hdc, hPen);
 	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-	short* pData = Buff +
+	short* pData = (short*)cData->Buff +
 		(
 			DrawInfo.iHZoom > 0
 			? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
@@ -584,14 +583,15 @@ void CSignalWin::DrawSignal_short(HDC hdc, RECT *rt, short* Buff, UINT* BuffPos,
 		y = DrawInfo.dwVZoomedFullHeight / 2 - (*pData * DrawInfo.dbVZoom) - DrawInfo.dwVZoomedPos;
 		y = BOUND(y, 0, DrawInfo.DrawHeight);
 		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
+
 		if (bufStep == 1) {
-			if ((pData == (Buff + (*BuffPos & DataLengthMask)))) {
+			if ((pData == ((short*)cData->Buff + (cData->Pos & cData->Mask)))) {
 				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
 				LineTo(hdc, x, WAVE_RECT_BORDER_TOP + DrawInfo.DrawHeight);
 				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
 			}
 		}
-		else if (pData >= (Buff + (*BuffPos & DataLengthMask)) && (pData - bufStep) <= (Buff + (*BuffPos & DataLengthMask))) {
+		else if (pData >= ((short*)cData->Buff + (cData->Pos & cData->Mask)) && (pData - bufStep) <= ((short*)cData->Buff + (cData->Pos & cData->Mask))) {
 			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
 			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + DrawInfo.DrawHeight);
 			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
@@ -601,9 +601,10 @@ void CSignalWin::DrawSignal_short(HDC hdc, RECT *rt, short* Buff, UINT* BuffPos,
 	DeleteObject(hPen);
 }
 
-void CSignalWin::DrawSignal_float(HDC hdc, RECT* rt, float* Buff, UINT* BuffPos, COLORREF Color)
+void CSignalWin::DrawSignal_float(HDC hdc, RECT* rt, void* Data, COLORREF Color)
 {
 	HPEN hPen;
+	CData* cData = (CData*)Data;
 
 	UINT dwWStep, dwXOffSet, bufStep, dwMark;
 	if (DrawInfo.iHZoom > 0)
@@ -631,7 +632,7 @@ void CSignalWin::DrawSignal_float(HDC hdc, RECT* rt, float* Buff, UINT* BuffPos,
 	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
 	SelectObject(hdc, hPen);
 	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-	float* pData = Buff +
+	float* pData = (float*)cData->Buff +
 		( DrawInfo.iHZoom > 0
 			? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
 			: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom)
@@ -647,13 +648,13 @@ void CSignalWin::DrawSignal_float(HDC hdc, RECT* rt, float* Buff, UINT* BuffPos,
 		y = BOUND(y, 0, DrawInfo.DrawHeight);
 		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
 		if (bufStep == 1) {
-			if ((pData == (Buff + (*BuffPos & DataLengthMask)))) {
+			if ((pData == ((float*)cData->Buff + (cData->Pos & cData->Mask)))) {
 				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
 				LineTo(hdc, x, WAVE_RECT_BORDER_TOP + DrawInfo.DrawHeight);
 				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
 			}
 		}
-		else if (pData >= (Buff + (*BuffPos & DataLengthMask)) && (pData - bufStep) <= (Buff + (*BuffPos & DataLengthMask))) {
+		else if (pData >= ((float*)cData->Buff + (cData->Pos & cData->Mask)) && (pData - bufStep) <= ((float*)cData->Buff + (cData->Pos & cData->Mask))) {
 			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
 			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + DrawInfo.DrawHeight);
 			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
@@ -794,7 +795,7 @@ bool CSignalWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_WAVEHZOOMDECREASE:
 	{
 		INT z = 0;
-		UINT wd = DataLength;
+		UINT wd = ((CData*)DataOrignal)->Len;
 		while ((wd - 1) > DrawInfo.DrawWidth) { z--; wd = wd >> 1; }
 		if (DrawInfo.iHZoom > z) {
 			DrawInfo.iHZoom--;
@@ -815,7 +816,7 @@ bool CSignalWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_WAVEVZOOMDECREASE:
 	{
 		INT z = 0;
-		UINT64 hd = (UINT64)1 << BuffDataBit;
+		UINT64 hd = (UINT64)1 << ((CData*)DataOrignal)->DataBits;
 		while ((hd - 1) > DrawInfo.DrawHeight) { z--; hd = hd >> 1; }
 		if (DrawInfo.iVZoom > z) {
 			DrawInfo.iVZoom--;

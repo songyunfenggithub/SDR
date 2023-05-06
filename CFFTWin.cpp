@@ -11,8 +11,7 @@
 #include "myDebug.h"
 #include "CSoundCard.h"
 #include "CData.h"
-#include "CWaveFFT.h"
-#include "CWaveFilter.h"
+#include "CFilter.h"
 #include "CWinSpectrum.h"
 #include "CDataFromSDR.h"
 #include "CAnalyze.h"
@@ -20,12 +19,14 @@
 
 #include "CFFTWin.h"
 
+using namespace WINS; 
+using namespace DEVICES;
+
 #define WAVE_RECT_HEIGHT			0X200
 #define WAVE_RECT_BORDER_TOP		25
 #define WAVE_RECT_BORDER_LEFT		20
 #define WAVE_RECT_BORDER_RIGHT		60
 #define WAVE_RECT_BORDER_BOTTON		25
-
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -81,6 +82,7 @@ void CFFTWin::Init(void)
 {
 	hDrawMutex = CreateMutex(NULL, false, "CFFTWinhDrawMutex");
 	fft = new CFFT();
+	fft2 = new CFFT();
 }
 
 void CFFTWin::UnInit(void)
@@ -131,11 +133,22 @@ LRESULT CALLBACK CFFTWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		
 		me->RestoreValue();
 
-		me->fft->FFTDoing = false;
-		while (me->fft->bFFT_Thread_Exitted == false);
-		me->fft->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, me, 0, NULL);
+		CheckMenuRadioItem(me->hMenuSpect, 0, 1, me->isDrawLogSpectrum == true ? 1 : 0, MF_BYPOSITION);
+		CheckMenuItem(me->hMenu, IDM_SPECTRUM_ZOOMED_SHOW,
+			(me->isSpectrumZoomedShow == true ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 
-		CheckMenuRadioItem(me->hMenuSpect, 0, 1, 0, MF_BYPOSITION);
+		//me->fft->FFTDoing = false;
+		//while (me->fft->bFFT_Thread_Exitted == false);
+		me->fft->hWnd = hWnd;
+		me->fft->Data = me->Data;
+		me->fft->Init();
+		me->fft->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, me->fft, 0, NULL);
+		me->fft2->hWnd = hWnd;
+		me->fft2->Data = me->Data2;
+		me->fft2->Init();
+		me->fft2->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, me->fft2, 0, NULL);
+
+		me->DrawWhich = me->fft;
 	}
 	break;
 	case WM_CHAR:
@@ -158,11 +171,18 @@ LRESULT CALLBACK CFFTWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		InvalidateRect(hWnd, NULL, TRUE);
 		UpdateWindow(hWnd);
 		me->fft->FFTNext = true;
+		me->fft2->FFTNext = true;
 		break;
+	case WM_FFT:
+	{
+		if(me->isDrawBriefly == true) me->BrieflyBuff((CFFT*)lParam);
+		me->PaintSpectrum((CFFT*)lParam);
+	}
+	break;
 	case WM_SIZE:
 	{
 		me->GetRealClientRect(&me->WinRect);
-		me->HScrollWidth = me->HalfFFTSize * me->HScrollZoom - (me->WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+		me->HScrollWidth = ((CFFT*)me->fft)->FFTInfo->HalfFFTSize * me->HScrollZoom - (me->WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
 		UP_TO_ZERO(me->HScrollWidth);
 		SetScrollRange(hWnd, SB_HORZ, 0, me->HScrollWidth, TRUE);
 		me->VScrollHeight = (me->DBMin * -64) * me->VScrollZoom - (me->FFTHeight - WAVE_RECT_BORDER_TOP - WAVE_RECT_BORDER_BOTTON);
@@ -188,6 +208,7 @@ LRESULT CALLBACK CFFTWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		break;
 	case WM_DESTROY:
 		me->fft->FFTDoing = false;
+		while (me->fft->bFFT_Thread_Exitted == false);
 		WaitForSingleObject(me->hDrawMutex, INFINITE);
 		me->hWnd = NULL;
 		ReleaseMutex(me->hDrawMutex);
@@ -211,7 +232,7 @@ bool CFFTWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_FFT_HORZ_ZOOM_INCREASE:
 		if (HScrollZoom < FFT_ZOOM_MAX) {
 			HScrollZoom *= 2.0;
-			HScrollWidth = HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			HScrollWidth = ((CFFT*)fft)->FFTInfo->HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
 			UP_TO_ZERO(HScrollWidth);
 			SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
 			HScrollPos *= 2.0;
@@ -219,9 +240,9 @@ bool CFFTWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case IDM_FFT_HORZ_ZOOM_DECREASE:
-		if (HScrollZoom * HalfFFTSize > WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) {
+		if (HScrollZoom * ((CFFT*)fft)->FFTInfo->HalfFFTSize > WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) {
 			HScrollZoom /= 2.0;
-			HScrollWidth = HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			HScrollWidth = ((CFFT*)fft)->FFTInfo->HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
 			UP_TO_ZERO(HScrollWidth);
 			SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
 			HScrollPos /= 2.0;
@@ -231,7 +252,7 @@ bool CFFTWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case IDM_FFT_HORZ_ZOOM_HOME:
 		HScrollPos /= HScrollZoom;
-		HScrollWidth = HalfFFTSize - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+		HScrollWidth = ((CFFT*)fft)->FFTInfo->HalfFFTSize - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
 		UP_TO_ZERO(HScrollWidth);
 		SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
 		SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
@@ -270,19 +291,35 @@ bool CFFTWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_SPECTRUM_ORIGNAL_SHOW:
 	{
 		isDrawLogSpectrum = false;
-		CheckMenuRadioItem(hMenuSpect, 0, 1, 0, MF_BYPOSITION);
+		DrawWhich = fft;
+		CheckMenuRadioItem(hMenuSpect, 0, 3, 0, MF_BYPOSITION);
 	}
 	break;
 	case IDM_SPECTRUM_ORIGNAL_LOG_SHOW:
 	{
 		isDrawLogSpectrum = true;
-		CheckMenuRadioItem(hMenuSpect, 0, 1, 1, MF_BYPOSITION);
+		DrawWhich = fft;
+		CheckMenuRadioItem(hMenuSpect, 0, 3, 1, MF_BYPOSITION);
+	}
+	break;
+	case IDM_SPECTRUM_FILTTED_SHOW:
+	{
+		isDrawLogSpectrum = false;
+		DrawWhich = fft2;
+		CheckMenuRadioItem(hMenuSpect, 0, 3, 2, MF_BYPOSITION);
+	}
+	break;
+	case IDM_SPECTRUM_FILTTED_LOG_SHOW:
+	{
+		isDrawLogSpectrum = true;
+		DrawWhich = fft2;
+		CheckMenuRadioItem(hMenuSpect, 0, 3, 3, MF_BYPOSITION);
 	}
 	break;
 	case IDM_SPECTRUM_ZOOMED_SHOW:
 		isSpectrumZoomedShow = !isSpectrumZoomedShow;
 		CheckMenuItem(hMenu, IDM_SPECTRUM_ZOOMED_SHOW,
-			(isSpectrumZoomedShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+			(isSpectrumZoomedShow == true ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 	case IDM_EXIT:
 		break;
@@ -294,23 +331,18 @@ bool CFFTWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 
 void CFFTWin::OnMouse(void)
 {
-	int i = 0;
+	int i = 0, n = 0;
 	char s[500], t[100];
-	FILTER_CORE_DATA_TYPE* pFilterCore = clsWaveFilter.pCurrentFilterInfo->FilterCore;
-	int FilterLength = clsWaveFilter.pCurrentFilterInfo->CoreLength;
+	CFFT* cFFT = (CFFT*)fft;
 	int X = (HScrollPos + MouseX - WAVE_RECT_BORDER_LEFT) / HScrollZoom;
 	X = BOUND(X, 0, (HScrollPos + this->WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / HScrollZoom);
-	double Y = X > FilterLength ? 0 : pFilterCore[X];
-	int n = 0;
-	n += sprintf(strMouse + n, "X: %d, core V: %lf", X, Y);
 
-	double Hz = (double)X * *SampleRate / FFTSize;
-	Y = X > FFTSize / 2 ? 0 : clsWinSpect.OrignalFFTBuff[X];
-	n += sprintf(strMouse + n, " | ");
+	double Hz = (double)X * ((CData*)Data)->SampleRate / ((CFFT*)fft)->FFTInfo->FFTSize;
+	double Y = X > cFFT->FFTInfo->HalfFFTSize ? 0 : cFFT->FFTOutBuff[X];
 	n += sprintf(strMouse + n, "Hz: %.03f, FFT: %s", Hz, formatKDouble(Y, 0.001, "", t));
 
 	int Ypos = BOUND(MouseY - WAVE_RECT_BORDER_TOP, 0, WAVE_RECT_HEIGHT);
-	double Ylog = 20 * (X > clsWaveFFT.FFTSize / 2 ? 0 : clsWinSpect.FilttedFFTBuffLog[X]);
+	double Ylog = 20 * (X > cFFT->FFTInfo->HalfFFTSize ? 0 : cFFT->FFTOutLogBuff[X]);
 	n += sprintf(strMouse + n, " | ");
 	n += sprintf(strMouse + n, "Y: %.03fdb, logFFT: %fdb", -(double)Ypos / 64 * 20, Ylog);
 
@@ -327,6 +359,8 @@ void CFFTWin::Paint(void)
 
 	//EndPaint(hWnd, &ps);
 	//return;
+	//CData* cData = (CData*)Data;
+	//CFFT* cFFT = (CFFT*)fft;
 
 	GetClientRect(hWnd, &rt);
 
@@ -386,7 +420,7 @@ void CFFTWin::Paint(void)
 				DrawText(hdc, s, strlen(s), &r, NULL);
 				//sprintf(s, "%.6fs", (double)pos / *SampleRate);
 				//formatKKDouble((double)pos / *SampleRate, "s", s);
-				sprintf(s, "%.03fhz", (double)(pos * *SampleRate / FFTSize));
+				sprintf(s, "%.03fhz", (double)(pos * Data->SampleRate / fft->FFTInfo->FFTSize));
 				r.top = WAVE_RECT_BORDER_TOP + (FFTDrawHeight) + DIVLONG;
 				DrawText(hdc, s, strlen(s), &r, NULL);
 			}
@@ -433,8 +467,12 @@ void CFFTWin::Paint(void)
 	DeleteObject(hPen);
 	DeleteObject(hPenLighter);
 
-	PaintFFT(hdc, fft);
-	PaintFFTBriefly(hdc, fft);
+	PaintFFT(hdc,fft);
+	PaintFFT(hdc, fft2);
+	if (isDrawBriefly == true) {
+		PaintFFTBriefly(hdc, fft);
+		PaintFFTBriefly(hdc, fft2);
+	}
 
 	//---------------------------------------
 	{
@@ -442,23 +480,27 @@ void CFFTWin::Paint(void)
 #define DRAW_TEXT_X		(WAVE_RECT_BORDER_LEFT + 10)	
 #define DRAW_TEXT_Y		(WAVE_RECT_BORDER_TOP + DIVLONG + 20)
 		double FullVotage = 5.0;
-		double VotagePerDIV = (FullVotage / (unsigned __int64)((UINT64)1 << (sizeof(ADCDATATYPE) * 8)));
+		double VotagePerDIV = (FullVotage / (unsigned __int64)((UINT64)1 << (sizeof(ADC_DATA_TYPE) * 8)));
 		char tstr1[100], tstr2[100];
 		r.top = DRAW_TEXT_Y;
 		r.left = DRAW_TEXT_X;
 		r.right = rt.right;
 		r.bottom = rt.bottom;
-		char t1[100], t2[100], t3[100];
+		char t1[100], t11[100], t2[100], t3[100], t4[100], t5[100];
 		sprintf(s, "32pix / DIV\r\n"\
-			"SampleRate=%s\r\n"\
-			"FFTSize=%s  FFTStep=%s FFTPerSec=.03f\r\n"\
+			"Data SampleRate=%s\r\n"\
+			"FFTSize=%s  FFTStep=%s FFTPerSec=%.03f\r\n"\
+			"Data2 SampleRate=%s\r\n"\
+			"2FFTSize=%s  2FFTStep=%s 2FFTPerSec=%.03f\r\n"\
 			"HZoom=%f HZoom=%f\r\n"
 			,
-			fomatKINT64(*SampleRate, t1),
-			fomatKINT64(FFTSize, t2), fomatKINT64(FFTStep, t3), 0,
+			fomatKINT64(Data->SampleRate, t1),
+			fomatKINT64(fft->FFTInfo->FFTSize, t2), fomatKINT64(fft->FFTInfo->FFTStep, t3), fft->FFTInfo->FFTPerSec,
+			fomatKINT64(Data2->SampleRate, t11),
+			fomatKINT64(fft2->FFTInfo->FFTSize, t4), fomatKINT64(fft2->FFTInfo->FFTStep, t5), fft2->FFTInfo->FFTPerSec,
 			HScrollZoom, VScrollZoom
 		);
-		SetBkMode(hdc, TRANSPARENT);
+		//SetBkMode(hdc, TRANSPARENT);
 		//	SetBkMode(hdc, OPAQUE); 
 		//	SetBkColor(hdc,COLOR_TEXT_BACKGOUND);
 
@@ -494,22 +536,28 @@ void CFFTWin::Paint(void)
 
 void CFFTWin::PaintFFT(HDC hdc, CFFT* fft)
 {
+	if (fft == NULL) return;
+
 	WaitForSingleObject(fft->hMutexBuff, INFINITE);
+
+	HPEN hPen = NULL;
+	HPEN hPenSaved = NULL;
 
 	double Y = 0;
 	int X;
-	int FFTLength = HalfFFTSize;
+	int FFTLength = fft->FFTInfo->HalfFFTSize;
 	UINT FFTDrawHeight = FFTHeight - WAVE_RECT_BORDER_TOP - WAVE_RECT_BORDER_BOTTON;
 	double* pBuf = fft->FFTOutBuff;
 	double fftvmax;
 	double fftvmin;
-	HPEN hPen;
 	int i = 0;
 	UINT64 maxHightPix = DBMin * -64 * VScrollZoom;
 
 	int Xstep = HScrollZoom > 1.0 ? HScrollZoom : 1;
 	int istep = HScrollZoom < 1.0 ? ((double)1.0 / HScrollZoom) : 1;
 	if (pBuf) {
+		hPen = CreatePen(PS_SOLID, 1, fft->Color);
+		hPenSaved = (HPEN)SelectObject(hdc, hPen);
 		double scale = (double)maxHightPix / fft->FFTMaxValue;
 		//double scale = FFTDrawHeight / fftvmax;
 		fftvmax = pBuf[FFTLength];
@@ -518,8 +566,6 @@ void CFFTWin::PaintFFT(HDC hdc, CFFT* fft)
 		Y = BOUND(Y, 0, FFTDrawHeight);
 		X = WAVE_RECT_BORDER_LEFT;
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT);
-		SelectObject(hdc, hPen);
 		for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
@@ -527,20 +573,21 @@ void CFFTWin::PaintFFT(HDC hdc, CFFT* fft)
 			Y = BOUND(Y, 0, FFTDrawHeight);
 			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
 		}
+		SelectObject(hdc, hPenSaved);
 		DeleteObject(hPen);
 	}
 
 	double* pLogBuf = fft->FFTOutLogBuff;
 	if (pLogBuf) {
 		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
+		hPen = CreatePen(PS_SOLID, 1, fft->ColorLog);
+		hPenSaved = (HPEN)SelectObject(hdc, hPen);
 		fftvmax = pLogBuf[FFTLength];
 		i = HScrollPos / HScrollZoom;
 		if (i < FFTLength) Y = pLogBuf[i] * -64 * VScrollZoom - VScrollPos;
 		Y = BOUND(Y, 0, FFTDrawHeight);
 		X = WAVE_RECT_BORDER_LEFT;
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT_LOG);
-		SelectObject(hdc, hPen);
 		for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
@@ -548,6 +595,7 @@ void CFFTWin::PaintFFT(HDC hdc, CFFT* fft)
 			Y = BOUND(Y, 0, FFTDrawHeight);
 			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
 		}
+		SelectObject(hdc, hPenSaved);
 		DeleteObject(hPen);
 	}
 	ReleaseMutex(fft->hMutexBuff);
@@ -556,23 +604,30 @@ void CFFTWin::PaintFFT(HDC hdc, CFFT* fft)
 
 void CFFTWin::PaintFFTBriefly(HDC hdc, CFFT* fft)
 {
-	WaitForSingleObject(fft->hMutexBuff, INFINITE);
+	if (fft == NULL) return;
+	CFFT* cFFT = (CFFT*)fft;
+
+	HPEN hPen = NULL;
+	HPEN hPenSaved = NULL;
+
+	WaitForSingleObject(cFFT->hMutexBuff, INFINITE);
 
 	double Y = 0;
 	int X;
-	int FFTLength = HalfFFTSize;
+	int FFTLength = cFFT->FFTInfo->HalfFFTSize;
 	UINT FFTDrawHeight = FFTHeight - WAVE_RECT_BORDER_TOP - WAVE_RECT_BORDER_BOTTON;
-	double* pBuf = fft->FFTBrieflyBuff;
+	double* pBuf = cFFT->FFTBrieflyBuff;
 	double fftvmax;
 	double fftvmin;
-	HPEN hPen;
 	int i = 0;
 	UINT64 maxHightPix = DBMin * -64 * VScrollZoom;
 
 	int Xstep = HScrollZoom > 1.0 ? HScrollZoom : 1;
 	int istep = HScrollZoom < 1.0 ? ((double)1.0 / HScrollZoom) : 1;
 	if (pBuf) {
-		double scale = (double)maxHightPix / fft->FFTMaxValue;
+		hPen = CreatePen(PS_SOLID, 1, cFFT->Color);
+		hPenSaved = (HPEN)SelectObject(hdc, hPen);
+		double scale = (double)maxHightPix / cFFT->FFTMaxValue;
 		//double scale = FFTDrawHeight / fftvmax;
 		fftvmax = pBuf[FFTLength];
 		i = HScrollPos / HScrollZoom;
@@ -580,8 +635,6 @@ void CFFTWin::PaintFFTBriefly(HDC hdc, CFFT* fft)
 		Y = BOUND(Y, 0, FFTDrawHeight);
 		X = WAVE_RECT_BORDER_LEFT;
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT);
-		SelectObject(hdc, hPen);
 		for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
@@ -589,12 +642,14 @@ void CFFTWin::PaintFFTBriefly(HDC hdc, CFFT* fft)
 			Y = BOUND(Y, 0, FFTDrawHeight);
 			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
 		}
+		SelectObject(hdc, hPenSaved);
 		DeleteObject(hPen);
 	}
 
-	double* pLogBuf = fft->FFTBrieflyLogBuff;
+	double* pLogBuf = cFFT->FFTBrieflyLogBuff;
 	if (pLogBuf) {
-		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
+		hPen = CreatePen(PS_SOLID, 1, cFFT->ColorLog);
+		hPenSaved = (HPEN)SelectObject(hdc, hPen);
 		fftvmax = pLogBuf[FFTLength];
 		i = HScrollPos / HScrollZoom;
 		if (i < FFTLength) Y = pLogBuf[i] * -64 * VScrollZoom - VScrollPos;
@@ -610,10 +665,10 @@ void CFFTWin::PaintFFTBriefly(HDC hdc, CFFT* fft)
 			Y = BOUND(Y, 0, FFTDrawHeight);
 			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
 		}
+		SelectObject(hdc, hPenSaved);
 		DeleteObject(hPen);
 	}
-	ReleaseMutex(fft->hMutexBuff);
-
+	ReleaseMutex(cFFT->hMutexBuff);
 }
 
 void CFFTWin::GetRealClientRect(PRECT lprc)
@@ -817,17 +872,21 @@ void CFFTWin::SpectrumToWin(HDC hDC)
 
 void CFFTWin::PaintSpectrum(CFFT* fft)
 {
+	if (fft != DrawWhich) return;
+
+	CFFT* cFFT = (CFFT*)fft;
+
 	WaitForSingleObject(hDrawMutex, INFINITE);
 	if (hWnd == NULL) {
 		ReleaseMutex(hDrawMutex);
 		return;
 	}
 
-	double* pBuf = isSpectrumZoomedShow == true ?
-		(isDrawLogSpectrum == true ? fft->FFTOutBuff : fft->FFTOutLogBuff) :
-		(isDrawLogSpectrum == true ? fft->FFTBrieflyBuff : fft->FFTBrieflyLogBuff);
+	double* pBuf = isSpectrumZoomedShow == false ?
+		(isDrawLogSpectrum == false ? cFFT->FFTOutBuff : cFFT->FFTOutLogBuff) :
+		(isDrawLogSpectrum == false ? cFFT->FFTBrieflyBuff : cFFT->FFTBrieflyLogBuff);
 
-	UINT32 halfFFTSize = HalfFFTSize;
+	UINT32 halfFFTSize = cFFT->FFTInfo->HalfFFTSize;
 	UINT DrawLen = WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT;
 	RECT rt;
 	UINT64 color;
@@ -955,7 +1014,7 @@ void CFFTWin::PaintSpectrum(CFFT* fft)
 						}
 						*/
 						//			color = (UINT)(((double)(1.0 * 0xFFFFFFFF) / fftmaxdiff) * (pBuf[i] - fftminv));
-			color = (UINT)(((double)(1.0 * 0xFFFFFFFF) / clsWaveFFT.FFTMaxValue) * (pBuf[i]));
+			color = (UINT)(((double)(1.0 * 0xFFFFFFFF) / ((CFFT*)fft)->FFTMaxValue) * (pBuf[i]));
 			if (C = (BYTE)(color >> 24)) cx = RGB(255, ~C, ~C);
 			else {
 				if (C = (BYTE)(color >> 16)) cx = RGB(C, C, 255);
@@ -1067,22 +1126,28 @@ LRESULT CALLBACK CFFTWin::DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, 
 	switch (message)
 	{
 	case WM_INITDIALOG:
+	{
 		me = (CFFTWin*)set_DlgWinClass(hDlg, lParam);
 		//SetWindowLong(hDlg, DWLP_USER, lParam);
-		SetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, me->FFTSize, false);
-		SetDlgItemInt(hDlg, IDC_EDIT_FFT_STEP, me->FFTStep, false);
-		return TRUE;
+		CFFT* cFFT = (CFFT*)me->fft;
+		SetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, cFFT->FFTInfo->FFTSize, false);
+		SetDlgItemInt(hDlg, IDC_EDIT_FFT_STEP, cFFT->FFTInfo->FFTStep, false);
+	}
+	return TRUE;
 
 	case WM_COMMAND:
 		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
 		{
 			if (LOWORD(wParam) == IDOK)
 			{
-				me->FFTSize = GetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, NULL, false);
-				me->FFTStep = GetDlgItemInt(hDlg, IDC_EDIT_FFT_STEP, NULL, false);
-				me->fft->FFTDoing = false;
-				while (me->fft->bFFT_Thread_Exitted == false);
-				me->fft->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, me, 0, NULL);
+				CFFT* cFFT = (CFFT*)me->fft;
+				cFFT->FFTDoing = false;
+				while (cFFT->bFFT_Thread_Exitted == false);
+				cFFT->FFTInfo->FFTSize = GetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, NULL, false); 
+				cFFT->FFTInfo->HalfFFTSize = cFFT->FFTInfo->FFTSize / 2;
+				cFFT->FFTInfo->FFTStep = GetDlgItemInt(hDlg, IDC_EDIT_FFT_STEP, NULL, false);
+				cFFT->Init();
+				cFFT->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, cFFT, 0, NULL);
 			}
 			EndDialog(hDlg, LOWORD(wParam));
 			return TRUE;
@@ -1092,15 +1157,16 @@ LRESULT CALLBACK CFFTWin::DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, 
 	return FALSE;
 }
 
-void CFFTWin::BrieflyBuff(void)
+void CFFTWin::BrieflyBuff(CFFT* fft)
 {
-	double* pfft = fft->FFTOutBuff;
-	double* pfftlog = fft->FFTOutLogBuff;
-	double* pbrifft = fft->FFTBrieflyBuff;
-	double* pbrifftlog = fft->FFTBrieflyLogBuff;
+	CFFT* cFFT = (CFFT*)fft;
+	double* pfft = cFFT->FFTOutBuff;
+	double* pfftlog = cFFT->FFTOutLogBuff;
+	double* pbrifft = cFFT->FFTBrieflyBuff;
+	double* pbrifftlog = cFFT->FFTBrieflyLogBuff;
 	int stepn = 1 / HScrollZoom;
 	if (stepn == 0)stepn = 1;
-	int N = HalfFFTSize / stepn;
+	int N = cFFT->FFTInfo->HalfFFTSize / stepn;
 	double maxd;
 	double maxdlog;
 	double mind = DBL_MAX;
@@ -1121,8 +1187,8 @@ void CFFTWin::BrieflyBuff(void)
 		if (mind > maxd) mind = maxd;
 		if (minlogd > maxdlog) minlogd = maxdlog;
 	}
-	pbrifft[HalfFFTSize] = pfft[HalfFFTSize];
-	pbrifft[HalfFFTSize + 1] = mind;// pfft[clsWaveFFT.HalfFFTSize + 1];
-	pbrifftlog[HalfFFTSize] = pfftlog[HalfFFTSize];
-	pbrifftlog[HalfFFTSize + 1] = minlogd;// pfftlog[clsWaveFFT.HalfFFTSize + 1];
+	pbrifft[cFFT->FFTInfo->HalfFFTSize] = pfft[cFFT->FFTInfo->HalfFFTSize];
+	pbrifft[cFFT->FFTInfo->HalfFFTSize + 1] = mind;// pfft[clsWaveFFT.HalfFFTSize + 1];
+	pbrifftlog[cFFT->FFTInfo->HalfFFTSize] = pfftlog[cFFT->FFTInfo->HalfFFTSize];
+	pbrifftlog[cFFT->FFTInfo->HalfFFTSize + 1] = minlogd;// pfftlog[clsWaveFFT.HalfFFTSize + 1];
 }

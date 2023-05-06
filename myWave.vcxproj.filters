@@ -42,19 +42,13 @@
     <ClCompile Include="CAnalyze.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CWaveFilter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CWaveFFT.cpp">
+    <ClCompile Include="CFilter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CWinSpectrum.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="public.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CWaveFunc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CDataFromUSB.cpp">
@@ -70,9 +64,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CWinOneSpectrum.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CWinFFT.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CFile.cpp">
@@ -129,6 +120,12 @@
     <ClCompile Include="CFilttedWin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CFilterFFT.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CToolsWin.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="myDebug.h">
@@ -155,16 +152,10 @@
     <ClInclude Include="CAnalyze.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CWaveFilter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CWaveFFT.h">
+    <ClInclude Include="CFilter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CWinSpectrum.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CWaveFunc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CDataFromUSB.h">
@@ -177,9 +168,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CWinOneSpectrum.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CWinFFT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CFilterWin.h">
@@ -221,9 +209,6 @@
     <ClInclude Include="CWinSDRScan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cuda_FFT.cuh">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="CDemodulatorAM.h">
       <Filter>Header Files\Demodulator</Filter>
     </ClInclude>
@@ -251,6 +236,12 @@
     <ClInclude Include="CFilttedWin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CFilterFFT.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CToolsWin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="myWave.ico">
@@ -270,9 +261,6 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="cuda_CFilter.cu">
-      <Filter>Source Files</Filter>
-    </CudaCompile>
-    <CudaCompile Include="cuda_FFT.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="cuda_CFilter2.cu">

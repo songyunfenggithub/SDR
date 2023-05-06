@@ -14,7 +14,6 @@
 
 #include "public.h"
 #include "CData.h"
-#include "CWaveFFT.h"
 #include "CWinFFT.h"
 #include "CWinSDR.h"
 #include "CWinOneSpectrum.h"
@@ -27,6 +26,7 @@
 #pragma comment(lib,"SDRPlay_API.3.09/API/x64/sdrplay_api.lib")
 
 using namespace std;
+using namespace WINS; using namespace DEVICES;
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -101,7 +101,7 @@ void CWinSDR::ProcessKey(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONDOWN:
 		pt.x = LOWORD(lParam);
 		pt.y = HIWORD(lParam);
-		hz = (uint32_t)(clsData.AdcSampleRate * pt.y / clsWaveFFT.FFTSize);
+		hz = (uint32_t)(AdcData->SampleRate * pt.y / FFTInfo_Signal.FFTSize);
 		cout << pt.x << ":" << pt.y << ":" << hz << endl;
 		break;
 
@@ -347,109 +347,41 @@ BOOL CWinSDR::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 
 	case IDM_SPECTRUM_HORZ_ZOOM_INCREASE:
-		if (WinOneSpectrumHScrollZoom < SDR_ZOOM_MAX) {
-			WinOneSpectrumHScrollZoom *= 2;
-			int w = SDR_WIDTH - SDR_WIN_WIDTH / WinOneSpectrumHScrollZoom;
-			if (w < 0) w = 0;
-			SetScrollRange(hWndSpectrumHScrollBar, SB_HORZ, 0, w, TRUE);
-		}
 		break;
 	case IDM_SPECTRUM_HORZ_ZOOM_DECREASE:
-		if (WinOneSpectrumHScrollZoom * SDR_WIDTH > SDR_WIN_WIDTH) {
-			WinOneSpectrumHScrollZoom /= 2;
-			int w = SDR_WIDTH - SDR_WIN_WIDTH / WinOneSpectrumHScrollZoom;
-			if (w < 0) w = 0;
-			SetScrollRange(hWndSpectrumHScrollBar, SB_HORZ, 0, w, TRUE);
-		}
 		break;
 	case IDM_SPECTRUM_HORZ_ZOOM_HOME:
-	{
-		WinOneSpectrumHScrollZoom = 1.0;
-		int w = SDR_WIDTH - SDR_WIN_WIDTH / WinOneSpectrumHScrollZoom;
-		if (w < 0) w = 0;
-		SetScrollRange(hWndSpectrumHScrollBar, SB_HORZ, 0, w, TRUE);
-	}
 	break;
 	case IDM_SPECTRUM_VERT_ZOOM_INCREASE:
-		if (WinOneSpectrumVScrollZoom < SDR_ZOOM_MAX) {
-			WinOneSpectrumVScrollZoom *= 2;
-			int w = clsWaveFFT.FFTSize / 2 - WinOneSpectrumHeight / WinOneSpectrumVScrollZoom;
-			if (w < 0)w = 0;
-			SetScrollRange(hWndSpectrumVScrollBar, SB_VERT, 0, w, TRUE);
-		}
 		break;
 	case IDM_SPECTRUM_VERT_ZOOM_DECREASE:
-		if (WinOneSpectrumVScrollZoom * clsWaveFFT.FFTSize / 2 > WinOneSpectrumHeight) {
-			WinOneSpectrumVScrollZoom /= 2;
-			int w = clsWaveFFT.FFTSize / 2 - WinOneSpectrumHeight / WinOneSpectrumVScrollZoom;
-			if (w < 0)w = 0;
-			SetScrollRange(hWndSpectrumVScrollBar, SB_VERT, 0, w, TRUE);
-		}
 		break;
 	case IDM_SPECTRUM_VERT_ZOOM_HOME:
-	{
-		WinOneSpectrumVScrollZoom = 1.0;
-		int w = clsWaveFFT.FFTSize / 2 - WinOneSpectrumHeight / WinOneSpectrumVScrollZoom;
-		if (w < 0)w = 0;
-		SetScrollRange(hWndSpectrumVScrollBar, SB_VERT, 0, w, TRUE);
-	}
 	break;
 	case IDM_SPECTRUM_FOLLOW:
-		SpectrumAutoFollow = !SpectrumAutoFollow;
-		CheckMenuItem(hMenu, IDM_SPECTRUM_FOLLOW, MF_BYCOMMAND | (SpectrumAutoFollow == true ? MF_CHECKED : MF_UNCHECKED));
 		break;
-
 	case IDM_FFT_HORZ_ZOOM_INCREASE:
-		if (clsWinFFT.HScrollZoom < FFT_ZOOM_MAX) {
-			clsWinFFT.HScrollZoom *= 2;
-			PostMessage(clsWinFFT.hWnd, WM_SIZE, 0, 0);
-		}
 		break;
 	case IDM_FFT_HORZ_ZOOM_DECREASE:
-		if (clsWinFFT.HScrollZoom * clsWaveFFT.FFTSize > clsWinFFT.WinWidth) {
-			clsWinFFT.HScrollZoom /= 2;
-			PostMessage(clsWinFFT.hWnd, WM_SIZE, 0, 0);
-		}
 		break;
 	case IDM_FFT_HORZ_ZOOM_HOME:
-		clsWinFFT.HScrollZoom = 1.0;
-		PostMessage(clsWinFFT.hWnd, WM_SIZE, 0, 0);
 		break;
 	case IDM_FFT_VERT_ZOOM_INCREASE:
-		//if (clsWinFFT.VScrollZoom < FFT_ZOOM_MAX)
-		//	clsWinFFT.VScrollZoom *= 2;
 		break;
 	case IDM_FFT_VERT_ZOOM_DECREASE:
-		//if (clsWinFFT.VScrollZoom < FFT_ZOOM_MAX)
-		//	clsWinFFT.VScrollZoom *= 2;
 		break;
 	case IDM_FFT_VERT_ZOOM_HOME:
-		clsWinFFT.VScrollZoom = 1.0;
+
 		break;
 	case IDM_FFT_ORIGNAL_SHOW:
-		clsWinFFT.bFFTOrignalShow = !clsWinFFT.bFFTOrignalShow;
-		CheckMenuItem(hMenu, IDM_FFT_ORIGNAL_SHOW,
-			(clsWinFFT.bFFTOrignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 	case IDM_FFT_ORIGNAL_LOG_SHOW:
-		clsWinFFT.bFFTOrignalLogShow = !clsWinFFT.bFFTOrignalLogShow;
-		CheckMenuItem(hMenu, IDM_FFT_ORIGNAL_LOG_SHOW,
-			(clsWinFFT.bFFTOrignalLogShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 	case IDM_FFT_FILTTED_SHOW:
-		clsWinFFT.bFFTFilttedShow = !clsWinFFT.bFFTFilttedShow;
-		CheckMenuItem(hMenu, IDM_FFT_FILTTED_SHOW,
-			(clsWinFFT.bFFTFilttedShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 	case IDM_FFT_FILTTED_LOG_SHOW:
-		clsWinFFT.bFFTFilttedLogShow = !clsWinFFT.bFFTFilttedLogShow;
-		CheckMenuItem(hMenu, IDM_FFT_FILTTED_LOG_SHOW,
-			(clsWinFFT.bFFTFilttedLogShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 	case IDM_FFT_HOLD:
-		clsWinFFT.bFFTHold = !clsWinFFT.bFFTHold;
-		CheckMenuItem(hMenu, IDM_FFT_HOLD,
-			(clsWinFFT.bFFTHold ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 
 	case IDM_EXIT:
@@ -497,7 +429,7 @@ VOID CWinSDR::Paint(HWND hWnd)
 	EndPaint(hWnd, &ps);
 }
 
-void CWinSDR::PaintFFT(WHICHSIGNAL WhichSignal)
+void CWinSDR::PaintFFT(void)
 {
 
 }
@@ -591,18 +523,18 @@ void CWinSDR::KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 
 		if (dn != 0)
 		{
-			WinOneSpectrumVScrollPos = BOUND(WinOneSpectrumVScrollPos + dn, 0, clsWaveFFT.FFTSize / 2 - WinOneSpectrumHeight / WinOneSpectrumVScrollZoom);
+			WinOneSpectrumVScrollPos = BOUND(WinOneSpectrumVScrollPos + dn, 0, FFTInfo_Signal.FFTSize / 2 - WinOneSpectrumHeight / WinOneSpectrumVScrollZoom);
 		}
 		if (tbdn != 0)
 		{
-			WinOneSpectrumVScrollPos = BOUND(tbdn + dn, 0, clsWaveFFT.FFTSize / 2 - WinOneSpectrumHeight / WinOneSpectrumVScrollZoom);
+			WinOneSpectrumVScrollPos = BOUND(tbdn + dn, 0, FFTInfo_Signal.FFTSize / 2 - WinOneSpectrumHeight / WinOneSpectrumVScrollZoom);
 		}
 		if (dn != 0 || tbdn != 0)
 		{
 			si.cbSize = sizeof(si);
 			si.fMask = SIF_ALL;
 			si.nMin = 0;
-			si.nMax = clsWaveFFT.FFTSize / 2 - WinOneSpectrumHeight / WinOneSpectrumVScrollZoom;
+			si.nMax = FFTInfo_Signal.FFTSize / 2 - WinOneSpectrumHeight / WinOneSpectrumVScrollZoom;
 			si.nPage = 128;
 			si.nPos = WinOneSpectrumVScrollPos;
 			SetScrollInfo(hWndSpectrumVScrollBar, SB_CTL, &si, TRUE);
@@ -849,6 +781,6 @@ void CWinSDR::Init(void)
 	si.nMax = SDR_WIDTH - SDR_WIN_WIDTH;
 	SetScrollInfo(hWndSpectrumHScrollBar, SB_CTL, &si, TRUE);
 
-	si.nMax = clsWaveFFT.FFTSize / 2 - WinOneSpectrumHeight;
+	si.nMax = FFTInfo_Signal.FFTSize / 2 - WinOneSpectrumHeight;
 	SetScrollInfo(hWndSpectrumVScrollBar, SB_CTL, &si, TRUE);
 }

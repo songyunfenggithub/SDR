@@ -4,7 +4,7 @@
 #include "stdafx.h"
 #include "stdint.h"
 
-#include "CWaveFilter.h"
+#include "CFilter.h"
 
 
 #define FFT_WIN_CLASS	"FFT_WIN"

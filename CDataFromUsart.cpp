@@ -9,7 +9,8 @@
 
 #include "CDataFromUsart.h"
 
-using  namespace std;
+using namespace std;
+using namespace DEVICES;
 
 CDataFromUsart clsGetDataUsart;
 
@@ -274,13 +275,13 @@ UINT WINAPI CDataFromUsart::ListenThread(void* pParam)
 		}
 		/** 读取输入缓冲区中的数据并输出显示 */
 		UINT BytesReadBlock;
-		if ((DATA_BUFFER_LENGTH << 2) - clsData.AdcGetCharLength < BytesInQue) {
-			BytesReadBlock = (DATA_BUFFER_LENGTH << 2) - clsData.AdcGetCharLength;
+		if ((AdcData->Len << AdcData->MoveBit) - AdcData->CharPos < BytesInQue) {
+			BytesReadBlock = (AdcData->Len << AdcData->MoveBit) - AdcData->CharPos;
 			BytesInQue -= BytesReadBlock;
 		}
 		else
 			BytesReadBlock = BytesInQue;
-		UINT nBytesRead = pSerialPort->ReadBytesInQue((char*)(clsData.AdcBuff) + clsData.AdcGetCharLength, BytesReadBlock);
+		UINT nBytesRead = pSerialPort->ReadBytesInQue((char*)(AdcData->Buff) + AdcData->CharPos, BytesReadBlock);
 		//cout << " - " << nBytesRead << ":" << BytesInQue << endl;
 		if (nBytesRead != BytesReadBlock) 
 			cout << "Usart ReadByte Error\n" 
@@ -290,14 +291,13 @@ UINT WINAPI CDataFromUsart::ListenThread(void* pParam)
 		if (count++ % 100 == 0)
 		{
 			cout << endl << "StringToHex" << endl;
-			StringToHex((char*)clsData.AdcBuff + clsData.AdcGetCharLength, nBytesRead);
+			StringToHex((char*)AdcData->Buff + AdcData->CharPos, nBytesRead);
 		}
 
-		clsData.NumPerSecInProcess += nBytesRead;
-		clsData.AdcGetCharLength += nBytesRead;
-		clsData.AdcPos = clsData.AdcGetCharLength >> 2;
-		if (clsData.AdcGetCharLength == (DATA_BUFFER_LENGTH << 2)) clsData.AdcGetCharLength = 0;
-		clsData.AdcGetNew = true;
+		AdcData->CharPos += nBytesRead;
+		AdcData->Pos = AdcData->CharPos >> 2;
+		if (AdcData->CharPos == (AdcData->Len << AdcData->MoveBit)) AdcData->CharPos = 0;
+		AdcData->GetNew = true;
 
 	}
 

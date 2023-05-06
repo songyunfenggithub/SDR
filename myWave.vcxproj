@@ -246,10 +246,14 @@
       <SubSystem>Windows</SubSystem>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalDependencies>cufft.lib;odbc32.lib;odbccp32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <StackReserveSize>200000000</StackReserveSize>
-      <HeapReserveSize>200000000</HeapReserveSize>
-      <HeapCommitSize>200000000</HeapCommitSize>
-      <StackCommitSize>200000000</StackCommitSize>
+      <StackReserveSize>
+      </StackReserveSize>
+      <HeapReserveSize>
+      </HeapReserveSize>
+      <HeapCommitSize>
+      </HeapCommitSize>
+      <StackCommitSize>
+      </StackCommitSize>
     </Link>
     <CudaCompile>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
@@ -276,11 +280,10 @@
     <ClCompile Include="CSoundCard.cpp" />
     <ClCompile Include="CAnalyze.cpp" />
     <ClCompile Include="CData.cpp" />
-    <ClCompile Include="CWaveFFT.cpp" />
-    <ClCompile Include="CWaveFilter.cpp" />
-    <ClCompile Include="CWaveFunc.cpp" />
-    <ClCompile Include="CWinFFT.cpp" />
+    <ClCompile Include="CFilter.cpp" />
     <ClCompile Include="CFilterWin.cpp" />
+    <ClCompile Include="CFilterFFT.cpp" />
+    <ClCompile Include="CToolsWin.cpp" />
     <ClCompile Include="CWinOneFFT.cpp" />
     <ClCompile Include="CWinOneSpectrum.cpp" />
     <ClCompile Include="CWinSDR.cpp" />
@@ -325,18 +328,16 @@
     <ClInclude Include="CSoundCard.h" />
     <ClInclude Include="CAnalyze.h" />
     <ClInclude Include="CData.h" />
-    <ClInclude Include="CWaveFFT.h" />
-    <ClInclude Include="CWaveFilter.h" />
-    <ClInclude Include="CWaveFunc.h" />
-    <ClInclude Include="CWinFFT.h" />
+    <ClInclude Include="CFilter.h" />
     <ClInclude Include="CFilterWin.h" />
+    <ClInclude Include="CFilterFFT.h" />
+    <ClInclude Include="CToolsWin.h" />
     <ClInclude Include="CWinOneFFT.h" />
     <ClInclude Include="CWinOneSpectrum.h" />
     <ClInclude Include="CWinSDR.h" />
     <ClInclude Include="CWinSDRScan.h" />
     <ClInclude Include="CWinSpectrum.h" />
     <ClInclude Include="cuda_CFilter.cuh" />
-    <ClInclude Include="cuda_FFT.cuh" />
     <ClInclude Include="cuda_CFilter2.cuh" />
     <ClInclude Include="cuda_CFFT.cuh" />
     <ClInclude Include="myDebug.h" />
@@ -355,7 +356,6 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="cuda_CFilter.cu" />
-    <CudaCompile Include="cuda_FFT.cu" />
     <CudaCompile Include="cuda_CFilter2.cu" />
     <CudaCompile Include="cuda_CFFT.cu" />
   </ItemGroup>

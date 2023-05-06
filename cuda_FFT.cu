@@ -8,12 +8,16 @@
 #include <time.h>
 #include <Windows.h>
 
-#include "myDebug.h"
+#include "public.h"
 #include "CData.h"
+#include "myDebug.h"
 #include "CWaveFFT.h"
+#include "CFilter.h"
 
 #include "cuda_FFT.cuh"
 
+//using namespace WINS;
+//using namespace DEVICES;
 
 #define CUFFT_CALL( call )                                                                                             \
     {                                                                                                                  \
@@ -55,7 +59,7 @@ void cuda_FFT(WHICHSIGNAL WhichSignal)
         //printf("Time of cudaFFT: %fms\r\n", GetTickCount() - s);
     }
     else {
-        UINT n = (clsWaveFFT.FFTSize >> clsWaveFilter.rootFilterInfo.decimationFactorBit);
+        UINT n = (clsWaveFFT.FFTSize >> clsFilter.rootFilterInfo.decimationFactorBit);
         CUFFT_CALL(cudaMemcpy(cuda_FFT_d_fftData_filtted, cuda_FFT_CompiData_filtted, n * sizeof(cufftDoubleComplex), cudaMemcpyHostToDevice));// copy data from host to device
         //WaitForSingleObject(cuda_FFT_hMutexBuff, INFINITE);
         CUFFT_CALL(cufftExecZ2Z(cuda_FFT_fft_plan_filtted, (cufftDoubleComplex*)cuda_FFT_d_fftData_filtted, (cufftDoubleComplex*)cuda_FFT_d_outfftData_filtted, CUFFT_FORWARD));//execute
@@ -85,7 +89,7 @@ void cuda_FFT_Init(void)
     if(cuda_FFT_fft_plan != 0) cufftDestroy(cuda_FFT_fft_plan);
     cufftPlan1d(&cuda_FFT_fft_plan, FFTSize, CUFFT_Z2Z, 1);//declaration
 
-    FFTSize = clsWaveFFT.FFTSize >> clsWaveFilter.rootFilterInfo.decimationFactorBit;
+    FFTSize = clsWaveFFT.FFTSize >> clsFilter.rootFilterInfo.decimationFactorBit;
     if (cuda_FFT_CompiData_filtted != NULL) free(cuda_FFT_CompiData_filtted);
     cuda_FFT_CompiData_filtted = (cufftDoubleComplex*)malloc(FFTSize * sizeof(cufftDoubleComplex));//allocate memory for the data in host
 
@@ -99,7 +103,7 @@ void cuda_FFT_Init(void)
     cudaMalloc((void**)&cuda_FFT_d_outfftData_filtted, FFTSize * sizeof(cufftDoubleComplex));// allocate memory for the data in device
 
     if (cuda_FFT_fft_plan_filtted != 0) cufftDestroy(cuda_FFT_fft_plan_filtted);
-    cufftPlan1d(&cuda_FFT_fft_plan_filtted, FFTSize >> clsWaveFilter.rootFilterInfo.decimationFactorBit, CUFFT_Z2Z, 1);//declaration
+    cufftPlan1d(&cuda_FFT_fft_plan_filtted, FFTSize >> clsFilter.rootFilterInfo.decimationFactorBit, CUFFT_Z2Z, 1);//declaration
 }
 
 void cuda_FFT_UnInit(void)
@@ -132,17 +136,49 @@ void cuda_FFT_Prepare_Data(WHICHSIGNAL WhichSignal, uint32_t pos)
     int i;
     if (WhichSignal == WHICHSIGNAL::SIGNAL_ORIGNAL) {
         memset(cuda_FFT_CompiData, 0, clsWaveFFT.FFTSize * sizeof(cufftDoubleComplex));
-        for (i = 0; i < clsWaveFFT.FFTStep; i++, pos++) {
-            cuda_FFT_CompiData[i].x = (double)clsData.AdcBuff[pos & DATA_BUFFER_MASK];
-            cuda_FFT_CompiData[i].y = 0;
+        switch (AdcData->DataType) {
+        case short_type:
+        {
+            short* Buff = (short*)AdcData->Buff;
+            for (i = 0; i < clsWaveFFT.FFTStep; i++, pos++) {
+                cuda_FFT_CompiData[i].x = (double)Buff[pos & AdcData->Mask];
+                cuda_FFT_CompiData[i].y = 0;
+            }
+        }
+        break;
+        case float_type:
+        {
+            float* Buff = (float*)AdcData->Buff;
+            for (i = 0; i < clsWaveFFT.FFTStep; i++, pos++) {
+                cuda_FFT_CompiData[i].x = (double)Buff[pos & AdcData->Mask];
+                cuda_FFT_CompiData[i].y = 0;
+            }
+        }
+        break;
         }
     }
     else {
-        UINT n = clsWaveFFT.FFTStep >> clsWaveFilter.rootFilterInfo.decimationFactorBit;
+        UINT n = clsWaveFFT.FFTStep >> clsFilter.rootFilterInfo.decimationFactorBit;
         memset(cuda_FFT_CompiData_filtted, 0, n * sizeof(cufftDoubleComplex));
-        for (i = 0; i < n; i++, pos++) {
-            cuda_FFT_CompiData_filtted[i].x = (double)clsData.FilttedBuff[pos & DATA_BUFFER_MASK];
-            cuda_FFT_CompiData_filtted[i].y = 0;
+        switch (AdcData->DataType) {
+        case short_type:
+        {
+            short* Buff = (short*)AdcDataFiltted->Buff;
+            for (i = 0; i < n; i++, pos++) {
+                cuda_FFT_CompiData_filtted[i].x = (double)Buff[pos & AdcDataFiltted->Mask];
+                cuda_FFT_CompiData_filtted[i].y = 0;
+            }
+        }
+        break;
+        case float_type:
+        {
+            float* Buff = (float*)AdcDataFiltted->Buff;
+            for (i = 0; i < n; i++, pos++) {
+                cuda_FFT_CompiData_filtted[i].x = (double)Buff[pos & AdcDataFiltted->Mask];
+                cuda_FFT_CompiData_filtted[i].y = 0;
+            }
+        }
+        break;
         }
     }
 }
@@ -158,7 +194,7 @@ void cuda_FFT_Prepare_Data_for_MaxValue(WHICHSIGNAL WhichSignal, double *buff)
         }
     }
     else {
-        fftsize = clsWaveFFT.FFTStep >> clsWaveFilter.rootFilterInfo.decimationFactorBit;
+        fftsize = clsWaveFFT.FFTStep >> clsFilter.rootFilterInfo.decimationFactorBit;
         for (int i = 0; i < fftsize; i++) {
             cuda_FFT_CompiData_filtted[i].x = (double)buff[i];
             cuda_FFT_CompiData_filtted[i].y = 0;

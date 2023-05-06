@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <string>
 
-#include "public.h"
-#include "CMessage.h"
-#include "CScreenButton.h"
+class CMessage;
+
+namespace WINS {
 
 #define SIGNAL_WIN_CLASS		"SIGNAL_WIN_CLASS"
 
@@ -16,88 +16,68 @@
 
 #define SIGNAL_DATA_MAX_ZOOM_BIT				5
 
-class CSignalWin
-{
-public:
-	typedef struct tagDRAWINFO
+	class CSignalWin
 	{
-
-		int			iHZoom, iHOldZoom, iVZoom, iVOldZoom, iHFit, iVFit;
-		INT64		dwHZoomedWidth, dwHZoomedPos, dwVZoomedHeight, dwVZoomedPos, dwVZoomedFullHeight;
-		UINT16		wHSclPos, wVSclPos, wHSclMin, wHSclMax, wVSclMin, wVSclMax;
-
-		double		dbVZoom;
-		double		dbHZoom;
-		double		FullVotage;
-		double		VotagePerDIV;
-
-		INT		DrawHeight, DrawWidth;
-
-	} DRAWINFO, * PDRAWINFO;
-
-	DRAWINFO	DrawInfo;
-
-	const char* Tag = NULL;
-
-	GetStrFunction GetStrFunc = NULL;
-
-	HWND hWnd = NULL;
-	HMENU hMenu = NULL;
-
-	UINT uTimerId;
-
-	UINT* SampleRate = NULL;
-
-	void* OrignalBuff = NULL;
-	UINT* OrignalBuffPos = NULL;
-	BUFF_DATA_TYPE	orignal_buff_type;
-
-	void* FilttedBuff = NULL;
-	UINT* FilttedBuffPos = NULL;
-	BUFF_DATA_TYPE	filtted_buff_type;
-
-	UINT		BuffDataBit;
-	UINT64		DataLength;
-	UINT		DataLengthMask;
-
-	bool bDrawOrignalSignal = true;
-	bool bDrawFilttedSignal = true;
-	bool bFollowByOrignal = true;
-	bool bAutoScroll = true;
-
-	INT MouseX;
-	INT MouseY;
-
-	RECT WinRect;
-
-	char strMouse[1024];
-
-	CMessage msgs;
-
-public:
-	CSignalWin();
-	~CSignalWin();
-
-	void Init(UINT data_bit, UINT data_length);
-	void UnInit(void);
-
-	void RegisterWindowsClass(void);
-	void Paint(void);
-	bool OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
-	void OnMouse(void);
-	void GetRealClientRect(PRECT lprc);
-
-	void DrawSignal_short(HDC hdc, RECT* rt, short *Buff, UINT *BuffPos, COLORREF Color);
-	void DrawSignal_float(HDC hdc, RECT* rt, float* Buff, UINT* BuffPos, COLORREF Color);
+	public:
+		typedef struct tagDRAWINFO {
+			INT			iHZoom, iHOldZoom, iVZoom, iVOldZoom, iHFit, iVFit;
+			INT64		dwHZoomedWidth, dwHZoomedPos, dwVZoomedHeight, dwVZoomedPos, dwVZoomedFullHeight;
+			UINT16		wHSclPos, wVSclPos, wHSclMin, wHSclMax, wVSclMin, wVSclMax;
+			double		dbVZoom, dbHZoom, FullVotage, VotagePerDIV;
+			INT			DrawHeight, DrawWidth;
+		} DRAWINFO, * PDRAWINFO;
+		DRAWINFO	DrawInfo;
 
 
-	void CaculateScrolls(void);
-	void CaculateHScroll(void);
-	void CaculateVScroll(void);
-	void KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
+		const char* Tag = NULL;
 
-	void SaveValue(void);
-	void RestoreValue(void);
+		HWND hWnd = NULL;
+		HMENU hMenu = NULL;
 
-	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-};
+		UINT uTimerId;
+
+		void* DataOrignal = NULL;
+		void* DataFiltted = NULL;
+
+		bool bDrawOrignalSignal = true;
+		bool bDrawFilttedSignal = true;
+		bool bFollowByOrignal = true;
+		bool bAutoScroll = true;
+
+		INT MouseX;
+		INT MouseY;
+
+		RECT WinRect;
+
+		char strMouse[1024];
+
+		CMessage *msgs;
+
+	public:
+		CSignalWin();
+		~CSignalWin();
+
+		void Init(void);
+		void UnInit(void);
+
+		void RegisterWindowsClass(void);
+		void Paint(void);
+		bool OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
+		void OnMouse(void);
+		void GetRealClientRect(PRECT lprc);
+
+		void DrawSignal_short(HDC hdc, RECT* rt, void* Data, COLORREF Color);
+		void DrawSignal_float(HDC hdc, RECT* rt, void* Data, COLORREF Color);
+
+
+		void CaculateScrolls(void);
+		void CaculateHScroll(void);
+		void CaculateVScroll(void);
+		void KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
+
+		void SaveValue(void);
+		void RestoreValue(void);
+
+		static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+	};
+}

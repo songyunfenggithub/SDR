@@ -4,6 +4,19 @@
 #include "locale.h"
 #include "stdint.h"
 
+typedef struct FFTINFO_TAG {
+	UINT FFTSize = 0;
+	UINT FFTStep = 0;
+	UINT HalfFFTSize = 0;
+	UINT AverageDeep = 0;
+	UINT AverageDeepNum = 0;
+	UINT FFTPos = 0;
+	UINT FFTCount = 0;
+	UINT SavedFFTCount = 0;
+	float FFTPerSec = 0.0;
+	bool FFTNew = false;
+}FFT_INFO;
+
 #ifdef _DEBUG
 
 #define OPENCONSOLE		AllocConsole();\
@@ -21,33 +34,24 @@
 #endif // _DEBUG
 
 
-#define FORWARD_CMD_LENGTH				16
+//#define FORWARD_CMD_LENGTH				16
+//
+//#define FORWARD_CMD_TYPE_FILTER_SETTING				0
+//#define FORWARD_CMD_TYPE_FILTER_RECORE				1
+//#define FORWARD_CMD_TYPE_FILTER_DESC_SETTING		2
+//#define FORWARD_CMD_TYPE_FILTER_DESC_RECORE			3
+//
+//#define FORWARD_CMD_TYPE_FFT_SET					10
+//#define FORWARD_CMD_TYPE_FFT_GET_SIGNAL				11
+//
+//#define FORWARD_CMD_TYPE_FFT_SIGNAL_SAMPLE_RATE		20
 
-#define FORWARD_CMD_TYPE_FILTER_SETTING				0
-#define FORWARD_CMD_TYPE_FILTER_RECORE				1
-#define FORWARD_CMD_TYPE_FILTER_DESC_SETTING		2
-#define FORWARD_CMD_TYPE_FILTER_DESC_RECORE			3
-
-#define FORWARD_CMD_TYPE_FFT_SET					10
-#define FORWARD_CMD_TYPE_FFT_GET_SIGNAL				11
-
-#define FORWARD_CMD_TYPE_FFT_SIGNAL_SAMPLE_RATE		20
+#define FFT_SIZE	0x100000
+#define FFT_STEP	0x40000
+#define FFT_DEEP		0x10
 
 #define BOUND(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 #define UP_TO_ZERO(x) (x = x < 0 ? 0 : x)
-
-typedef enum BUFF_DATA_TYPE_ENUM{
-	u_char_type,
-	u_short_type,
-	u_int_type,
-	u_int64_type,
-	char_type,
-	short_type,
-	int_type,
-	int64_type,
-	float_type,
-	double_type
-}BUFF_DATA_TYPE;
 
 typedef void(*GetStrFunction)(char*);
 
@@ -59,6 +63,11 @@ extern BOOLEAN isGetDataExited;
 extern  CHAR IniFilePath[];
 
 extern HANDLE  cuda_FFT_hMutexBuff;
+
+extern FFT_INFO FFTInfo_Signal;
+extern FFT_INFO FFTInfo_Filtted;
+extern FFT_INFO FFTInfo_Audio;
+extern FFT_INFO FFTInfo_AudioFiltted;
 
 void* set_WinClass(HWND hWnd, LPARAM lParam);
 void* get_WinClass(HWND hWnd);
