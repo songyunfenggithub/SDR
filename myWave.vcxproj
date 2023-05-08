@@ -332,6 +332,7 @@
     <ClInclude Include="CFilterWin.h" />
     <ClInclude Include="CFilterFFT.h" />
     <ClInclude Include="CToolsWin.h" />
+    <ClInclude Include="cuda_CFilter3.cuh" />
     <ClInclude Include="CWinOneFFT.h" />
     <ClInclude Include="CWinOneSpectrum.h" />
     <ClInclude Include="CWinSDR.h" />
@@ -358,6 +359,7 @@
     <CudaCompile Include="cuda_CFilter.cu" />
     <CudaCompile Include="cuda_CFilter2.cu" />
     <CudaCompile Include="cuda_CFFT.cu" />
+    <CudaCompile Include="cuda_CFilter3.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

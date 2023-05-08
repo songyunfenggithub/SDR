@@ -16,6 +16,7 @@
 
 #include "cuda_CFilter.cuh"
 #include "cuda_CFilter2.cuh"
+#include "cuda_CFilter3.cuh"
 
 using namespace std;
 using namespace WINS; 
@@ -38,52 +39,10 @@ CFilter::CFilter(const char* tag)
 
 	TAG = tag;
 
-	int i;
-	for (i = 0; i < FILTER_WORK_THREADS; i++)
-	{
-		filter_ready_poss[i] = 0;
-	}
-
-	/*
-	for (i = 0; i < MAX_FILTER_NUMBER; i++)
-	{
-		FilterInfos[i].Enable		= false;
-		FilterInfos[i].FilterCore	= NULL;
-	}
-	*/
-
 	hFilterMutex = CreateMutex(NULL, false, "hFilterMutex");		//创建互斥对象
 	hCoreMutex = CreateMutex(NULL, false, "hCoreMutex");		//创建互斥对象
 
-	//char s[] = "1025, 0, 0; 0, 50, 10; 2, 100, 10";//; 1, 100, 10; 1, 500, 10; 1, 600, 10";
-	//strcpy(FilterCoreDesc, s);
-	
-//	const char h[] = " 65,0,0;0,50000,10000;2,100000,10000;1,150000,10000";
-	const char h[] = "65,0,0;0,10000,100";
-	char filterdes[1024];
-	char t[100];
-	int n, m;
-	strcpy(FilterCoreDesc, h);
-	m = strlen(h);
-	FilterCoreDesc[m] = 0;
-
-	/*
-	n = sprintf(t, " %d,%d,%d;", 1, 1000000, 200000);
-	sprintf(FilterCoreDesc + m, "%s", t);
-	m += n;
-	for (i = 2; i < 2; i++) {
-		n = sprintf(t, " %d,%d,%d;", 1, i*5000, 40);
-		sprintf(FilterCoreDesc + m, "%s", t);
-		m += n;
-	}
-	n = sprintf(t, " %d,%d,%d", 1, i*5000, 200000);
-	sprintf(FilterCoreDesc + m, "%s", t);
-	*/
-
 	RestoreValue();
-
-	pCurrentFilterInfo = &rootFilterInfo;
-	//setFilterCoreDesc(&rootFilterInfo, (char*)h);
 }
 
 CFilter::~CFilter()
@@ -91,13 +50,15 @@ CFilter::~CFilter()
 	//CLOSECONSOLE;
 }
 
-void CFilter::set_cudaFilter(cuda_CFilter* f, cuda_CFilter2* f2, UINT filterSrcLen)
+void CFilter::set_cudaFilter(cuda_CFilter* f, cuda_CFilter2* f2, cuda_CFilter3* f3, UINT filterSrcLen)
 {
 	FilterSrcLen = filterSrcLen;
 	f->SrcLen = filterSrcLen;
 	cudaFilter = f;
-	f2->SrcLen = filterSrcLen;
+	if (f2 != NULL)f2->SrcLen = filterSrcLen;
 	cudaFilter2 = f2;
+	if (f3 != NULL)f3->SrcLen = filterSrcLen;
+	cudaFilter3 = f3;
 }
 
 void CFilter::setFilterCoreDesc(PFILTER_INFO pFilterInfo, char* CoreDescStr)
@@ -124,7 +85,7 @@ void CFilter::build_desc_core(PFILTER_INFO rootFilterInfo)
 	pFilterInfo = rootFilterInfo->nextFilter;
 	while (pFilterInfo != NULL)
 	{
-		core(pFilterInfo);
+		core(pFilterInfo, rootFilterInfo);
 		for (i = 0; i < pFilterInfo->CoreLength; i++)
 		{
 			rootFilterInfo->FilterCore[i] += pFilterInfo->FilterCore[i];
@@ -268,19 +229,24 @@ type: 0低通 1高通 2带通 3阻带
 freq0： 中心频率
 freq_width： 通带/阻带 频宽
 */
-void CFilter::core(PFILTER_INFO pFilterInfo)
+void CFilter::core(PFILTER_INFO pFilterInfo, PFILTER_INFO rootf)
 {
 	FILTER_CORE_DATA_TYPE fl = pFilterInfo->FreqCenter - pFilterInfo->BandWidth / 2;
 	FILTER_CORE_DATA_TYPE fh = pFilterInfo->FreqCenter + pFilterInfo->BandWidth / 2;
-	UINT32 fs = SrcData->SampleRate / (1 << pFilterInfo->decimationFactorBit);
+	UINT32 fs = SrcData->SampleRate / 
+		(
+			1 << ( 
+			rootf == &rootFilterInfo1 ? 
+			rootFilterInfo1.decimationFactorBit : 
+			rootFilterInfo1.decimationFactorBit + rootFilterInfo2.decimationFactorBit
+			)
+		);
 	UINT32 CoreLength = pFilterInfo->CoreLength;
 
 	pFilterInfo->FreqFallWidth = 4.0 / (CoreLength - 1) * fs;
 	if (pFilterInfo->FilterCore != NULL) delete[] pFilterInfo->FilterCore;
 	pFilterInfo->FilterCore = new FILTER_CORE_DATA_TYPE[CoreLength];
 	FILTER_CORE_DATA_TYPE* FilterCore = pFilterInfo->FilterCore;
-
-	FilterInfoCount++;
 
 	FILTER_CORE_DATA_TYPE* TempBuf = new FILTER_CORE_DATA_TYPE[CoreLength];
 
@@ -313,7 +279,7 @@ void CFilter::core(PFILTER_INFO pFilterInfo)
 
 void CFilter::ReBuildFilterCore(void)
 {
-	ParseCoreDesc(&rootFilterInfo);
+	ParseCoreDesc();
 	//clsFilter.FilterCoreAnalyse(clsWinMain.m_FilterWin, &rootFilterInfo);
 }
 
@@ -430,24 +396,24 @@ void CFilter::filter_func_short(UINT32 thread_id)
 		{
 			UINT32 w_pos = work_pos + 1;
 			WaitForSingleObject(hCoreMutex, INFINITE);
-			if (w_pos < pCurrentFilterInfo->CoreLength)
+			if (w_pos < rootFilterInfo1.CoreLength)
 			{
-				pbuf1 = (short*)SrcData->Buff + SrcData->Len - (pCurrentFilterInfo->CoreLength - w_pos) ;
+				pbuf1 = (short*)SrcData->Buff + SrcData->Len - (rootFilterInfo1.CoreLength - w_pos) ;
 				pend1 = (short*)SrcData->Buff + SrcData->Len;
 				pbuf2 = (short*)SrcData->Buff;
 				pend2 = (short*)SrcData->Buff + w_pos;
 			}
 			else
 			{
-				pbuf1 = (short*)SrcData->Buff + (w_pos - pCurrentFilterInfo->CoreLength);
+				pbuf1 = (short*)SrcData->Buff + (w_pos - rootFilterInfo1.CoreLength);
 				pend1 = (short*)SrcData->Buff + w_pos;
 				pbuf2 = pend2 = 0;
 			}
-			if(psave != pCurrentFilterInfo->FilterCore){
-				psave = pCurrentFilterInfo->FilterCore;
+			if(psave != rootFilterInfo1.FilterCore){
+				psave = rootFilterInfo1.FilterCore;
 				if (pcore != NULL) delete[] pcore;
-				pcore = new FILTER_CORE_DATA_TYPE[pCurrentFilterInfo->CoreLength];
-				memcpy(pcore, pCurrentFilterInfo->FilterCore, sizeof(FILTER_CORE_DATA_TYPE) * pCurrentFilterInfo->CoreLength);
+				pcore = new FILTER_CORE_DATA_TYPE[rootFilterInfo1.CoreLength];
+				memcpy(pcore, rootFilterInfo1.FilterCore, sizeof(FILTER_CORE_DATA_TYPE) * rootFilterInfo1.CoreLength);
 			}
 			pc = pcore;
 			ReleaseMutex(hCoreMutex);
@@ -481,16 +447,28 @@ void CFilter::cuda_filter_func(void)
 	doFiltting = true;
 	cuda_Filter_exit = false;
 	UINT stepLen = FilterSrcLen >> 2;
+	SrcData->ProcessPos = ((UINT)(SrcData->Pos / stepLen)) * stepLen;
 	while (doFiltting == true && Program_In_Process == true) {
 		if (((SrcData->Pos - SrcData->ProcessPos) & SrcData->Mask) > stepLen)
 		{
-			if(rootFilterInfo.decimationFactorBit > 0)
-				cudaFilter2->Filtting();
-			else 
+			switch (Cuda_Filter_N_Doing) {
+			case cuda_filter_1:
 				cudaFilter->Filtting();
+				break;
+			case cuda_filter_2:
+				cudaFilter2->Filtting();
+				break;
+			case cuda_filter_3:
+				cudaFilter3->Filtting();
+				break;
+			}
 		}
 		else Sleep(0);
 	}
+	cudaFilter->UnInit();
+	cudaFilter2->UnInit();
+	cudaFilter3->UnInit();
+
 	cuda_Filter_exit = true;
 }
 
@@ -566,11 +544,36 @@ Exit:
 	return state;
 }
 
-int CFilter::ParseCoreDesc(PFILTER_INFO rootFilterInfo)
+void CFilter::ParseCoreDesc(void)
 {
 	WaitForSingleObject(hCoreMutex, INFINITE);
+	
+	cudaFilter->UnInit();
+	cudaFilter2->UnInit();
+	cudaFilter3->UnInit();
 
-	rootFilterInfo->SampleRate = SrcData->SampleRate / (1 << rootFilterInfo->decimationFactorBit);
+	ParseOneCore(&rootFilterInfo1);
+	switch (Cuda_Filter_N_New) {
+	case cuda_filter_1:
+		cudaFilter->Init(this);
+		break;
+	case cuda_filter_2:
+		cudaFilter2->Init(this);
+		break;
+	case cuda_filter_3:
+		ParseOneCore(&rootFilterInfo2);
+		cudaFilter3->Init(this);
+		break;
+	}
+	Cuda_Filter_N_Doing = Cuda_Filter_N_New;
+	ReleaseMutex(hCoreMutex);
+}
+
+int CFilter::ParseOneCore(PFILTER_INFO rootFilterInfo)
+{
+	TargetData->SampleRate = SrcData->SampleRate / (1 << rootFilterInfo->decimationFactorBit);
+	if(Cuda_Filter_N_Doing == cuda_filter_3) 
+		TargetData->SampleRate = SrcData->SampleRate / (1 << (rootFilterInfo1.decimationFactorBit + rootFilterInfo2.decimationFactorBit));
 	if (rootFilterInfo->FilterCore != NULL) delete[] rootFilterInfo->FilterCore;
 	rootFilterInfo->FilterCore = NULL;
 	PFILTER_INFO tt, pp = rootFilterInfo->nextFilter;
@@ -650,8 +653,6 @@ int CFilter::ParseCoreDesc(PFILTER_INFO rootFilterInfo)
 		pFilterInfo->subFilteindex = i - 1;
 		pFilterInfo->nextFilter = NULL;
 		pFilterInfo->decimationFactorBit = rootFilterInfo->decimationFactorBit;
-		pFilterInfo->SampleRate = SrcData->SampleRate / (1 << rootFilterInfo->decimationFactorBit);
-
 		{
 			if(i == 1) rootFilterInfo->nextFilter = pFilterInfo;
 			else prevFilterInfo->nextFilter = pFilterInfo;
@@ -686,20 +687,10 @@ int CFilter::ParseCoreDesc(PFILTER_INFO rootFilterInfo)
 
 	build_last_iterate_core(rootFilterInfo);
 
-	cudaFilter->UnInit();
-	cudaFilter2->UnInit();
-
-	doFiltting = false;
-	while (cuda_Filter_exit == false);
-
-	if (rootFilterInfo->decimationFactorBit > 0)
-		cudaFilter2->Init(rootFilterInfo, SrcData, TargetData, FilterSrcLen);
-	else
-		cudaFilter->Init(rootFilterInfo, SrcData, TargetData, FilterSrcLen);
-
-	ReleaseMutex(hCoreMutex);
-
-	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::cuda_filter_thread, this, 0, NULL);
+	//doFiltting = false;
+	//while (cuda_Filter_exit == false) {
+	//	Sleep(1000);
+	//}
 }
 
 
@@ -709,8 +700,15 @@ void CFilter::SaveValue(void)
 	char section[VALUE_LENGTH];
 	sprintf(section, "CFilter_%s", TAG);
 	char value[VALUE_LENGTH];
-	WritePrivateProfileString(section, "FilterCoreDesc", rootFilterInfo.CoreDescStr, IniFilePath);
-	WritePrivateProfileString(section, "decimationFactorBit", std::to_string(rootFilterInfo.decimationFactorBit).c_str(), IniFilePath);
+	
+	WritePrivateProfileString(section, "FilterCoreDesc1", rootFilterInfo1.CoreDescStr, IniFilePath);
+	WritePrivateProfileString(section, "decimationFactorBit1", std::to_string(rootFilterInfo1.decimationFactorBit).c_str(), IniFilePath);
+	
+	WritePrivateProfileString(section, "FilterCoreDesc2", rootFilterInfo2.CoreDescStr, IniFilePath);
+	WritePrivateProfileString(section, "decimationFactorBit2", std::to_string(rootFilterInfo2.decimationFactorBit).c_str(), IniFilePath);
+	
+	WritePrivateProfileString(section, "Cuda_Filter_N", std::to_string(Cuda_Filter_N_Doing).c_str(), IniFilePath);
+
 	DbgMsg("SaveValue %s\r\n", section);
 }
 
@@ -720,10 +718,21 @@ void CFilter::RestoreValue(void)
 	char value[VALUE_LENGTH];
 	char section[VALUE_LENGTH];
 	sprintf(section, "CFilter_%s", TAG);
-	GetPrivateProfileString(section, "FilterCoreDesc", "65, 0, 0; 0, 10000, 100", value, VALUE_LENGTH, IniFilePath);
-	rootFilterInfo.CoreDescStr = new char[strlen(value) + 1];
-	strcpy(rootFilterInfo.CoreDescStr, value);
-	GetPrivateProfileString(section, "decimationFactorBit", "0", value, VALUE_LENGTH, IniFilePath);
-	rootFilterInfo.decimationFactorBit = atoi(value);
+	
+	GetPrivateProfileString(section, "FilterCoreDesc1", "65, 0, 0; 0, 10000, 100", value, VALUE_LENGTH, IniFilePath);
+	rootFilterInfo1.CoreDescStr = new char[strlen(value) + 1];
+	strcpy(rootFilterInfo1.CoreDescStr, value);
+	GetPrivateProfileString(section, "decimationFactorBit1", "0", value, VALUE_LENGTH, IniFilePath);
+	rootFilterInfo1.decimationFactorBit = atoi(value);
+	
+	GetPrivateProfileString(section, "FilterCoreDesc2", "65, 0, 0; 0, 10000, 100", value, VALUE_LENGTH, IniFilePath);
+	rootFilterInfo2.CoreDescStr = new char[strlen(value) + 1];
+	strcpy(rootFilterInfo2.CoreDescStr, value);
+	GetPrivateProfileString(section, "decimationFactorBit2", "0", value, VALUE_LENGTH, IniFilePath);
+	rootFilterInfo2.decimationFactorBit = atoi(value);
+
+	GetPrivateProfileString(section, "Cuda_Filter_N", "0", value, VALUE_LENGTH, IniFilePath);
+	Cuda_Filter_N_Doing = Cuda_Filter_N_New = (CUDA_FILTER_N)atoi(value);
+	
 	DbgMsg("RestoreValue %s\r\n", section);
 }

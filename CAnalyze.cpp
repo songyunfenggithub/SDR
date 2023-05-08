@@ -13,6 +13,7 @@
 #include "CFilter.h"
 #include "cuda_CFilter.cuh"
 #include "cuda_CFilter2.cuh"
+#include "cuda_CFilter3.cuh"
 #include "CDemodulatorAM.h"
 
 #pragma comment(lib,"SDRPlay_API.3.09/API/x64/sdrplay_api.lib")
@@ -110,9 +111,11 @@ void CAnalyze::Init_Params(void)
 	UINT sampleRate = 8000000;
 	AdcData = new CData();
 	AdcData->Init(DATA_BUFFER_LENGTH, short_type, ADC_DATA_SAMPLE_BIT);
-	AdcData->SampleRate = sampleRate;
 	AdcDataFiltted = new CData();
 	AdcDataFiltted->Init(DATA_BUFFER_LENGTH, float_type, ADC_DATA_SAMPLE_BIT);
+
+	clsMainFilter.SrcData = AdcData;
+	clsMainFilter.TargetData = AdcDataFiltted;
 
 	INT64 rf = 11000000;
 	this->set_SDR_bwType_Bw_MHzT(sdrplay_api_Bw_MHzT::sdrplay_api_BW_0_200);
@@ -129,21 +132,21 @@ void CAnalyze::Init_Params(void)
 	AdcData->SampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ?
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz / clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor :
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz;
-	clsMainFilter.rootFilterInfo.SampleRate = AdcData->SampleRate / (1 << clsMainFilter.rootFilterInfo.decimationFactorBit);
 
-	clsMainFilter.SrcData = AdcData;
-	clsMainFilter.TargetData = AdcDataFiltted;
-	clsMainFilter.set_cudaFilter(&clscudaMainFilter, &clscudaMainFilter2, CUDA_FILTER_ADC_BUFF_SRC_LENGTH);
-	clsMainFilter.ParseCoreDesc(&clsMainFilter.rootFilterInfo);
+	//clsMainFilter.Cuda_Filter_N_Doing = clsMainFilter.Cuda_Filter_N_New = CFilter::cuda_filter_3;
+	clsMainFilter.set_cudaFilter(&clscudaMainFilter, &clscudaMainFilter2, &clscudaMainFilter3, CUDA_FILTER_ADC_BUFF_SRC_LENGTH);
+	clsMainFilter.ParseCoreDesc();
+
+	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::cuda_filter_thread, &clsMainFilter, 0, NULL);
 
 	FFTInfo_Signal.FFTSize = FFT_SIZE;
 	FFTInfo_Signal.HalfFFTSize = FFT_SIZE / 2;
 	FFTInfo_Signal.FFTStep = FFT_STEP;
 	FFTInfo_Signal.AverageDeep = FFT_DEEP;
 
-	FFTInfo_Filtted.FFTSize = FFT_SIZE >> clsMainFilter.rootFilterInfo.decimationFactorBit;
+	FFTInfo_Filtted.FFTSize = FFT_SIZE >> clsMainFilter.rootFilterInfo1.decimationFactorBit;
 	FFTInfo_Filtted.HalfFFTSize = FFTInfo_Filtted.FFTSize / 2;
-	FFTInfo_Filtted.FFTStep = FFT_STEP >> clsMainFilter.rootFilterInfo.decimationFactorBit;
+	FFTInfo_Filtted.FFTStep = FFT_STEP >> clsMainFilter.rootFilterInfo1.decimationFactorBit;
 	FFTInfo_Filtted.AverageDeep = FFT_DEEP;
 
 	clsWinSpect.FFTOrignal = new CFFT();

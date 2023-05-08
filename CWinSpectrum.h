@@ -42,6 +42,7 @@ namespace WINS {
 
 		HWND hWndOneSpectrum = NULL;
 		HWND hWndOneFFT = NULL;
+		HWND hWndRebar = NULL;
 
 		HMENU hMenu;
 
@@ -68,6 +69,13 @@ namespace WINS {
 
 		void GetRealClientRect(PRECT lprc);
 
+		HWND MakeToolsBar(void);
+		void ToolsbarSetFilterCenterFreq(void);
+		void ToolsbarSetAMFreqAdd(void);
+		void ToolsbarSetAMFreqSub(void);
+		void ToolsbarSetFMFreqAdd(void);
+		void ToolsbarSetFMFreqSub(void);
+	
 		void RestoreValue(void);
 		void SaveValue(void);
 

@@ -120,7 +120,7 @@ BEGIN
     END
     POPUP "视图"
     BEGIN
-        MENUITEM "音频...",                       IDM_SOUND_WINDOW
+        MENUITEM "音频...",                       IDM_AUDIO_WINDOW
         MENUITEM SEPARATOR
         MENUITEM "滤波后信号...",                    IDM_FILTTEDWINDOW
         MENUITEM "滤波器设置...",                    IDM_FILTERWINDOW
@@ -150,7 +150,7 @@ BEGIN
     BEGIN
         MENUITEM "设置剪切位置...\tF8",               IDM_EDIT_SET_CUT_POS
     END
-    POPUP "音频"
+    POPUP "音频播放"
     BEGIN
         MENUITEM "播放\tCtrl + P",                IDM_STARTPLAY
         MENUITEM "暂停",                          IDM_PAUSEPLAY
@@ -158,6 +158,11 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "指定开始播放位置...\tF6",             IDM_FROMPOSPLAY
         MENUITEM "指定停止播放位置...",                 IDM_PLAY_STOP_POSITION
+        MENUITEM SEPARATOR
+        MENUITEM "播放输出缓冲",                      IDM_AUDIO_OUT_SEL
+        MENUITEM "播放输出滤波后缓冲",                   IDM_AUDIO_FILT_OUT_SEL
+        MENUITEM "播放录制缓冲",                      IDM_AUDIO_IN_SEL
+        MENUITEM "播放录制滤波后缓冲",                   IDM_AUDIO_FILT_IN_SEL
     END
     POPUP "录音"
     BEGIN
@@ -205,16 +210,18 @@ BEGIN
         MENUITEM "显示滤波信号 FFT LOG",              IDM_FFT_FILTTED_LOG_SHOW
         MENUITEM SEPARATOR
         MENUITEM "定格",                          IDM_FFT_HOLD
-		MENUITEM SEPARATOR
+        MENUITEM SEPARATOR
         MENUITEM "设置FFTSize...",                IDM_FFT_SET
     END
     POPUP "频率谱"
     BEGIN
-        MENUITEM "显示原信号频率谱",                     IDM_SPECTRUM_ORIGNAL_SHOW
-        MENUITEM "显示原信号频率谱Log",                  IDM_SPECTRUM_ORIGNAL_LOG_SHOW
+        MENUITEM "显示原信号频率谱",                    IDM_SPECTRUM_ORIGNAL_SHOW
+        MENUITEM "显示原信号频率谱Log",                 IDM_SPECTRUM_ORIGNAL_LOG_SHOW
+        MENUITEM "显示滤波后信号频率谱",                  IDM_SPECTRUM_FILTTED_SHOW
+        MENUITEM "显示滤波后信号频率谱Log",               IDM_SPECTRUM_FILTTED_LOG_SHOW
         MENUITEM SEPARATOR
-        MENUITEM "显示缩放后频率谱",                     IDM_SPECTRUM_ZOOMED_SHOW
-    END	
+        MENUITEM "显示缩放后频率谱",                    IDM_SPECTRUM_ZOOMED_SHOW
+    END
     POPUP "波形"
     BEGIN
         MENUITEM "适合缩放",                        IDM_WAVE_AUTO_FIT
@@ -228,6 +235,22 @@ BEGIN
     POPUP "帮助"
     BEGIN
         MENUITEM "&About ...",                  IDM_ABOUT
+    END
+    POPUP "Demodulator"
+    BEGIN
+        MENUITEM "AM",                          IDM_DEMODULATOR_AM
+        MENUITEM "FM",                          IDM_DEMODULATOR_FM
+    END
+    POPUP "音频滤波"
+    BEGIN
+        MENUITEM "滤波输入信号",                      IDM_AUDIO_FILTER_IN
+        MENUITEM "滤波输出信号",                      IDM_AUDIO_FILTER_OUT
+        MENUITEM SEPARATOR
+        MENUITEM "使用滤波器",                       IDM_AUDIO_FILTER_USE
+        MENUITEM SEPARATOR
+        MENUITEM "滤波器设置...",                    IDM_AUDIO_FILTER_SET
+        MENUITEM SEPARATOR
+        MENUITEM "生成滤波器",                       IDM_AUDIO_BUILD_FILTER
     END
 END
 
@@ -246,7 +269,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "E&xit",                       IDM_EXIT
     END
-    POPUP "音频信号缩放"
+    POPUP "信号缩放"
     BEGIN
         MENUITEM "H Zoom +\tCtrl+1",            IDM_WAVEHZOOMINCREASE
         MENUITEM "H Zoom - \tCtrl+2",           IDM_WAVEHZOOMDECREASE
@@ -281,12 +304,12 @@ BEGIN
     END
     POPUP "频率谱"
     BEGIN
-        MENUITEM "显示原信号频率谱",                     IDM_SPECTRUM_ORIGNAL_SHOW
-        MENUITEM "显示原信号频率谱Log",                  IDM_SPECTRUM_ORIGNAL_LOG_SHOW
+        MENUITEM "显示原信号频率谱",                    IDM_SPECTRUM_ORIGNAL_SHOW
+        MENUITEM "显示原信号频率谱Log",                 IDM_SPECTRUM_ORIGNAL_LOG_SHOW
         MENUITEM SEPARATOR
-        MENUITEM "显示缩放后频率谱",                     IDM_SPECTRUM_ZOOMED_SHOW
+        MENUITEM "显示缩放后频率谱",                    IDM_SPECTRUM_ZOOMED_SHOW
     END
-	POPUP "波形"
+    POPUP "波形"
     BEGIN
         MENUITEM "适合缩放",                        IDM_WAVE_AUTO_FIT
         MENUITEM "耦合直流信号",                      IDM_WAVE_DC
@@ -503,19 +526,27 @@ BEGIN
     LTEXT           "Static",IDC_STATIC,21,42,19,8
 END
 
-IDD_DLG_FILTER_CORE_SET DIALOGEX 0, 0, 463, 202
+IDD_DLG_FILTER_CORE_SET DIALOGEX 0, 0, 500, 300
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "滤波器核 设置..."
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "确定",IDOK,349,181,50,14
-    PUSHBUTTON      "取消",IDCANCEL,406,181,50,14
+    DEFPUSHBUTTON   "确定",IDOK,349,280,50,14
+    PUSHBUTTON      "取消",IDCANCEL,406,280,50,14
+	
     EDITTEXT        IDC_EDIT1,85,18,357,14,ES_AUTOHSCROLL
     LTEXT           "描述滤波器核",IDC_STATIC,25,20,49,8,0,WS_EX_TRANSPARENT
     CONTROL         "使用采样频率抽取率",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,39,100,10
     EDITTEXT        IDC_EDIT2,85,38,60,14,ES_AUTOHSCROLL
     LTEXT           "采样频率抽取率",IDC_STATIC,25,38,49,8
-    LTEXT           "abc",IDC_STATIC1,25,55,417,118
+
+    EDITTEXT        IDC_EDIT3,85,68,357,14,ES_AUTOHSCROLL
+    LTEXT           "描述滤波器核",IDC_STATIC,25,70,49,8,0,WS_EX_TRANSPARENT
+    CONTROL         "使用采样频率抽取率",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,89,100,10
+    EDITTEXT        IDC_EDIT4,85,88,60,14,ES_AUTOHSCROLL
+    LTEXT           "采样频率抽取率",IDC_STATIC,25,88,49,8
+
+    LTEXT           "abc",IDC_STATIC1,25,115,417,118
 END
 
 IDD_DLG_FFT_SET DIALOGEX 0, 0, 255, 238

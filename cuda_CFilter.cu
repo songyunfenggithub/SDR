@@ -20,45 +20,48 @@ cuda_CFilter clscudaMainFilter;
 cuda_CFilter clscudaAudioFilter;
 
 __global__ void
-cuda_Filter(const ADC_DATA_TYPE* src, const FILTER_CORE_DATA_TYPE* core, FILTTED_DATA_TYPE* result, int stage, unsigned int corelen, unsigned int srclen)
+cuda_Filter(const ADC_DATA_TYPE* src, const FILTER_CORE_DATA_TYPE* core, FILTTED_DATA_TYPE* result, int stage, unsigned int corelen, unsigned int srclen, float scale)
 {
 	//	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	unsigned int index = blockIdx.x;
 	unsigned int step = stage * (srclen >> 2);
 	unsigned int istep = step + index - corelen;
 	unsigned int srcmask = srclen - 1;
-	result[index] = 0;
+	float d = 0;
 	for (int n = 0; n < corelen; n++) {
-		result[index] += src[(istep + n) & srcmask] * core[n];
+		d += src[(istep + n) & srcmask] * core[n];
 	}
+	result[index] = d * scale;
 }
 
 __global__ void
-cuda_Filter_short(const short* src, const FILTER_CORE_DATA_TYPE* core, FILTTED_DATA_TYPE* result, int stage, unsigned int corelen, unsigned int srclen)
+cuda_Filter_short(const short* src, const FILTER_CORE_DATA_TYPE* core, FILTTED_DATA_TYPE* result, int stage, unsigned int corelen, unsigned int srclen, float scale)
 {
 //	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	unsigned int index = blockIdx.x;
 	unsigned int step = stage * (srclen >> 2);
 	unsigned int istep = step + index - corelen;
 	unsigned int srcmask = srclen - 1;
-	result[index] = 0;
+	float d = 0;
 	for (int n = 0; n < corelen; n++) {
-		result[index] += src[(istep + n) & srcmask] * core[n];
+		d += src[(istep + n) & srcmask] * core[n];
 	}
+	result[index] = d * scale;
 }
 
 __global__ void
-cuda_Filter_float(const float* src, const FILTER_CORE_DATA_TYPE* core, FILTTED_DATA_TYPE* result, int stage, unsigned int corelen, unsigned int srclen)
+cuda_Filter_float(const float* src, const FILTER_CORE_DATA_TYPE* core, FILTTED_DATA_TYPE* result, int stage, unsigned int corelen, unsigned int srclen, float scale)
 {
 	//	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	unsigned int index = blockIdx.x;
 	unsigned int step = stage * (srclen >> 2);
 	unsigned int istep = step + index - corelen;
 	unsigned int srcmask = srclen - 1;
-	result[index] = 0;
+	float d = 0;
 	for (int n = 0; n < corelen; n++) {
-		result[index] += src[(istep + n) & srcmask] * core[n];
+		d += src[(istep + n) & srcmask] * core[n];
 	}
+	result[index] = d * scale;
 }
 
 void cuda_CFilter::getThreadNum(void)
@@ -75,12 +78,13 @@ void cuda_CFilter::getThreadNum(void)
 		prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
 }
 
-void cuda_CFilter::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CData* targetData, UINT srcLen)
+void cuda_CFilter::Init(CFilter* f)
 {
-	rootFilterInfo = pFilterInfo;
-	SrcData = srcData;
-	TargetData = targetData;
-	SrcLen = srcLen;
+	cFilter = f;
+	rootFilterInfo = &f->rootFilterInfo1;
+	SrcData = f->SrcData;
+	TargetData = f->TargetData;
+	SrcLen = f->FilterSrcLen;
 
 	UnInit();
 
@@ -88,13 +92,13 @@ void cuda_CFilter::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CData
 
 	cudaError_t err = cudaSuccess;
 
-	int numElements = srcLen;
-	size_t src_data_size = numElements * srcData->SizeOfType;
-	src_step_size = (srcLen >> 2) * srcData->SizeOfType;
+	int numElements = SrcLen;
+	size_t src_data_size = numElements * SrcData->SizeOfType;
+	src_step_size = (SrcLen >> 2) * SrcData->SizeOfType;
 	printf("Cuda_Init [Vector addition of %d elements]\n", numElements);
 
-	thread_size = (srcLen >> 2);
-	result_size = thread_size * targetData->SizeOfType;
+	thread_size = (SrcLen >> 2);
+	result_size = thread_size * TargetData->SizeOfType;
 
 	err = cudaMalloc((void**)&d_SrcData, src_data_size);
 	if (err != cudaSuccess) {
@@ -111,12 +115,12 @@ void cuda_CFilter::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CData
 			printf("cudaFree d_Filter_Core failed!\r\n");
 		}
 	}
-	size_t filter_core_size = pFilterInfo->CoreLength * sizeof(FILTER_CORE_DATA_TYPE);
+	size_t filter_core_size = rootFilterInfo->CoreLength * sizeof(FILTER_CORE_DATA_TYPE);
 	err = cudaMalloc((void**)&d_Filter_Core, filter_core_size);
 	if (err != cudaSuccess) {
 		printf("cudaMalloc d_Filter_Core failed!\r\n");
 	}
-	err = cudaMemcpy(d_Filter_Core, pFilterInfo->FilterCore, filter_core_size, cudaMemcpyHostToDevice);
+	err = cudaMemcpy(d_Filter_Core, rootFilterInfo->FilterCore, filter_core_size, cudaMemcpyHostToDevice);
 	if (err != cudaSuccess) {
 		printf("cudaMemcpy d_Filter_Core failed!\r\n");
 	}
@@ -159,9 +163,14 @@ void cuda_CFilter::UnInit(void)
 
 void cuda_CFilter::Filtting(void)
 {
-	WaitForSingleObject(clsMainFilter.hCoreMutex, INFINITE);
+	WaitForSingleObject(cFilter->hCoreMutex, INFINITE);
 
-	CData* src_Data = (CData*)SrcData;
+	if (cFilter->Cuda_Filter_N_New != cFilter->Cuda_Filter_N_Doing) {
+		ReleaseMutex(cFilter->hCoreMutex);
+		Sleep(100);
+		return;
+	}
+
 	cudaError_t err = cudaSuccess;
 	static unsigned int stage = 0;
 
@@ -169,23 +178,23 @@ void cuda_CFilter::Filtting(void)
 	//int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
 	size_t blocksPerGrid = 1;
 	
-	h_SrcData = (char*)src_Data->Buff + src_Data->SizeOfType * src_Data->ProcessPos;
+	h_SrcData = (char*)SrcData->Buff + SrcData->SizeOfType * SrcData->ProcessPos;
 	err = cudaMemcpy((char*)d_SrcData + stage * src_step_size, h_SrcData, src_step_size, cudaMemcpyHostToDevice);
 	if (err != cudaSuccess) {
 		printf("cudaMemcpy d_SrcData failed!\r\n");
 	}
 	
-	switch (src_Data->DataType) {
+	switch (SrcData->DataType) {
 	case short_type:
 	{
 		cuda_Filter_short << <threadsPerBlock, blocksPerGrid >> > ((short*)d_SrcData, d_Filter_Core, d_Result, stage,
-			rootFilterInfo->CoreLength, SrcLen);
+			rootFilterInfo->CoreLength, SrcLen, *cFilter->scale);
 	}
 	break;
 	case float_type:
 	{
 		cuda_Filter_float << <threadsPerBlock, blocksPerGrid >> > ((float*)d_SrcData, d_Filter_Core, d_Result, stage,
-			rootFilterInfo->CoreLength, SrcLen);
+			rootFilterInfo->CoreLength, SrcLen, *cFilter->scale);
 	}
 	break;
 	}
@@ -204,13 +213,15 @@ void cuda_CFilter::Filtting(void)
 	if (err != cudaSuccess) {
 		printf("cudaMemcpy h_Result failed!\r\n");
 	}
-	src_Data->ProcessPos += (SrcLen >> 2);
-	src_Data->ProcessPos &= src_Data->Mask;
-	target_Data->Pos = src_Data->ProcessPos;
+	UINT T;
+	T = SrcData->ProcessPos;
+	SrcData->ProcessPos = (T + (SrcLen >> 2)) & SrcData->Mask;
+	T = target_Data->Pos;
+	target_Data->Pos = (T + (SrcLen >> 2)) & target_Data->Mask;
 
 	stage++;
 	stage &= 0x3;
 	//printf("Cuda Filtting Done.\r\n");
 
-	ReleaseMutex(clsMainFilter.hCoreMutex);
+	ReleaseMutex(cFilter->hCoreMutex);
 }

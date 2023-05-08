@@ -50,15 +50,18 @@ void CAudioWin::Init(void)
 
 	m_FilterWin = new CFilterWin();
 	m_FilterWin->cFilter = &clsAudioFilter;
-	m_FilterWin->rootFilterInfo = &clsAudioFilter.rootFilterInfo;
+	m_FilterWin->rootFilterInfo1 = &clsAudioFilter.rootFilterInfo1;
 
 	m_SignalWin = new CSignalWin();
 	m_SignalWin->Tag = AudioWinTag;
 	AudioData = new CData();
-	AudioData->Init(SOUNDCARD_BUFF_LENGTH, short_type, SOUNDCARD_BUFF_DATA_BIT);
-	m_SignalWin->DataOrignal = AudioData;
+	//AudioData->Init(SOUNDCARD_BUFF_LENGTH, short_type, SOUNDCARD_BUFF_DATA_BIT);
+	AudioData->Init(DATA_BUFFER_LENGTH, short_type, SOUNDCARD_BUFF_DATA_BIT);
+	//	m_SignalWin->DataOrignal = AudioData;
+	m_SignalWin->DataOrignal = AdcDataFiltted;
 	AudioDataFiltted = new CData();
-	AudioDataFiltted->Init(SOUNDCARD_BUFF_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT);
+//	AudioDataFiltted->Init(SOUNDCARD_BUFF_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT);
+	AudioDataFiltted->Init(DATA_BUFFER_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT);
 	m_SignalWin->DataFiltted = AudioDataFiltted;
 	m_SignalWin->Init();
 
@@ -68,7 +71,7 @@ void CAudioWin::Init(void)
 
 	m_FFTWin = new CFFTWin();
 	m_FFTWin->Tag = AudioWinTag;
-	m_FFTWin->Data = AudioData;
+	m_FFTWin->Data = AdcDataFiltted;
 	FFTInfo_Audio.FFTSize = 2048;
 	FFTInfo_Audio.HalfFFTSize = FFTInfo_Audio.FFTSize / 2;
 	FFTInfo_Audio.FFTStep = 2048;
@@ -159,10 +162,16 @@ LRESULT CALLBACK CAudioWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 			0, 0, 500, 200, hWnd, NULL, hInst, me->m_FFTWin);
 		ShowWindow(me->m_FFTWin->hWnd, SW_SHOW);
 
-		clsAudioFilter.SrcData = AudioData;
+//		clsAudioFilter.SrcData = AudioData;
+		clsAudioFilter.SrcData = AdcDataFiltted;
 		clsAudioFilter.TargetData = AudioDataFiltted;
-		clsAudioFilter.set_cudaFilter(&clscudaAudioFilter, &clscudaAudioFilter2, CUDA_FILTER_AUDIO_BUFF_SRC_LENGTH);
-		clsAudioFilter.ParseCoreDesc(&clsAudioFilter.rootFilterInfo);
+		clsAudioFilter.set_cudaFilter(&clscudaAudioFilter, &clscudaAudioFilter2, NULL, CUDA_FILTER_AUDIO_BUFF_SRC_LENGTH);
+		clsAudioFilter.ParseCoreDesc();
+		clsAudioFilter.scale = &me->m_Audio->Am_zoom;
+
+		me->m_Audio->SampleRate = &AdcDataFiltted->SampleRate;
+
+		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::cuda_filter_thread, &clsAudioFilter, 0, NULL);
 	}
 	break;
 	case WM_NOTIFY:
@@ -177,6 +186,7 @@ LRESULT CALLBACK CAudioWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 		RECT rt;
 		GetClientRect(me->hWndRebar, &rt);
 		DbgMsg("rt.bottom: %d\r\n", rt.bottom);
+		MoveWindow(me->hWndRebar, 0, 0, me->WinRect.right, rt.bottom, true);
 		MoveWindow(me->m_SignalWin->hWnd, 0, rt.bottom, me->WinRect.right, me->SignalWinHeight, true);
 		MoveWindow(me->m_FFTWin->hWnd, 0, me->SignalWinHeight + rt.bottom, me->WinRect.right, me->WinRect.bottom - me->SignalWinHeight - rt.bottom, true);
 	}
@@ -222,9 +232,12 @@ LRESULT CALLBACK CAudioWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 	break;
 	case WM_DESTROY:
 		me->m_DemodulatorAM->AM_Demodulator_Doing = false;
-		while (me->m_DemodulatorAM->h_AM_Demodulator_Thread != NULL);
+		//while (me->m_DemodulatorAM->h_AM_Demodulator_Thread != NULL);
+
+		me->m_Audio->StopOut();
 		me->m_DemodulatorAM->AM_Demodulator_Audio_Out_Doing = false;
-		while (me->m_DemodulatorAM->h_AM_Demodulator_Thread_Audio_Out != NULL);
+		//while (me->m_DemodulatorAM->h_AM_Demodulator_Thread_Audio_Out != NULL);
+		clsAudioFilter.doFiltting = false;
 
 		DestroyWindow(me->m_SignalWin->hWnd);
 		DestroyWindow(me->m_FFTWin->hWnd);
@@ -280,6 +293,9 @@ bool CAudioWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_STOPPLAY:
 		m_Audio->StopOut();
 		break;
+	case IDM_AUDIO_BUILD_FILTER:
+		BuildAudioFilter();
+		break;
 	case IDM_WAVEHZOOMRESET:
 	case IDM_WAVEHZOOMINCREASE:
 	case IDM_WAVEHZOOMDECREASE:
@@ -317,6 +333,27 @@ bool CAudioWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	return TRUE;
 }
 
+void CAudioWin::BuildAudioFilter(void)
+{
+	CFFTWin::POIINT_SERIAL*cp2, * cp = m_FFTWin->FilterPsHead;
+	char str[2000];
+	int n = sprintf(str, "1023, 0, 0; ");
+	if (cp != NULL) cp2 = cp->next;
+	float HzScale = (float)m_FFTWin->Data2->SampleRate / m_FFTWin->fft2->FFTInfo->FFTSize;
+	while (cp2 != NULL) {
+		n += sprintf(str + n, "2, %u, %u; ", (UINT)(HzScale * (cp->P.x + (cp2->P.x - cp->P.x) / 2)), (UINT)(HzScale *(cp2->P.x - cp->P.x)));
+		cp2 = cp2->next;
+		if (cp2 != NULL) {
+			cp = cp2;
+			cp2 = cp2->next;
+		}
+	}
+	str[n - 2] = '\0';
+	DbgMsg("Filter Desc: %s\r\n", str);
+	if (clsAudioFilter.CheckCoreDesc(str) == false) return;
+	clsAudioFilter.setFilterCoreDesc(&clsAudioFilter.rootFilterInfo1, str);
+	clsAudioFilter.ParseCoreDesc();
+}
 
 LRESULT CALLBACK CAudioWin::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -440,7 +477,7 @@ HWND CAudioWin::CreateTrackbar(HWND hWnd, UINT iMin, UINT iMax, UINT pos)
 		(WPARAM)TRUE, // redraw flag
 		(LPARAM)MAKELONG(iMin, iMax)); // min. & max. positions
 	SendMessage(hWndTrack, TBM_SETPAGESIZE,
-		0, (LPARAM)4); // new page size
+		0, (LPARAM)5); // new page size
 	SendMessage(hWndTrack, TBM_SETSEL,
 		(WPARAM)FALSE, // redraw flag
 		(LPARAM)MAKELONG(iMin, iMax));
@@ -459,7 +496,7 @@ VOID CAudioWin::TBNotifications(WPARAM wParam)
 {
 	DWORD dwPos; 
 	switch (LOWORD(wParam)) {
-	case TB_ENDTRACK:
+	case TB_THUMBTRACK:
 		dwPos = SendMessage(hWndTrack, TBM_GETPOS, 0, 0);
 		if (dwPos > TRACK_MAX)
 			SendMessage(hWndTrack, TBM_SETPOS, (WPARAM)TRUE, (LPARAM)TRACK_MAX);

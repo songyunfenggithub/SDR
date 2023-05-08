@@ -23,6 +23,7 @@ namespace METHOD {
 		FILTTED_DATA_TYPE* h_Filtted_Result = NULL;
 		FILTTED_DATA_TYPE* h_Demodulator_Result = NULL;
 
+		CFilter* cFilter = NULL;
 		CFilter::PFILTER_INFO rootFilterInfo = NULL;
 
 		UINT SrcLen;
@@ -33,7 +34,7 @@ namespace METHOD {
 
 		void Filtting(void);
 		void UnInit(void);
-		void Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CData* targetData, UINT srcLen);
+		void Init(CFilter* f);
 
 	};
 }

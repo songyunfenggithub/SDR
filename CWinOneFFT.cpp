@@ -54,6 +54,9 @@ using namespace WINS; using namespace DEVICES;
 #define DIVLONG		10
 #define DIVSHORT	5
 
+#define POINT_WIDTH 5
+#define POINT_WIDTH2 10
+
 CWinOneFFT clsWinOneFFT;
 
 CWinOneFFT::CWinOneFFT()
@@ -154,9 +157,12 @@ LRESULT CALLBACK CWinOneFFT::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 			P->x = GET_X_LPARAM(lParam);
 			P->y = GET_Y_LPARAM(lParam);
 			if (P->x > WAVE_RECT_BORDER_LEFT && P->x < WinRect.right - WAVE_RECT_BORDER_RIGHT
-				&& P->y > WAVE_RECT_BORDER_TOP && P->y < WinRect.bottom - WAVE_RECT_BORDER_BOTTON)
-			{
+				&& P->y > WAVE_RECT_BORDER_TOP && P->y < WinRect.bottom - WAVE_RECT_BORDER_BOTTON) {
 				if (message == WM_LBUTTONUP) P1_Use = true; else P2_Use = true;
+				P->x = (P->x - WAVE_RECT_BORDER_LEFT + clsWinSpect.HScrollPos) / clsWinSpect.HScrollZoom;
+				if (P->x >= FFTInfo_Signal.HalfFFTSize) {
+					if (message == WM_LBUTTONUP) P1_Use = false; else P2_Use = false;
+				}
 			}
 			else {
 				if (message == WM_LBUTTONUP) P1_Use = false; else P2_Use = false;
@@ -620,9 +626,9 @@ void CWinOneFFT::Paint(void)
 			(INT)clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor,
 			(INT)clsGetDataSDR.chParams->tunerParams.bwType,
 			fomatKINT64(AdcData->SampleRate, t2), fomatKINT64(AdcData->NumPerSec, t3),
-			clsMainFilter.rootFilterInfo.CoreDescStr,
-			clsMainFilter.rootFilterInfo.decimationFactorBit,
-			clsMainFilter.rootFilterInfo.SampleRate,
+			clsMainFilter.rootFilterInfo1.CoreDescStr,
+			clsMainFilter.rootFilterInfo1.decimationFactorBit,
+			clsMainFilter.TargetData->SampleRate,
 			formatKDouble(clsGetDataSDR.chParams->tunerParams.rfFreq.rfHz, 0.001, "", t8)
 			
 		);
@@ -676,37 +682,39 @@ void CWinOneFFT::Paint(void)
 
 void CWinOneFFT::DrawPoint(HDC hdc, POINT* P, HFONT hFont)
 {
-#define PW 5
-#define PW2 10
-	RECT r;
+	if (P == &ScreenP1 && P1_Use == false)return;
+	if (P == &ScreenP2 && P2_Use == false)return;
 
-	if (P->x > WAVE_RECT_BORDER_LEFT && P->x < WinRect.right - WAVE_RECT_BORDER_RIGHT
-		&& P->y > WAVE_RECT_BORDER_TOP && P->y < WinRect.bottom - WAVE_RECT_BORDER_BOTTON)
-	{
-		HPEN hPen = CreatePen(PS_SOLID, 0, RGB(128, 255, 128));;
-		HPEN hPen_old = (HPEN)SelectObject(hdc, (HPEN)hPen);
-		HFONT hFont_old = (HFONT)SelectObject(hdc, (HFONT)hFont);
+	
+	int x = P->x * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos + WAVE_RECT_BORDER_LEFT;
+	if (x > WinRect.right - WAVE_RECT_BORDER_RIGHT) return;
 
-		MoveToEx(hdc, P->x - PW, P->y - PW, NULL);
-		LineTo(hdc, P->x + PW, P->y - PW);
-		LineTo(hdc, P->x + PW, P->y + PW);
-		LineTo(hdc, P->x - PW, P->y + PW);
-		LineTo(hdc, P->x - PW, P->y - PW);
+	HPEN hPen = CreatePen(PS_SOLID, 0, RGB(128, 255, 128));;
+	HPEN hPen_old = (HPEN)SelectObject(hdc, (HPEN)hPen);
+	HFONT hFont_old = (HFONT)SelectObject(hdc, (HFONT)hFont);
 
-		MoveToEx(hdc, P->x - PW2, P->y, NULL);
-		LineTo(hdc, P->x + PW2, P->y);
-		MoveToEx(hdc, P->x, P->y - PW2, NULL);
-		LineTo(hdc, P->x, P->y + PW2);
-		r.top = P->y - PW2 / 2;
-		r.left = P->x + PW2 + 2;
-		r.right = WinRect.right;
-		r.bottom = WinRect.bottom;
-		DrawText(hdc, P == &ScreenP1 ? "P1" : "P2", 2, &r, NULL);
+	MoveToEx(hdc, x - POINT_WIDTH, P->y - POINT_WIDTH, NULL);
+	LineTo(hdc, x + POINT_WIDTH, P->y - POINT_WIDTH);
+	LineTo(hdc, x + POINT_WIDTH, P->y + POINT_WIDTH);
+	LineTo(hdc, x - POINT_WIDTH, P->y + POINT_WIDTH);
+	LineTo(hdc, x - POINT_WIDTH, P->y - POINT_WIDTH);
 
-		SelectObject(hdc, (HPEN)hPen_old);
-		SelectObject(hdc, (HFONT)hFont_old);
-		DeleteObject(hPen);
-	}
+	MoveToEx(hdc, x - POINT_WIDTH2, P->y, NULL);
+	LineTo(hdc, x + POINT_WIDTH2, P->y);
+	MoveToEx(hdc, x, P->y - POINT_WIDTH2, NULL);
+	LineTo(hdc, x, P->y + POINT_WIDTH2);
+
+	RECT r = { 0 };
+	r.top = P->y - POINT_WIDTH2 / 2;
+	r.left = x + POINT_WIDTH2 + 2;
+	r.right = WinRect.right;
+	r.bottom = WinRect.bottom;
+	DrawText(hdc, P == &ScreenP1 ? "P1" : "P2", 2, &r, NULL);
+
+	SelectObject(hdc, (HPEN)hPen_old);
+	SelectObject(hdc, (HFONT)hFont_old);
+	DeleteObject(hPen);
+
 }
 
 void CWinOneFFT::GetRealClientRect(PRECT lprc)
@@ -1096,7 +1104,7 @@ void CWinOneFFT::P2SubP1(void)
 	CFFT* FFTFiltted = (CFFT*)clsWinSpect.FFTFiltted;
 	if (P1_Use == true) {
 		P = &ScreenP1;
-		X = (clsWinSpect.HScrollPos + P->x - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
+		X = P->x;
 		if (X < FFTInfo_Signal.HalfFFTSize) {
 			Y = FFTOrignal->FFTOutBuff[X];
 			Ylog = FFTOrignal->FFTOutLogBuff[X];
@@ -1124,7 +1132,7 @@ void CWinOneFFT::P2SubP1(void)
 	bool P2Eanble = false;
 	if (P2_Use == true) {
 		P = &ScreenP2;
-		X = (clsWinSpect.HScrollPos + P->x - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
+		X = P->x;
 		if (X < FFTInfo_Signal.HalfFFTSize) {
 			Y = FFTOrignal->FFTOutBuff[X];
 			Ylog = FFTOrignal->FFTOutLogBuff[X];

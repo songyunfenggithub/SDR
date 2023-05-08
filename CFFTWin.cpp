@@ -62,6 +62,9 @@ using namespace DEVICES;
 
 #define FFT_ZOOM_MAX		16
 
+#define POINT_WIDTH 5
+#define POINT_WIDTH2 10
+
 CFFTWin::CFFTWin()
 {
 	OPENCONSOLE;
@@ -159,9 +162,70 @@ LRESULT CALLBACK CFFTWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		//clsWinSpect.ActivehWnd = NULL;
 		break;
 	case WM_LBUTTONUP:
-		break;
+	{
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+		if (x < WAVE_RECT_BORDER_LEFT || x > me->WinRect.right - WAVE_RECT_BORDER_RIGHT) break;
+		x = (x - WAVE_RECT_BORDER_LEFT + me->HScrollPos) / me->HScrollZoom;
+		if (x >= me->fft->FFTInfo->HalfFFTSize) break;
+		POIINT_SERIAL* ps = new POIINT_SERIAL;
+		ps->P.x = x;
+		ps->P.y = y;
+		POIINT_SERIAL* pp, * cp = me->FilterPsHead;
+		if (cp == NULL) {
+			me->FilterPsHead = ps;
+		}
+		else {
+			pp = cp;
+			while (cp != NULL) {
+				if (x > cp->P.x) {
+					pp = cp;
+					cp = cp->next;
+				}
+				else break;
+			}
+			if (cp == me->FilterPsHead) {
+				ps->next = me->FilterPsHead;
+				me->FilterPsHead = ps;
+			}
+			else {
+				ps->next = pp->next;
+				pp->next = ps;
+			}
+		}
+	}
+	break;
 	case WM_RBUTTONUP:
-		break;
+	{
+		POIINT_SERIAL* pp, * cp = me->FilterPsHead;
+		if (cp == NULL)break;
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+		if (x < WAVE_RECT_BORDER_LEFT || x > me->WinRect.right - WAVE_RECT_BORDER_RIGHT) break;
+		x = (x - WAVE_RECT_BORDER_LEFT + me->HScrollPos) / me->HScrollZoom;
+		if (x >= me->fft->FFTInfo->HalfFFTSize) break;
+		pp = cp;
+		POINT* P;
+		int pw = POINT_WIDTH2;
+		while (cp != NULL) {
+			P = &cp->P;
+			if (x > P->x - pw && x < P->x + pw && y > P->y - pw && y < P->y + pw) 
+				break; 
+			else {
+				pp = cp;
+				cp = cp->next;
+			}
+		}
+		if (cp == me->FilterPsHead) {
+			me->FilterPsHead = cp->next;
+			delete cp;
+		}
+		else if (cp != NULL) {
+			pp->next = cp->next;
+			delete cp;
+		}
+	}
+	break;
 	case WM_MOUSEMOVE:
 		me->MouseX = GET_X_LPARAM(lParam);
 		me->MouseY = GET_Y_LPARAM(lParam);
@@ -473,6 +537,8 @@ void CFFTWin::Paint(void)
 		PaintFFTBriefly(hdc, fft);
 		PaintFFTBriefly(hdc, fft2);
 	}
+
+	DrawPoints(hdc);
 
 	//---------------------------------------
 	{
@@ -1191,4 +1257,43 @@ void CFFTWin::BrieflyBuff(CFFT* fft)
 	pbrifft[cFFT->FFTInfo->HalfFFTSize + 1] = mind;// pfft[clsWaveFFT.HalfFFTSize + 1];
 	pbrifftlog[cFFT->FFTInfo->HalfFFTSize] = pfftlog[cFFT->FFTInfo->HalfFFTSize];
 	pbrifftlog[cFFT->FFTInfo->HalfFFTSize + 1] = minlogd;// pfftlog[clsWaveFFT.HalfFFTSize + 1];
+}
+
+void CFFTWin::DrawPoints(HDC hdc)
+{
+	RECT r = { 0 };
+	POIINT_SERIAL* cp = FilterPsHead;
+	POINT* P;
+	int i = 0;
+	if (cp != NULL) {
+		HPEN hPen = CreatePen(PS_SOLID, 0, RGB(128, 255, 128));;
+		HPEN hPen_old = (HPEN)SelectObject(hdc, (HPEN)hPen);
+		while (cp != NULL) {
+			P = &cp->P;
+			int x = P->x * HScrollZoom  - HScrollPos + WAVE_RECT_BORDER_LEFT;
+			if (x > WAVE_RECT_BORDER_LEFT && x < WinRect.right - WAVE_RECT_BORDER_RIGHT) {
+				MoveToEx(hdc, x - POINT_WIDTH, P->y - POINT_WIDTH, NULL);
+				LineTo(hdc, x + POINT_WIDTH, P->y - POINT_WIDTH);
+				LineTo(hdc, x + POINT_WIDTH, P->y + POINT_WIDTH);
+				LineTo(hdc, x - POINT_WIDTH, P->y + POINT_WIDTH);
+				LineTo(hdc, x - POINT_WIDTH, P->y - POINT_WIDTH);
+
+				MoveToEx(hdc, x - POINT_WIDTH2, P->y, NULL);
+				LineTo(hdc, x + POINT_WIDTH2, P->y);
+				MoveToEx(hdc, x, P->y - POINT_WIDTH2, NULL);
+				LineTo(hdc, x, P->y + POINT_WIDTH2);
+				r.top = P->y - POINT_WIDTH2 / 2;
+				r.left = x + POINT_WIDTH2 + 2;
+				r.right = WinRect.right;
+				r.bottom = WinRect.bottom;
+				char ptxt[100];
+				int n = sprintf(ptxt, "P%d", i);
+				DrawText(hdc, ptxt, n, &r, NULL);
+			}
+			i++;
+			cp = cp->next;
+		}
+		SelectObject(hdc, (HPEN)hPen_old);
+		DeleteObject(hPen);
+	}
 }

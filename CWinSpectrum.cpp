@@ -13,6 +13,9 @@
 #include "CWinSpectrum.h"
 #include "CWinOneSpectrum.h"
 #include "CWinOneFFT.h"
+#include "CToolsWin.h"
+#include "CDataFromSDR.h"
+#include "CAnalyze.h"
 
 using namespace std;
 using namespace WINS; 
@@ -30,6 +33,13 @@ using namespace WINS;
 #define DIVSHORT	5
 
 #define SCROLLBAR_WIDTH		16
+
+#define TOOLSBAR_SET_FILTER_CENTER_FREQ	1
+#define TOOLSBAR_SET_AM_FREQ_ADD	2
+#define TOOLSBAR_SET_AM_FREQ_SUB	3
+#define TOOLSBAR_SET_FM_FREQ_ADD	4
+#define TOOLSBAR_SET_FM_FREQ_SUB	5
+#define TOOLSBAR_TBSTYLE_DROPDOWN	6
 
 CWinSpectrum clsWinSpect;
 
@@ -72,7 +82,7 @@ void CWinSpectrum::OpenWindow(void)
 {
 	if (hWnd == NULL) {
 		hWnd = CreateWindow(SPECTRUM_WIN_CLASS, "Spectrum windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-			CW_USEDEFAULT, 0, 1400, 800, NULL, NULL, hInst, NULL);
+			CW_USEDEFAULT, 0, 1400, 900, NULL, NULL, hInst, NULL);
 	}
 	ShowWindow(hWnd, SW_SHOW);
 	UpdateWindow(hWnd);
@@ -95,6 +105,8 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 		clsWinSpect.hWnd = hWnd;
 		hMenu = GetMenu(hWnd);
 		HMENU m = GetSubMenu(hMenu, 2);
+
+		MakeToolsBar();
 
 		CheckMenuRadioItem(m, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
 		CheckMenuItem(hMenu, IDM_SPECTRUM_ZOOMED_SHOW,
@@ -159,10 +171,14 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 	{
 		GetClientRect(hWnd, &WinRect);
 		//WinOneSpectrumHeight = (WinHeight - SCROLLBAR_WIDTH) / 4;
+		RECT rt;
+		GetClientRect(hWndRebar, &rt);
+		DbgMsg("rt.bottom: %d\r\n", rt.bottom);
 		int FFThight = WAVE_RECT_HEIGHT + WAVE_RECT_BORDER_TOP + WAVE_RECT_BORDER_BOTTON;
-		MoveWindow(hWndOneFFT, 0, 0, WinRect.right, FFThight, true);
+		MoveWindow(hWndRebar, 0, 0, WinRect.right, rt.bottom, true);
+		MoveWindow(hWndOneFFT, 0, rt.bottom, WinRect.right, FFThight, true);
 		//MoveWindow(hWndOneFFT, 0, 0, WinWidth, WinHeight, true);
-		MoveWindow(hWndOneSpectrum, 0, FFThight, WinRect.right, WinRect.bottom - FFThight, true);
+		MoveWindow(hWndOneSpectrum, 0, rt.bottom + FFThight, WinRect.right, WinRect.bottom - rt.bottom - FFThight, true);
 
 		//MoveWindow(hWndSpectrumHScrollBar, 0, 4 * WinOneSpectrumHeight, WinWidthSpectrum, SCROLLBAR_WIDTH, true);
 		//SetScrollRange(hWndSpectrumHScrollBar, SB_HORZ, 0, SPECTRUM_WIDTH - SPECTRUM_WIN_WIDTH / WinOneSpectrumHScrollZoom, TRUE);
@@ -171,7 +187,6 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 		//if (clsWaveFFT.HalfFFTSize - WinOneSpectrumHeight > 0)
 			//SetScrollRange(hWndSpectrumVScrollBar, SB_VERT, 0, clsWaveFFT.HalfFFTSize - WinOneSpectrumHeight, TRUE);
 		//滚动条初始化
-		RECT rt;
 		GetRealClientRect(&rt);
 		HScrollWidth = ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize * HScrollZoom - (rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
 		if (HScrollWidth < 0) HScrollWidth = 0;
@@ -367,6 +382,24 @@ bool CWinSpectrum::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 			(clsWinOneSpectrum.bSpectrumBrieflyShow == true ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 		
+	case TOOLSBAR_SET_FILTER_CENTER_FREQ:
+		ToolsbarSetFilterCenterFreq();
+		break;
+	case TOOLSBAR_SET_AM_FREQ_ADD:
+		ToolsbarSetAMFreqAdd();
+		break;
+	case TOOLSBAR_SET_AM_FREQ_SUB:
+		ToolsbarSetAMFreqSub();
+		break;
+	case TOOLSBAR_SET_FM_FREQ_ADD:
+		ToolsbarSetFMFreqAdd();
+		break;
+	case TOOLSBAR_SET_FM_FREQ_SUB:
+		ToolsbarSetFMFreqSub();
+		break;
+	case TOOLSBAR_TBSTYLE_DROPDOWN:
+		break;
+
 	case IDM_EXIT:
 		DestroyWindow(hWnd);
 		break;
@@ -660,4 +693,90 @@ void CWinSpectrum::RestoreValue(void)
 	//FFTInfo_Filtted.AverageDeep = FFTInfo_Signal.AverageDeep;
 
 	DbgMsg("CWinSpectrum::RestoreValue\r\n");
+}
+
+HWND CWinSpectrum::MakeToolsBar(void)
+{
+	hWndRebar = clsToolsWin.CreateRebar(hWnd);
+	static TBBUTTON tbb[9] = {
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"FC" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
+		{ MAKELONG(1, 0), TOOLSBAR_SET_AM_FREQ_ADD, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"AM Go +" },
+		{ MAKELONG(1, 0), TOOLSBAR_SET_AM_FREQ_SUB, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"AM Go -" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
+		{ MAKELONG(2, 0), TOOLSBAR_SET_FM_FREQ_ADD, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"FM Go +" },
+		{ MAKELONG(2, 0), TOOLSBAR_SET_FM_FREQ_SUB, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"FM Go -" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
+		{ MAKELONG(4, 0), TOOLSBAR_TBSTYLE_DROPDOWN, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"下拉" }
+	};
+	CToolsWin::TOOL_TIPS tips[9] = {
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ 0, NULL }, // Separator
+		{ TOOLSBAR_SET_AM_FREQ_ADD,"P1 点频率 + 移动到AM滤波器中心频率." },
+		{ TOOLSBAR_SET_AM_FREQ_SUB,"P1 点频率 - 移动到AM滤波器中心频率." },
+		{ 0, NULL }, // Separator
+		{ TOOLSBAR_SET_FM_FREQ_ADD, "P1 点频率 + 移动到FM滤波器中心频率." },
+		{ TOOLSBAR_SET_FM_FREQ_SUB, "P1 点频率 - 移动到FM滤波器中心频率." },
+		{ 0, NULL }, // Separator
+		{ 0, "TBSTYLE_DROPDOWN" }
+	};
+	HWND hToolBar = clsToolsWin.CreateToolbar(hWnd, tbb, 9, tips, 9);
+
+	// Add images
+	TBADDBITMAP tbAddBmp = { 0 };
+	tbAddBmp.hInst = HINST_COMMCTRL;
+	tbAddBmp.nID = IDB_STD_SMALL_COLOR;
+	SendMessage(hToolBar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
+
+	clsToolsWin.CreateRebarBand(hWndRebar, "BTN", 1, 500, 0, hToolBar);
+
+	//hWndTrack = CreateTrackbar(hWnd, 0, 100, 10);
+	clsToolsWin.CreateRebarBand(hWndRebar, "Value", 2, 0, 0, NULL);
+	return hWndRebar;
+}
+
+void CWinSpectrum::ToolsbarSetFilterCenterFreq(void)
+{
+	if(clsWinOneFFT.P1_Use == false)return;
+	char str[2000];
+	int n = sprintf(str, "257, 0, 0; 2, %u, 3000", (UINT)((float)clsMainFilter.TargetData->SampleRate / FFTInfo_Filtted.FFTSize * clsWinOneFFT.ScreenP1.x));
+	DbgMsg("Filter Desc: %s\r\n", str);
+	//clsMainFilter.Cuda_Filter_N = CFilter::cuda_filter_2;
+	clsMainFilter.setFilterCoreDesc(&clsMainFilter.rootFilterInfo1, str);
+	clsMainFilter.ParseCoreDesc();
+}
+
+void CWinSpectrum::ToolsbarSetAMFreqAdd(void)
+{
+	if (clsWinOneFFT.P1_Use == false)return;
+	if(
+		clsWinOneFFT.rfButton->RefreshMouseNumButton(
+			clsGetDataSDR.chParams->tunerParams.rfFreq.rfHz 
+			+ (UINT)((float)clsMainFilter.TargetData->SampleRate / FFTInfo_Filtted.FFTSize * clsWinOneFFT.ScreenP1.x)
+			+ clsMainFilter.rootFilterInfo1.FreqCenter
+		)
+		)
+		clsAnalyze.set_SDR_rfHz(clsWinOneFFT.rfButton->Button->value);
+}
+
+void CWinSpectrum::ToolsbarSetAMFreqSub(void)
+{
+	if (clsWinOneFFT.P1_Use == false)return;
+	if (
+		clsWinOneFFT.rfButton->RefreshMouseNumButton(
+			clsGetDataSDR.chParams->tunerParams.rfFreq.rfHz
+			- (UINT)((float)clsMainFilter.TargetData->SampleRate / FFTInfo_Filtted.FFTSize * clsWinOneFFT.ScreenP1.x)
+			- clsMainFilter.rootFilterInfo1.FreqCenter
+		)
+		)
+		clsAnalyze.set_SDR_rfHz(clsWinOneFFT.rfButton->Button->value);
+}
+
+void CWinSpectrum::ToolsbarSetFMFreqAdd(void)
+{
+
+}
+void CWinSpectrum::ToolsbarSetFMFreqSub(void)
+{
+
 }

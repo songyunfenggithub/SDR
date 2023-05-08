@@ -373,7 +373,8 @@ LRESULT CALLBACK CWinMain::WndProcReal(HWND hWnd, UINT message, WPARAM wParam, L
 		m_filttedWin = new CFilttedWin();
 		m_FilterWin = new CFilterWin();
 		m_FilterWin->cFilter = &clsMainFilter;
-		m_FilterWin->rootFilterInfo = &clsMainFilter.rootFilterInfo;
+		m_FilterWin->rootFilterInfo1 = &clsMainFilter.rootFilterInfo1;
+		m_FilterWin->rootFilterInfo2 = &clsMainFilter.rootFilterInfo2;
 
 		DbgMsg("CWinMain WM_CREATE\r\n");
 

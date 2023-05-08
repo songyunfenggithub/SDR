@@ -23,6 +23,7 @@ namespace METHOD {
 		size_t result_size;
 		size_t src_step_size;
 
+		CFilter* cFilter = NULL;
 		CFilter::PFILTER_INFO rootFilterInfo = NULL;
 
 		UINT SrcLen = 0;
@@ -31,7 +32,7 @@ namespace METHOD {
 
 		void Filtting(void);
 		void UnInit(void);
-		void Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CData* targetData, UINT srcLen);
+		void Init(CFilter* f);
 
 		void getThreadNum(void);
 	};

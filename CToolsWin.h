@@ -22,14 +22,6 @@ namespace WINS {
 			LPSTR text;
 		} TOOL_TIPS;
 
-
-		HWND hWnd = NULL;
-		HMENU hMenu = NULL;
-		RECT WinRect;
-
-		HWND hWndButtonPlay = NULL;
-		HWND hWndButtonValue = NULL;
-
 	public:
 		CToolsWin();
 		~CToolsWin();

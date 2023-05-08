@@ -66,7 +66,7 @@ public:
     void Draw(HDC hdc, RECT* srcRt);
     void SetValue(INT64 value);
     void ButtonInit(HWND hWnd);
-    void RefreshMouseNumButton(INT64 value);
+    bool RefreshMouseNumButton(INT64 value);
     void OnMouseMouseNumButton(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
     void DrawMouseNumButton(HDC hdc, RECT* srcRt);
     void DrawButton(HDC hdc, RECT* srcRt);

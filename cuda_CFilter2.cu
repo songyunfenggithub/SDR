@@ -14,8 +14,6 @@
 
 #include "cuda_CFilter2.cuh"
 
-#define DEMODULATOR_FILTER_SAMPLERATE_OFFSET_BIT	0x3
-
 using namespace METHOD;
 
 cuda_CFilter2 clscudaMainFilter2;
@@ -23,7 +21,7 @@ cuda_CFilter2 clscudaAudioFilter2;
 
 __global__ void
 cuda_core_Filter2(const ADC_DATA_TYPE* src, FILTTED_DATA_TYPE* decimation_cache, const FILTER_CORE_DATA_TYPE* core, FILTER_CORE_DATA_TYPE* filtted_result,
-	int stage, unsigned int decimation_factor_bit, unsigned int corelen, unsigned int srclen)
+	int stage, unsigned int decimation_factor_bit, unsigned int corelen, unsigned int srclen, float scale)
 {
 	//	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	unsigned int cache_length_mask = (srclen >> decimation_factor_bit) - 1;
@@ -38,10 +36,11 @@ cuda_core_Filter2(const ADC_DATA_TYPE* src, FILTTED_DATA_TYPE* decimation_cache,
 	__syncthreads();
 
 	unsigned int i_stage_step = cache_stage_step + index - corelen;
-	filtted_result[cache_stage_step + index] = 0;
+	float d = 0;
 	for (unsigned int i = 0; i < corelen; i++) {
-		filtted_result[cache_stage_step + index] += decimation_cache[(i_stage_step + i) & cache_length_mask] * core[i];
+		d += decimation_cache[(i_stage_step + i) & cache_length_mask] * core[i];
 	}
+	filtted_result[cache_stage_step + index] = d * scale;
 }
 
 __global__ void
@@ -54,12 +53,12 @@ cuda_core_Filter2_Demodulator(FILTER_CORE_DATA_TYPE* filtted_result, FILTTED_DAT
 
 	unsigned int index = blockIdx.x;
 
-	unsigned int n = 1 << DEMODULATOR_FILTER_SAMPLERATE_OFFSET_BIT;
+	unsigned int n = 1 << 2;
 	unsigned int mask = n - 1;
 	unsigned int demodulator_result_index;
 	float d;
 	if ((index & mask) == 0) {
-		demodulator_result_index = index >> DEMODULATOR_FILTER_SAMPLERATE_OFFSET_BIT;
+		demodulator_result_index = index >> 2;
 		demodulator_result[demodulator_result_index] = 0;
 		for (int i = 0; i < n; i++) {
 			if ((d = filtted_result[cache_stage_step + index + i]) > 0) demodulator_result[demodulator_result_index] += d;
@@ -90,7 +89,7 @@ void cuda_getThreadNum(void)
 		prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
 }
 
-void cuda_CFilter2::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CData* targetData, UINT srcLen)
+void cuda_CFilter2::Init(CFilter* f)
 {
 	UnInit();
 
@@ -98,12 +97,13 @@ void cuda_CFilter2::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CDat
 
 	cudaError_t err = cudaSuccess;
 
-	rootFilterInfo = pFilterInfo;
-	SrcData = srcData;
-	TargetData = targetData;
-	SrcLen = srcLen;
+	cFilter = f;
+	rootFilterInfo = &f->rootFilterInfo1;
+	SrcData = f->SrcData;
+	TargetData = f->TargetData;
+	SrcLen = f->FilterSrcLen;
 
-	printf("Cuda_Init [Vector addition of %d CUDA_FILTER_BUFF_SRC_LENGTH]\n", srcLen);
+	printf("Cuda_Init [Vector addition of %d CUDA_FILTER_BUFF_SRC_LENGTH]\n", SrcLen);
 
 	if (d_SrcData != NULL) {
 		err = cudaFree(d_SrcData);
@@ -112,7 +112,7 @@ void cuda_CFilter2::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CDat
 			//goto Error;
 		}
 	}
-	size_t src_data_size = srcLen * sizeof(ADC_DATA_TYPE);
+	size_t src_data_size = SrcLen * sizeof(ADC_DATA_TYPE);
 	err = cudaMalloc((void**)&d_SrcData, src_data_size);
 	if (err != cudaSuccess) {
 		printf("cudaMalloc d_SrcData failed!\r\n");
@@ -126,13 +126,13 @@ void cuda_CFilter2::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CDat
 			//goto Error;
 		}
 	}
-	size_t filter_core_size = pFilterInfo->CoreLength * sizeof(FILTER_CORE_DATA_TYPE);
+	size_t filter_core_size = rootFilterInfo->CoreLength * sizeof(FILTER_CORE_DATA_TYPE);
 	err = cudaMalloc((void**)&d_Filter_Core, filter_core_size);
 	if (err != cudaSuccess) {
 		printf("cudaMalloc d_Filter_Core failed!\r\n");
 		//goto Error;
 	}
-	err = cudaMemcpy(d_Filter_Core, pFilterInfo->FilterCore, filter_core_size, cudaMemcpyHostToDevice);
+	err = cudaMemcpy(d_Filter_Core, rootFilterInfo->FilterCore, filter_core_size, cudaMemcpyHostToDevice);
 	if (err != cudaSuccess) {
 		printf("cudaMemcpy d_Filter_Core failed!\r\n");
 		//goto Error;
@@ -146,7 +146,7 @@ void cuda_CFilter2::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CDat
 		}
 	}
 
-	size_t decimation_cache_size = (srcLen >> rootFilterInfo->decimationFactorBit) * sizeof(FILTTED_DATA_TYPE);
+	size_t decimation_cache_size = (SrcLen >> rootFilterInfo->decimationFactorBit) * sizeof(FILTTED_DATA_TYPE);
 	err = cudaMalloc((void**)&d_Decimation_Cache, decimation_cache_size);
 	if (err != cudaSuccess) {
 		printf("cudaMalloc d_Demodulator_Result failed!\r\n");
@@ -160,7 +160,7 @@ void cuda_CFilter2::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CDat
 			//goto Error;
 		}
 	}
-	size_t filter_result_size = (srcLen >> rootFilterInfo->decimationFactorBit) * sizeof(FILTTED_DATA_TYPE);
+	size_t filter_result_size = (SrcLen >> rootFilterInfo->decimationFactorBit) * sizeof(FILTTED_DATA_TYPE);
 	err = cudaMalloc((void**)&d_Filtted_Result, filter_result_size);
 	if (err != cudaSuccess) {
 		printf("cudaMalloc d_Filtted_Result failed!\r\n");
@@ -174,7 +174,7 @@ void cuda_CFilter2::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CDat
 			//goto Error;
 		}
 	}
-	size_t demodulator_result_size = ((srcLen >> 2) >> rootFilterInfo->decimationFactorBit) * sizeof(FILTTED_DATA_TYPE);
+	size_t demodulator_result_size = ((SrcLen >> 2) >> rootFilterInfo->decimationFactorBit) * sizeof(FILTTED_DATA_TYPE);
 	err = cudaMalloc((void**)&d_Demodulator_Result, demodulator_result_size);
 	if (err != cudaSuccess) {
 		printf("cudaMalloc d_Demodulator_Result failed!\r\n");
@@ -186,6 +186,7 @@ void cuda_CFilter2::Init(CFilter::PFILTER_INFO pFilterInfo, CData* srcData, CDat
 
 void cuda_CFilter2::UnInit(void)
 {
+	if (this == NULL)return;
 	cudaError_t err = cudaSuccess;
 
 	// Free device global memory
@@ -238,7 +239,13 @@ void cuda_CFilter2::UnInit(void)
 
 void cuda_CFilter2::Filtting(void)
 {
-	WaitForSingleObject(clsMainFilter.hCoreMutex, INFINITE);
+	WaitForSingleObject(cFilter->hCoreMutex, INFINITE);
+
+	if (cFilter->Cuda_Filter_N_New != cFilter->Cuda_Filter_N_Doing) {
+		ReleaseMutex(cFilter->hCoreMutex);
+		Sleep(100);
+		return;
+	}
 
 	cudaError_t err = cudaSuccess;
 	static unsigned int stage = 0;
@@ -259,7 +266,7 @@ void cuda_CFilter2::Filtting(void)
 	//printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid, threadsPerBlock);
 
 	cuda_core_Filter2 << <threadsPerBlock, blocksPerGrid >> > (d_SrcData, d_Decimation_Cache, d_Filter_Core, d_Filtted_Result,
-		stage, rootFilterInfo->decimationFactorBit, rootFilterInfo->CoreLength, SrcLen);
+		stage, rootFilterInfo->decimationFactorBit, rootFilterInfo->CoreLength, SrcLen, *cFilter->scale);
 	err = cudaGetLastError();
 	if (err != cudaSuccess) {
 		printf("cudaFilter launch failed: %s\r\n", cudaGetErrorString(err));
@@ -298,5 +305,5 @@ void cuda_CFilter2::Filtting(void)
 	stage++;
 	stage &= 0x3;
 
-	ReleaseMutex(clsMainFilter.hCoreMutex);
+	ReleaseMutex(cFilter->hCoreMutex);
 }

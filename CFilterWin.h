@@ -15,7 +15,9 @@ namespace WINS {
 	{
 	public:
 		CFilter* cFilter = NULL;
-		CFilter::PFILTER_INFO rootFilterInfo = NULL, pFilterInfo = NULL;
+		CFilter::FILTER_INFO* rootFilterInfo1 = NULL;
+		CFilter::FILTER_INFO* rootFilterInfo2 = NULL; 
+		CFilter::FILTER_INFO* pFilterInfo = NULL;
 
 		HWND	hWnd = NULL;
 		HDC		hdcCache = NULL;

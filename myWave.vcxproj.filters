@@ -242,6 +242,9 @@
     <ClInclude Include="CToolsWin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="cuda_CFilter3.cuh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="myWave.ico">
@@ -267,6 +270,9 @@
       <Filter>Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="cuda_CFFT.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="cuda_CFilter3.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
   </ItemGroup>

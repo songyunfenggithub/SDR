@@ -88,14 +88,16 @@ void CScreenButton::ButtonInit(HWND hWnd)
 	ReleaseDC(hWnd, hdc);
 }
 
-void CScreenButton::RefreshMouseNumButton(INT64 value)
+bool CScreenButton::RefreshMouseNumButton(INT64 value)
 {
 	if (value >= Button->min && value <= Button->max) {
 		Button->value = value;
 		char s[100];
 		char* s1 = fomatKINT64Width(Button->value, 4, s);
 		strcpy(Button->txt, s1 + 2);
+		return true;
 	}
+	return false;
 }
 
 void CScreenButton::OnMouseMouseNumButton(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)

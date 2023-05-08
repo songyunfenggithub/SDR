@@ -13,6 +13,7 @@
 #include "CFilter.h"
 #include "CWinFFT.h"
 #include "CWinSDR.h"
+#include "CToolsWin.h"
 
 #include "CWinSDRScan.h"
 
@@ -668,3 +669,5 @@ VOID CWinSDRScan::GetRealClientRect(HWND hWnd, PRECT lprc)
 	if (dwStyle & WS_VSCROLL)
 		lprc->right += GetSystemMetrics(SM_CXVSCROLL);
 }
+
+

@@ -56,8 +56,9 @@ void CDemodulatorAM::AM_Demodulator_Thread_Func(void)
 	UINT am_pos;
 	UINT am_between;
 	double Am_Decimation_Factor_offset = 0.0;
-	m_Audio->SampleRate = (double)AdcData->SampleRate / (1 << clsMainFilter.rootFilterInfo.decimationFactorBit) / 4;
-	Am_Decimation_Factor = (double)AdcData->SampleRate / (1 << clsMainFilter.rootFilterInfo.decimationFactorBit) / m_Audio->SampleRate;
+	m_Audio->uSampleRate = (double)AdcData->SampleRate / (1 << clsMainFilter.rootFilterInfo1.decimationFactorBit) / 4;
+	m_Audio->SampleRate = &m_Audio->uSampleRate;
+	Am_Decimation_Factor = (double)AdcData->SampleRate / (1 << clsMainFilter.rootFilterInfo1.decimationFactorBit) / m_Audio->uSampleRate;
 	UINT DemodulatorStepLength = SOUNDCARD_STEP_LENGTH * Am_Decimation_Factor;
 	AM_Demodulator_Doing = true;
 	float* SrcBuff = (float*)AdcDataFiltted->Buff;
@@ -96,8 +97,9 @@ void CDemodulatorAM::AM_Demodulator_Thread_Func(void)
 
 void CDemodulatorAM::AM_Demodulator_Thread_Func_Get_Envelope(void)
 {
-	AudioData->SampleRate = AudioDataFiltted->SampleRate = m_Audio->SampleRate = clsMainFilter.rootFilterInfo.nextFilter->FreqCenter;
-	clsAudioFilter.ParseCoreDesc(&clsAudioFilter.rootFilterInfo);
+	AudioData->SampleRate = AudioDataFiltted->SampleRate = m_Audio->uSampleRate = clsMainFilter.rootFilterInfo1.nextFilter->FreqCenter;
+	m_Audio->SampleRate = &m_Audio->uSampleRate;
+	clsAudioFilter.ParseCoreDesc();
 	AM_Demodulator_Doing = true;
 	float* SrcBuff = (float*)AdcDataFiltted->Buff;
 	UINT DemodulattedPos = (AdcDataFiltted->Pos - SOUNDCARD_STEP_LENGTH) & AdcDataFiltted->Mask;

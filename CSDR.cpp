@@ -956,10 +956,10 @@ void CSDR::set_params_SampleRate(int index)
 	//clsSDR.SdrSampleRate = *(double*)SDR_params[index].pValue;
 	//AdcData->SampleRate = clsSDR.DecimationFactorEnable != 0 ? clsSDR.SdrSampleRate / clsSDR.DecimationFactor : clsSDR.SdrSampleRate;
 	
-	AdcData->SampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ? 
+	clsMainFilter.SrcData->SampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ?
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz / clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor : 
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz;
-	clsMainFilter.rootFilterInfo.SampleRate = AdcData->SampleRate / (1 << clsMainFilter.rootFilterInfo.decimationFactorBit);
+	clsMainFilter.TargetData->SampleRate = clsMainFilter.SrcData->SampleRate / (1 << clsMainFilter.rootFilterInfo1.decimationFactorBit);
 	clsMainFilter.ReBuildFilterCore();
 	printf("set_params_SampleRate\r\n");
 }

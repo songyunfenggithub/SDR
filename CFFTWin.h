@@ -65,6 +65,13 @@ namespace WINS {
 		bool isDrawLogSpectrum = true;
 		CFFT* DrawWhich = NULL;
 
+		typedef struct POIINT_SERIAL;
+		struct POIINT_SERIAL {
+			POINT P = { 0 };
+			POIINT_SERIAL* next = NULL;
+		};
+		POIINT_SERIAL* FilterPsHead = NULL;
+
 	public:
 		CFFTWin();
 		~CFFTWin();
@@ -86,6 +93,8 @@ namespace WINS {
 		void PaintSpectrum(CFFT* fft);
 		void SpectrumToWin(HDC hDC);
 		void InitDrawBuff(void);
+
+		void CFFTWin::DrawPoints(HDC hdc);
 
 		void RestoreValue(void);
 		void SaveValue(void);

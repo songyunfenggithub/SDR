@@ -76,8 +76,9 @@ namespace DEVICES {
 		UINT			waveHDRPos, waveHDRUsed;
 		bool			boutOpened = false;
 
-		UINT SampleRate;
-		double Am_zoom = 10.0;
+		UINT uSampleRate = SOUNDCARD_SAMPLE;
+		UINT *SampleRate = &uSampleRate;
+		float Am_zoom = 10.0;
 
 		bool bPlay = true;
 

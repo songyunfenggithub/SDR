@@ -71,6 +71,8 @@ namespace WINS {
 		HWND CreateTrackbar(HWND hwndDlg, UINT iMin, UINT iMax, UINT pos);
 		VOID TBNotifications(WPARAM wParam);
 
+		void BuildAudioFilter(void);
+
 		static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 		static LRESULT CALLBACK DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 	};

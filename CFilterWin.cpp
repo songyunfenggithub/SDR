@@ -234,7 +234,7 @@ void CFilterWin::set_CoreAnalyse_root_Filter(void)
 
 	HMENU hMENUItem;
 	i = 0;
-	CFilter::PFILTER_INFO pfi = rootFilterInfo->nextFilter;
+	CFilter::PFILTER_INFO pfi = rootFilterInfo1->nextFilter;
 	while (pfi != NULL)
 	{
 		hMENUItem = CreateMenu();
@@ -247,14 +247,14 @@ void CFilterWin::set_CoreAnalyse_root_Filter(void)
 	hMENUItem = CreateMenu();
 	AppendMenu(hMenuFilterItems, MF_STRING, i, "×ÜÂË²¨Æ÷");
 
-	InitFilterCoreAnalyse(rootFilterInfo);
+	InitFilterCoreAnalyse(rootFilterInfo1);
 }
 
 void CFilterWin::InitFilterCoreAnalyse(CFilter::PFILTER_INFO pFilterInfo)
 {
 	this->pFilterInfo = pFilterInfo;
-	int index = pFilterInfo == rootFilterInfo ? rootFilterInfo->subFilterNum : pFilterInfo->subFilteindex;
-	CheckMenuRadioItem(hMenuFilterItems, 0, rootFilterInfo->subFilterNum, index, MF_BYPOSITION);
+	int index = pFilterInfo == rootFilterInfo1 ? rootFilterInfo1->subFilterNum : pFilterInfo->subFilteindex;
+	CheckMenuRadioItem(hMenuFilterItems, 0, rootFilterInfo1->subFilterNum, index, MF_BYPOSITION);
 	CoreAnalyse.pFilterWin = this;
 	CoreAnalyse.pFilterInfo = pFilterInfo;
 	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilterWin::FilterCoreAnalyse_thread, &CoreAnalyse, 0, NULL);
@@ -313,11 +313,11 @@ bool CFilterWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	wmEvent = HIWORD(wParam);
 	RECT rc;
 
-	if (wmId >= 0 && wmId <= rootFilterInfo->subFilterNum) {
+	if (wmId >= 0 && wmId <= rootFilterInfo1->subFilterNum) {
 		CFilter::PFILTER_INFO p;
-		if (rootFilterInfo->subFilterNum == wmId) p = rootFilterInfo;
+		if (rootFilterInfo1->subFilterNum == wmId) p = rootFilterInfo1;
 		else {
-			p = rootFilterInfo->nextFilter;
+			p = rootFilterInfo1->nextFilter;
 			while (p != NULL)
 			{
 				if (p->subFilteindex == wmId) {
@@ -598,8 +598,8 @@ VOID CFilterWin::Paint(void)
 			pFilterInfo->CoreLength,
 			pFilterInfo->decimationFactorBit, AdcData->SampleRate, AdcData->SampleRate / (1 << pFilterInfo->decimationFactorBit),
 			pFilterInfo->FreqFallWidth,
-			rootFilterInfo->subFilterNum, pFilterInfo->subFilteindex,
-			rootFilterInfo->CoreDescStr,
+			rootFilterInfo1->subFilterNum, pFilterInfo->subFilteindex,
+			rootFilterInfo1->CoreDescStr,
 			HScrollZoom
 		);
 		SetBkMode(hdc, TRANSPARENT);
@@ -775,9 +775,14 @@ LRESULT CALLBACK CFilterWin::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM w
 
 		//DWORD dwPos = GetDlgItemInt(hDlg, IDC_EDITGOTO, 0, 0);
 		//SetDlgItemInt(hDlg, IDC_EDIT_PLAY_STOP_POSITION,	clsSoundCard.dwPlayStopPosition, TRUE);
-		SetDlgItemText(hDlg, IDC_EDIT1,	me->rootFilterInfo->CoreDescStr);
-		SetDlgItemInt(hDlg, IDC_EDIT2, me->rootFilterInfo->decimationFactorBit, TRUE);
-		CheckDlgButton(hDlg, IDC_CHECK1, TRUE);
+		SetDlgItemText(hDlg, IDC_EDIT1,	me->rootFilterInfo1->CoreDescStr);
+		SetDlgItemInt(hDlg, IDC_EDIT2, me->rootFilterInfo1->decimationFactorBit, TRUE);
+		//CheckDlgButton(hDlg, IDC_CHECK1, TRUE);
+		if (me->rootFilterInfo2 != NULL) {
+			SetDlgItemText(hDlg, IDC_EDIT3, me->rootFilterInfo2->CoreDescStr);
+			SetDlgItemInt(hDlg, IDC_EDIT4, me->rootFilterInfo2->decimationFactorBit, TRUE);
+			//CheckDlgButton(hDlg, IDC_CHECK2, TRUE);
+		}
 		SetDlgItemText(hDlg, IDC_STATIC1, filterComment);
 		return TRUE;
 
@@ -786,28 +791,37 @@ LRESULT CALLBACK CFilterWin::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM w
 		{
 			if (LOWORD(wParam) == IDOK) 
 			{
-				char s[8192];
-				GetDlgItemText(hDlg, IDC_EDIT1, s, FILTER_CORE_DESC_MAX_LENGTH);
-				UINT decimationFactor = GetDlgItemInt(hDlg, IDC_EDIT2, NULL, false);
+				char s1[8192];
+				char s2[8192];
+				GetDlgItemText(hDlg, IDC_EDIT1, s1, FILTER_CORE_DESC_MAX_LENGTH);
+				UINT decimationFactor1 = GetDlgItemInt(hDlg, IDC_EDIT2, NULL, false);
+				GetDlgItemText(hDlg, IDC_EDIT3, s2, FILTER_CORE_DESC_MAX_LENGTH);
+				UINT decimationFactor2 = GetDlgItemInt(hDlg, IDC_EDIT4, NULL, false);
 				//IsDlgButtonChecked(hDlg, IDC_CHECK1) == true ?
 					//GetDlgItemInt(hDlg, IDC_EDIT2, NULL, TRUE) : AdcData->SampleRate;
 
-				if (me->cFilter->CheckCoreDesc(s) == true) {
-					me->cFilter->doFiltting = false;
-					while (me->cFilter->cuda_Filter_exit == false);
-
+				if (me->cFilter->CheckCoreDesc(s1) == true) {
+					me->cFilter->setFilterCoreDesc(me->rootFilterInfo1, s1);
+					me->cFilter->rootFilterInfo1.decimationFactorBit = decimationFactor1;
+					me->cFilter->Cuda_Filter_N_New = decimationFactor1 > 0 ? CFilter::cuda_filter_2 : CFilter::cuda_filter_1;
 					if (me->cFilter == &clsMainFilter) {
-						me->cFilter->rootFilterInfo.decimationFactorBit = decimationFactor;
-						AdcDataFiltted->SampleRate = AdcData->SampleRate / (1 << me->cFilter->rootFilterInfo.decimationFactorBit);
-
-						FFTInfo_Filtted.FFTSize = FFTInfo_Signal.FFTSize >> decimationFactor;
-						FFTInfo_Filtted.HalfFFTSize = FFTInfo_Signal.HalfFFTSize >> decimationFactor;
-						FFTInfo_Filtted.FFTStep = FFTInfo_Signal.FFTStep >> decimationFactor;
+						int factor;
+						if (me->cFilter->CheckCoreDesc(s2) == true) {
+							me->cFilter->setFilterCoreDesc(me->rootFilterInfo2, s2);
+							me->cFilter->rootFilterInfo2.decimationFactorBit = decimationFactor2;
+							factor = (decimationFactor1 + decimationFactor2);
+							me->cFilter->Cuda_Filter_N_New = CFilter::cuda_filter_3;
+						}
+						else {
+							factor = decimationFactor1;
+						}
+						//AdcDataFiltted->SampleRate = AdcData->SampleRate / (1 << factor);
+						FFTInfo_Filtted.FFTSize = FFTInfo_Signal.FFTSize >> factor;
+						FFTInfo_Filtted.HalfFFTSize = FFTInfo_Signal.HalfFFTSize >> factor;
+						FFTInfo_Filtted.FFTStep = FFTInfo_Signal.FFTStep >> factor;
 						clsWinSpect.FFTFiltted->Init();
 					}
-
-					me->cFilter->setFilterCoreDesc(me->rootFilterInfo, s);
-					me->cFilter->ParseCoreDesc(me->rootFilterInfo);
+					me->cFilter->ParseCoreDesc();
 					me->set_CoreAnalyse_root_Filter();
 				}
 			}

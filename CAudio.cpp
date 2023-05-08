@@ -36,16 +36,13 @@ CAudio::~CAudio()
 
 void CAudio::Init(void)
 {
-
-	SampleRate = SOUNDCARD_SAMPLE;
-
 	OutData.fOutOpen = FALSE;
 	InData.fInOpen = FALSE;
 
 	FormatEx.cbSize = sizeof(WAVEFORMATEX);
 	FormatEx.wFormatTag = WAVE_FORMAT_PCM;
 
-	FormatEx.nSamplesPerSec = SampleRate;
+	FormatEx.nSamplesPerSec = *SampleRate;
 	FormatEx.nChannels = 1;
 	FormatEx.wBitsPerSample = 16;
 	FormatEx.nBlockAlign = FormatEx.wBitsPerSample / 8 * FormatEx.nChannels;
@@ -293,8 +290,7 @@ void CALLBACK CAudio::waveOutProc2(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance
 void CAudio::StartOut(void)
 {
 	if (boutOpened == true) return;
-	UINT  wResult;
-	FormatEx.nSamplesPerSec = SampleRate;
+	FormatEx.nSamplesPerSec = *SampleRate;
 	FormatEx.nChannels = 1;
 	FormatEx.wBitsPerSample = 16;
 	FormatEx.nBlockAlign = FormatEx.wBitsPerSample / 8 * FormatEx.nChannels;
