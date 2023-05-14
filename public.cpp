@@ -6,9 +6,11 @@
 #include <string.h>
 #include <sstream>
 
-#include "CWinSpectrum.h"
-#include "CAudioWin.h"
 #include "public.h"
+#include "Debug.h"
+
+#include "CWinSpectrum.h"
+#include "CWinAudio.h"
 
 HINSTANCE	hInst;
 
@@ -89,10 +91,10 @@ void StringToHex(char* p, int len)
 
 	for (int i = 0; i < len; i++)
 	{
-		printf("%c", hex[(unsigned char)p[i] >> 4]);
-		printf("%c ", hex[(unsigned char)p[i] & 0xf]);
+		DbgMsg("%c", hex[(unsigned char)p[i] >> 4]);
+		DbgMsg("%c ", hex[(unsigned char)p[i] & 0xf]);
 	}
-	printf("\r\n");
+	DbgMsg("\r\n");
 }
 
 char* DoubleToFormat(double val, int dotlen, char* p)
@@ -125,7 +127,7 @@ char* DoubleToFormat(double val, int dotlen, char* p)
 	}
 	p[i] = '\0';
 
-	//printf("%s\r\n", p);
+	//DbgMsg("%s\r\n", p);
 	return p;
 }
 
@@ -332,8 +334,8 @@ void charsToHex(char* str, int len)
 
 	for (int i = 0; i < len; i++)
 	{
-		printf("%c", hex[(unsigned char)str[i] >> 4]);
-		printf("%c ", hex[(unsigned char)str[i] & 0xf]);
+		DbgMsg("%c", hex[(unsigned char)str[i] >> 4]);
+		DbgMsg("%c ", hex[(unsigned char)str[i] & 0xf]);
 	}
-	printf("\r\n");
+	DbgMsg("\r\n");
 }

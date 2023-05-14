@@ -3,6 +3,8 @@
 #include "resource.h"
 #include <iostream>
 
+#include "public.h"
+
 #include "CAudio.h"
 
 #include "CDemodulatorAM.h"
@@ -47,30 +49,30 @@ LPTHREAD_START_ROUTINE CDemodulatorAM::AM_Demodulator_Thread(LPVOID lp)
 {
 	CDemodulatorAM* me = (CDemodulatorAM*)lp;
 	//me->AM_Demodulator_Thread_Func();
-	me->AM_Demodulator_Thread_Func_Get_Envelope();
+	me->Thread_Func_IQ();
 	return 0;
 }
 
-void CDemodulatorAM::AM_Demodulator_Thread_Func(void)
+void CDemodulatorAM::Thread_Func(void)
 {
 	UINT am_pos;
 	UINT am_between;
 	double Am_Decimation_Factor_offset = 0.0;
-	m_Audio->uSampleRate = (double)AdcData->SampleRate / (1 << clsMainFilter.rootFilterInfo1.decimationFactorBit) / 4;
+	m_Audio->uSampleRate = (double)AdcDataI->SampleRate / (1 << clsMainFilterI.rootFilterInfo1.decimationFactorBit) / 4;
 	m_Audio->SampleRate = &m_Audio->uSampleRate;
-	Am_Decimation_Factor = (double)AdcData->SampleRate / (1 << clsMainFilter.rootFilterInfo1.decimationFactorBit) / m_Audio->uSampleRate;
-	UINT DemodulatorStepLength = SOUNDCARD_STEP_LENGTH * Am_Decimation_Factor;
-	AM_Demodulator_Doing = true;
-	float* SrcBuff = (float*)AdcDataFiltted->Buff;
-	UINT SrcPosMask = AdcDataFiltted->Mask;
-	UINT DemodulattedPos = (AdcDataFiltted->Pos - SOUNDCARD_STEP_LENGTH) & AdcDataFiltted->Mask;
+	float Decimation_Factor = (double)AdcDataI->SampleRate / (1 << clsMainFilterI.rootFilterInfo1.decimationFactorBit) / m_Audio->uSampleRate;
+	UINT DemodulatorStepLength = SOUNDCARD_STEP_LENGTH * Decimation_Factor;
+	Doing = true;
+	float* SrcBuff = (float*)AdcDataIFiltted->Buff;
+	UINT SrcPosMask = AdcDataIFiltted->Mask;
+	UINT DemodulattedPos = (AdcDataIFiltted->Pos - SOUNDCARD_STEP_LENGTH) & AdcDataIFiltted->Mask;
 	short* Buff = (short*)m_Audio->outData->Buff;
-	while (AM_Demodulator_Doing && Program_In_Process) {
-		am_pos = AdcDataFiltted->Pos;
+	while (Doing && Program_In_Process) {
+		am_pos = AdcDataIFiltted->Pos;
 		am_between = (am_pos - DemodulattedPos) & SrcPosMask;
 		if (am_between > DemodulatorStepLength) {
 			double dbi = 0;
-			for (int i = 0; i < SOUNDCARD_STEP_LENGTH; i++, dbi += Am_Decimation_Factor) {
+			for (int i = 0; i < SOUNDCARD_STEP_LENGTH; i++, dbi += Decimation_Factor) {
 				Buff[m_Audio->outData->Pos + i] = SrcBuff[(UINT)(DemodulattedPos + dbi) & SrcPosMask] * m_Audio->Am_zoom;
 			}
 			DemodulattedPos += SOUNDCARD_STEP_LENGTH;
@@ -82,7 +84,7 @@ void CDemodulatorAM::AM_Demodulator_Thread_Func(void)
 			else { Am_Decimation_Factor_offset = 0.0; }
 			m_Audio->outData->Pos += SOUNDCARD_STEP_LENGTH;
 			m_Audio->outData->Pos &= SOUNDCARD_BUFF_LENGTH_MASK;
-			//Am_Decimation_Factor = (double)AdcData->SampleRate / (1 << clsFilter.rootFilterInfo.decimationFactorBit) / m_Audio->SampleRate;
+			//Am_Decimation_Factor = (double)AdcDataI->SampleRate / (1 << clsFilter.rootFilterInfo.decimationFactorBit) / m_Audio->SampleRate;
 			//Am_Decimation_Factor += Am_Decimation_Factor_offset;
 			//DemodulatorStepLength = SOUNDCARD_STEP_LENGTH * Am_Decimation_Factor;
 			//break;
@@ -92,64 +94,86 @@ void CDemodulatorAM::AM_Demodulator_Thread_Func(void)
 			continue;
 		}
 	}
-	h_AM_Demodulator_Thread = NULL;
+	hThread = NULL;
 }
 
-void CDemodulatorAM::AM_Demodulator_Thread_Func_Get_Envelope(void)
+void CDemodulatorAM::Thread_Func_Get_Envelope(void)
 {
-	AudioData->SampleRate = AudioDataFiltted->SampleRate = m_Audio->uSampleRate = clsMainFilter.rootFilterInfo1.nextFilter->FreqCenter;
+	AudioData->SampleRate = AudioDataFiltted->SampleRate = m_Audio->uSampleRate = clsMainFilterI.rootFilterInfo1.nextFilter->FreqCenter;
 	m_Audio->SampleRate = &m_Audio->uSampleRate;
 	clsAudioFilter.ParseCoreDesc();
-	AM_Demodulator_Doing = true;
-	float* SrcBuff = (float*)AdcDataFiltted->Buff;
-	UINT DemodulattedPos = (AdcDataFiltted->Pos - SOUNDCARD_STEP_LENGTH) & AdcDataFiltted->Mask;
+	Doing = true;
+	float* SrcBuff = (float*)AdcDataIFiltted->Buff;
+	UINT DemodulattedPos = (AdcDataIFiltted->Pos - SOUNDCARD_STEP_LENGTH) & AdcDataIFiltted->Mask;
 	m_Audio->outData->Pos = 0;
 	short* TargetBuff = (short*)m_Audio->outData->Buff;
 	CData* out = m_Audio->outDataFiltted;
-	while (AM_Demodulator_Doing && Program_In_Process) {
-		if (((AdcDataFiltted->Pos - DemodulattedPos) & AdcDataFiltted->Mask) > SOUNDCARD_STEP_LENGTH) {
+	while (Doing && Program_In_Process) {
+		if (((AdcDataIFiltted->Pos - DemodulattedPos) & AdcDataIFiltted->Mask) > SOUNDCARD_STEP_LENGTH) {
 			double dbi = 0;
 			for (int i = 0; i < SOUNDCARD_STEP_LENGTH; i++) {
 				if (
-					SrcBuff[DemodulattedPos] > SrcBuff[(DemodulattedPos - 1) & AdcDataFiltted->Mask] &&
-					SrcBuff[DemodulattedPos] > SrcBuff[(DemodulattedPos + 1) & AdcDataFiltted->Mask]
+					SrcBuff[DemodulattedPos] > SrcBuff[(DemodulattedPos - 1) & AdcDataIFiltted->Mask] &&
+					SrcBuff[DemodulattedPos] > SrcBuff[(DemodulattedPos + 1) & AdcDataIFiltted->Mask]
 					) {
 					TargetBuff[m_Audio->outData->Pos++] = SrcBuff[DemodulattedPos] * m_Audio->Am_zoom;
 					m_Audio->outData->Pos &= m_Audio->outData->Mask;
 				}
 				DemodulattedPos++;
-				DemodulattedPos &= AdcDataFiltted->Mask;
+				DemodulattedPos &= AdcDataIFiltted->Mask;
 			}
 		}
 		else {
 			Sleep(10);
 		}
 	}
-	h_AM_Demodulator_Thread = NULL;
+	hThread = NULL;
 }
 
-LPTHREAD_START_ROUTINE CDemodulatorAM::AM_Demodulator_Thread_Audio_Out(LPVOID lp)
-{
-	CDemodulatorAM* me = (CDemodulatorAM*)lp;
-	me->AM_Demodulator_Thread_Func_Audio_Out();
-	return 0;
-}
 
-void CDemodulatorAM::AM_Demodulator_Thread_Func_Audio_Out(void)
+void CDemodulatorAM::Thread_Func_IQ(void)
 {
-	AM_Demodulator_Audio_Out_Doing = true;
-	short outBuff[SOUNDCARD_STEP_LENGTH];
-	CData* out = m_Audio->outDataFiltted;
-	UINT pos = 0;
-	while (AM_Demodulator_Audio_Out_Doing && m_Audio->boutOpened && Program_In_Process) {
-		if (((out->Pos - pos) & out->Mask) > SOUNDCARD_STEP_LENGTH) {
-			float* srcBuff = (float*)out->Buff;
-			for (int i = 0; i < SOUNDCARD_STEP_LENGTH; i++) {
-				outBuff[i] = (short)srcBuff[pos++];
-				pos &= out->Mask;
-			}
-			m_Audio->WriteToOut(outBuff);
+	CData* audioData = m_Audio->outData;
+	CData* iData = AdcDataIFiltted;
+	CData* qData = AdcDataQFiltted;
+
+	
+	UINT df = 0;
+	while ((iData->SampleRate >> df) > (1 << 15)) df++;
+	UINT Decimation_Factor = 1 << df;
+
+	m_Audio->outData->SampleRate = m_Audio->outDataFiltted->SampleRate = m_Audio->uSampleRate = iData->SampleRate >> df;
+	m_Audio->SampleRate = &m_Audio->uSampleRate;
+	clsAudioFilter.ParseCoreDesc();
+
+	UINT am_pos = iData->Pos;
+
+	//WaitForSingleObject(clsAudioFilter.hCoreMutex, INFINITE);
+	//audioData->Pos = audioData->ProcessPos = 0;
+	//ReleaseMutex(clsAudioFilter.hCoreMutex);
+
+	float *audioBuff = (float*)m_Audio->outData->Buff;
+	float* xi = (float*)iData->Buff;
+	float* xq = (float*)AdcDataQFiltted->Buff;
+
+	Doing = true;
+
+	while (Doing && Program_In_Process) {
+		if (
+			((iData->Pos - am_pos) & iData->Mask) > Decimation_Factor &&
+			((qData->Pos - am_pos) & iData->Mask) > Decimation_Factor
+			) {
+			UINT pos = am_pos + Decimation_Factor;
+			//audioBuff[audioData->Pos] = sqrt(xi[pos] * xi[pos] + xq[pos] * xq[pos]);
+			audioBuff[audioData->Pos] = xi[pos];
+			am_pos += Decimation_Factor ;
+			am_pos &= iData->Mask;
+			audioData->Pos++;
+			audioData->Pos &= audioData->Mask;
+		}
+		else {
+			Sleep(10);
 		}
 	}
-	h_AM_Demodulator_Thread_Audio_Out = NULL;
+	hThread = NULL;
 }

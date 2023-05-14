@@ -27,13 +27,8 @@ public:
 
 	CAudio* m_Audio = NULL;
 
-	HANDLE h_AM_Demodulator_Thread = NULL;
-	bool AM_Demodulator_Doing = false;
-
-	HANDLE h_AM_Demodulator_Thread_Audio_Out = NULL;
-	bool AM_Demodulator_Audio_Out_Doing = false;
-
-	double Am_Decimation_Factor = 1.0;
+	HANDLE hThread = NULL;
+	bool Doing = false;
 
 public:
 	CDemodulatorAM();
@@ -45,11 +40,8 @@ public:
 	void SaveValue(void);
 	void RestoreValue(void);
 	
-	void AM_Demodulator_Thread_Func(void);
-	void AM_Demodulator_Thread_Func_Get_Envelope(void);
+	void Thread_Func(void);
+	void Thread_Func_Get_Envelope(void);
+	void Thread_Func_IQ(void);
 	static LPTHREAD_START_ROUTINE AM_Demodulator_Thread(LPVOID lp);
-
-	void AM_Demodulator_Thread_Func_Audio_Out(void);
-	static LPTHREAD_START_ROUTINE AM_Demodulator_Thread_Audio_Out(LPVOID lp);
-
 };

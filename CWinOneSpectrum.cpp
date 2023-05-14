@@ -8,12 +8,13 @@
 #include <iostream>
 
 #include "public.h"
+#include "Debug.h"
 #include "CData.h"
 #include "CFFT.h"
 #include "CWinSpectrum.h"
 #include "CWinOneSpectrum.h"
 
-#include "CFFTWin.h"
+#include "CWinFFT.h"
 
 using namespace std;
 using namespace WINS; 
@@ -33,7 +34,7 @@ CWinOneSpectrum clsWinOneSpectrum;
 
 CWinOneSpectrum::CWinOneSpectrum()
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	RegisterWindowsClass();
 	hDrawMutex		= CreateMutex(NULL, false, "WinOneSpectrumhDrawMutex");
 }
@@ -58,7 +59,7 @@ void CWinOneSpectrum::RegisterWindowsClass(void)
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);//(HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName = (LPCSTR)NULL;
-	wcex.lpszClassName = SPECTRUM_ONE_WIN_CLASS;
+	wcex.lpszClassName = WIN_SPECTRUM_ONE_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	RegisterClassEx(&wcex);
@@ -104,7 +105,7 @@ LRESULT CALLBACK CWinOneSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam
 	{
 	case WM_CREATE:
 		{
-			OPENCONSOLE;
+			OPENCONSOLE_SAVED;
 
 			clsWinOneSpectrum.hWnd = hWnd;
 
@@ -113,7 +114,7 @@ LRESULT CALLBACK CWinOneSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam
 		}
 		break;
 	case WM_CHAR:
-		printf("WinOneSpectrum WM_CHAR\r\n");
+		DbgMsg("WinOneSpectrum WM_CHAR\r\n");
 		PostMessage(clsWinSpect.hWnd, message, wParam, lParam);
 		break;
 	case WM_LBUTTONDOWN:
@@ -122,7 +123,7 @@ LRESULT CALLBACK CWinOneSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam
 	case WM_MOUSEMOVE:
 		MouseX = GET_X_LPARAM(lParam);
 		MouseY = GET_Y_LPARAM(lParam);
-		Hz = ((double)(MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom + clsWinSpect.HScrollPos) * AdcData->SampleRate / FFTInfo_Signal.FFTSize;
+		Hz = ((double)(MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom + clsWinSpect.HScrollPos) * AdcDataI->SampleRate / FFTInfo_Signal.FFTSize;
 		//OnMouse(hWnd);
 		break;
 	case WM_TIMER:
@@ -203,7 +204,7 @@ void CWinOneSpectrum::Paint(void)
 		destWidth, spectY,
 		SRCCOPY);
 
-	//printf("%d,%d,%d,%d\r\n", rt.top, rt.left, rt.right, rt.bottom);
+	//DbgMsg("%d,%d,%d,%d\r\n", rt.top, rt.left, rt.right, rt.bottom);
 
 	DeleteObject(hDC);
 
@@ -300,7 +301,7 @@ void CWinOneSpectrum::PaintSpectrum(void* fft)
 			clsWinOneSpectrum.FFTAvgMaxValue = clsWinOneSpectrum.FFTMaxs / FFT_MAX_SAMPLING;
 			clsWinOneSpectrum.FFTMaxsPos = 0;
 			clsWinOneSpectrum.FFTMaxs = 0.0;
-			//printf("pWinData->FFTAvgMaxValue %f\r\n", pWinData->FFTAvgMaxValue);
+			//DbgMsg("pWinData->FFTAvgMaxValue %f\r\n", pWinData->FFTAvgMaxValue);
 		}
 		clsWinOneSpectrum.FFTMaxs += fftmaxv;
 	}

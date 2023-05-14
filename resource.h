@@ -31,6 +31,8 @@
 #define IDD_DLG_FFT_SET                 143
 #define IDC_MENU_SDR                    149
 #define IDD_DLG_SDR_SET                 150
+#define IDC_MENU_AM                     152
+#define IDC_MENU_POPUP_AM               152
 #define IDD_WAVEDEVICE_COMBO_DEVICE     200
 #define IDD_WAVEDEVICE_EDIT_CAPABILITIES 201
 #define IDC_EDITGOTO                    1000
@@ -233,15 +235,23 @@
 #define IDM_DEMODULATOR_FM              32951
 #define ID_32952                        32952
 #define IDM_AUDIO_BUILD_FILTER          32953
-#define IDC_CHECK2						32954
+#define IDC_CHECK2                      32954
+#define ID_32954                        32954
+#define ID_Menu32955                    32955
+#define IDM_FILTER_CORE_1_SHOW          32956
+#define IDM_FILTER_CORE_2_SHOW          32957
+#define ID_AM_IQ                        32958
+#define ID_AM_AM                        32959
+#define IDM_AM_IQ                       32960
+#define IDM_AM_GET_ENVELOPE             32961
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        152
-#define _APS_NEXT_COMMAND_VALUE         32954
+#define _APS_NEXT_RESOURCE_VALUE        153
+#define _APS_NEXT_COMMAND_VALUE         32962
 #define _APS_NEXT_CONTROL_VALUE         1025
 #define _APS_NEXT_SYMED_VALUE           110
 #endif

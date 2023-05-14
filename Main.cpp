@@ -12,10 +12,6 @@
 
 #include "public.h"
 #include "CWinMain.h"
-#include "CSoundCard.h"
-#include "CDevices.h"
-#include "CFile.h"
-
 
 int APIENTRY WinMain(HINSTANCE hInstance,
                      HINSTANCE hPrevInstance,
@@ -30,8 +26,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 
 	// Initialize global strings
 	LoadString(hInstance, IDS_APP_TITLE, clsWinMain.szTitle, MAX_LOADSTRING);
-	LoadString(hInstance, IDC_MYWAVE, clsWinMain.szWindowClass, MAX_LOADSTRING);
-	clsWinMain.MyRegisterClass(hInstance);
+	//LoadString(hInstance, IDC_MYWAVE, clsWinMain.szWindowClass, MAX_LOADSTRING);
+	clsWinMain.RegisterClass(hInstance);
 
 	// Perform application initialization:
 	if (!clsWinMain.InitInstance (hInstance, nCmdShow)) 

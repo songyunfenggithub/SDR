@@ -5,7 +5,7 @@
 #include "stdafx.h"
 #include <stdio.h>
 
-#include "MyDebug.h"
+#include "Debug.h"
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -29,8 +29,8 @@ void myDbgMsg (PSTR sz,...)
 
 //    wvsprintf (ach, sz, args);   /* Format the string */
     vsprintf (ach, sz, args);   /* Format the string */
-	//OutputDebugString(ach);
-	printf(ach);
+	OutputDebugString(ach);
+	//printf(ach);
 //    MessageBox (NULL, ach, NULL, MB_OK|MB_ICONEXCLAMATION|MB_APPLMODAL);
 }
 

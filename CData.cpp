@@ -13,10 +13,11 @@
 //using namespace DEVICES;
 
 #define TIMEOUT	1000
-CData clsData;
 
-CData* AdcData = NULL;
-CData* AdcDataFiltted = NULL;
+CData* AdcDataI = NULL;
+CData* AdcDataIFiltted = NULL;
+CData* AdcDataQ = NULL;
+CData* AdcDataQFiltted = NULL;
 
 CData* AudioData = NULL;
 CData* AudioDataFiltted = NULL;
@@ -50,7 +51,7 @@ void CData::Init(UINT len, BUFF_DATA_TYPE dataType, INT dataBits)
 
 	switch (dataType) {
 	case short_type:
-		SizeOfType = sizeof(short);
+		SizeOfType = sizeof(short);		
 		Buff = new short[len];
 		MoveBit = 1;
 		break;

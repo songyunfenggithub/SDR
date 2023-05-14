@@ -13,7 +13,7 @@
 #include <math.h>
 
 #include "public.h"
-#include "MyDebug.h"
+#include "Debug.h"
 
 #include "CData.h"
 #include "CWinMain.h"
@@ -497,7 +497,7 @@ void CSoundCard::OpenOut(DWORD dwPos, DWORD dwEndPos)
                     (DWORD_PTR)waveOutProc, 0L, CALLBACK_FUNCTION))
     { 
         //MessageBox(clsWinMain.hWnd, "Failed to open waveform output device.", NULL, MB_OK | MB_ICONEXCLAMATION); 
-		printf("Failed to open waveform output device.\r\n");
+		DbgMsg("Failed to open waveform output device.\r\n");
         return; 
     } 
 

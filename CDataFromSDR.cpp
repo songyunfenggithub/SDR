@@ -6,6 +6,7 @@
 
 
 #include "public.h"
+#include "Debug.h"
 #include "CData.h"
 #include "CFilter.h"
 #include "CWinFFT.h"
@@ -41,12 +42,12 @@ void CDataFromSDR::StreamACallback(short* xi, short* xq, sdrplay_api_StreamCbPar
 	numSamples, unsigned int reset, void* cbContext)
 {
 	if (reset)
-		printf("sdrplay_api_StreamACallback: numSamples=%d\n", numSamples);
+		DbgMsg("sdrplay_api_StreamACallback: numSamples=%d\n", numSamples);
 	// Process stream callback data here
 
-	//printf("firstSampleNum:%d\r\n", params->firstSampleNum);
+	//DbgMsg("firstSampleNum:%d\r\n", params->firstSampleNum);
 	/*
-	printf("xi:%p, xq:%p, params{firstSampleNum:%d, numSamples:%d, fsChanged:%d, grChanged:%d, rfChanged£º%d}, numSamples:%d, reset:%d, cbContext:%p\r\n",
+	DbgMsg("xi:%p, xq:%p, params{firstSampleNum:%d, numSamples:%d, fsChanged:%d, grChanged:%d, rfChanged£º%d}, numSamples:%d, reset:%d, cbContext:%p\r\n",
 		xi, xq, 
 		params->firstSampleNum, 
 		params->numSamples,
@@ -58,52 +59,127 @@ void CDataFromSDR::StreamACallback(short* xi, short* xq, sdrplay_api_StreamCbPar
 		cbContext
 	);
 	*/
-
-	int m1 = (AdcData->Len << AdcData->MoveBit) - AdcData->CharPos;
+	
+	int m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
 	int m2 = 0;
 	if (m1 > numSamples) {
 		m1 = numSamples;
-		memset(AdcBuffMarks + (AdcData->CharPos >> AdcData->MoveBit), 0, m1 >> AdcData->MoveBit);
-		memcpy((char*)AdcData->Buff + AdcData->CharPos, xi, m1);
-		AdcData->CharPos += m1;
+		memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+		memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
+		AdcDataI->CharPos += m1;
 	}
 	else {
 		m2 = numSamples - m1;
-		memset(AdcBuffMarks + (AdcData->CharPos >> AdcData->MoveBit), 0, m1 >> AdcData->MoveBit);
-		memset(AdcBuffMarks, 0, m2 >> AdcData->MoveBit);
-		memcpy((char*)AdcData->Buff + AdcData->CharPos, xi, m1);
-		memcpy((char*)AdcData->Buff, xi + m1, m2);
-		AdcData->CharPos = m2;
+		memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+		memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
+		memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
+		memcpy((char*)AdcDataI->Buff, xi + m1, m2);
+		AdcDataI->CharPos = m2;
 	}
-	AdcBuffMarks[((AdcData->CharPos - numSamples) >> AdcData->MoveBit) & AdcData->Mask] = 1;
+	AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 1;
 
-	m1 = (AdcData->Len << AdcData->MoveBit) - AdcData->CharPos;
+	m1 = (AdcDataQ->Len << AdcDataQ->MoveBit) - AdcDataQ->CharPos;
 	m2 = 0;
 	if (m1 > numSamples) {
 		m1 = numSamples;
-		memset(AdcBuffMarks + (AdcData->CharPos >> AdcData->MoveBit), 0, m1 >> AdcData->MoveBit);
-		memcpy((char*)AdcData->Buff + AdcData->CharPos, xq, m1);
-		AdcData->CharPos += m1;
+		//memset(AdcBuffMarks + (AdcDataQ->CharPos >> AdcDataQ->MoveBit), 0, m1 >> AdcDataQ->MoveBit);
+		memcpy((char*)AdcDataQ->Buff + AdcDataQ->CharPos, xq, m1);
+		AdcDataQ->CharPos += m1;
 	}
 	else {
 		m2 = numSamples - m1;
-		memset(AdcBuffMarks + (AdcData->CharPos >> AdcData->MoveBit), 0, m1 >> AdcData->MoveBit);
-		memset(AdcBuffMarks, 0, m2 >> AdcData->MoveBit);
-		memcpy((char*)AdcData->Buff + AdcData->CharPos, xq, m1);
-		memcpy((char*)AdcData->Buff, xq + m1, m2);
-		AdcData->CharPos = m2;
+		//memset(AdcBuffMarks + (AdcDataQ->CharPos >> AdcDataQ->MoveBit), 0, m1 >> AdcDataQ->MoveBit);
+		//memset(AdcBuffMarks, 0, m2 >> AdcDataQ->MoveBit);
+		memcpy((char*)AdcDataQ->Buff + AdcDataQ->CharPos, xq, m1);
+		memcpy((char*)AdcDataQ->Buff, xq + m1, m2);
+		AdcDataQ->CharPos = m2;
 	}
-	AdcBuffMarks[((AdcData->CharPos - numSamples) >> AdcData->MoveBit) & AdcData->Mask] = 2;
+	//AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 2;
 
-	//StringToHex((char*)(AdcData->Buff) + AdcData->CharPos, 20);
-	//printf("%d\n", len);
 
-	if ((AdcData->Len << AdcData->MoveBit) == AdcData->CharPos)AdcData->CharPos = 0;
-	//if ((DATA_BUFFER_LENGTH << DATA_BYTE_TO_POSITION_MOVEBIT) == AdcData->CharPos) AdcData->CharPos = 0;
+	//
+	//int m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
+	//int m2 = 0;
+	//if (m1 > numSamples) {
+	//	m1 = numSamples;
+	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
+	//	AdcDataI->CharPos += m1;
+	//}
+	//else {
+	//	m2 = numSamples - m1;
+	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+	//	memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
+	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
+	//	memcpy((char*)AdcDataI->Buff, xi + m1, m2);
+	//	AdcDataI->CharPos = m2;
+	//}
+	//AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 1;
 
-	AdcData->Pos = AdcData->CharPos >> AdcData->MoveBit;
-	//printf("pos:%d\n", AdcData->Pos);
-	AdcData->GetNew = true;
+	//m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
+	//m2 = 0;
+	//if (m1 > numSamples) {
+	//	m1 = numSamples;
+	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xq, m1);
+	//	AdcDataI->CharPos += m1;
+	//}
+	//else {
+	//	m2 = numSamples - m1;
+	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+	//	memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
+	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xq, m1);
+	//	memcpy((char*)AdcDataI->Buff, xq + m1, m2);
+	//	AdcDataI->CharPos = m2;
+	//}
+	//AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 2;
+	//
+
+	//int m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
+	//int m2 = 0;
+	//if (m1 > numSamples) {
+	//	m1 = numSamples;
+	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
+	//	short* p = (short*)((char*)AdcDataI->Buff + AdcDataI->CharPos);
+	//	short* pxi = (short*)xi;
+	//	short* pxq = (short*)xq;
+	//	double m[10000];
+
+	//	for(int i = 0; i < m1; i++)	{
+	//		//if (pxi[i] == 0) pxi[i] = 1;
+	//		//m[i] = atan((double)pxq[i] / pxi[i]);
+	//		//p[i] = (pxi[i-1] * pxi[i] - pxq[i-1] * pxq[i]) / (pxi[i] * pxi[i] + pxq[i] * pxq[i]) * 1000;
+	//		p[i] = sqrt(pxi[i] * pxi[i] + pxq[i] * pxq[i]);
+	//	}
+	//	//for (int i = 1; i < m1; i++) {
+	//	//	p[i] = (m[i] - m[i-1])*1000;
+	//	//	//p[i] = (pxi[i-1] * pxi[i] - pxq[i-1] * pxq[i]) / (pxi[i] * pxi[i] + pxq[i] * pxq[i]);
+	//	//}
+	//	//p[0] = p[1];
+	//	AdcDataI->CharPos += m1;
+	//}
+	//else {
+	//	m2 = numSamples - m1;
+	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+	//	memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
+	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
+	//	memcpy((char*)AdcDataI->Buff, xi + m1, m2);
+	//	AdcDataI->CharPos = m2;
+	//}
+	//AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 1;
+
+	//StringToHex((char*)(AdcDataI->Buff) + AdcDataI->CharPos, 20);
+	//DbgMsg("%d\n", len);
+
+	if ((AdcDataI->Len << AdcDataI->MoveBit) == AdcDataI->CharPos)AdcDataI->CharPos = 0;
+	AdcDataI->Pos = AdcDataI->CharPos >> AdcDataI->MoveBit;
+
+	if ((AdcDataQ->Len << AdcDataQ->MoveBit) == AdcDataQ->CharPos)AdcDataQ->CharPos = 0;
+	AdcDataQ->Pos = AdcDataQ->CharPos >> AdcDataQ->MoveBit;
+	
+	AdcDataI->GetNew = true;
+	AdcDataQ->GetNew = true;
 
 	return;
 }
@@ -112,7 +188,7 @@ void CDataFromSDR::StreamBCallback(short* xi, short* xq, sdrplay_api_StreamCbPar
 	numSamples, unsigned int reset, void* cbContext)
 {
 	if (reset)
-		printf("sdrplay_api_StreamBCallback: numSamples=%d\n", numSamples);
+		DbgMsg("sdrplay_api_StreamBCallback: numSamples=%d\n", numSamples);
 	// Process stream callback data here - this callback will only be used in dual tuner mode
 	return;
 }
@@ -123,13 +199,13 @@ void CDataFromSDR::EventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSe
 	switch (eventId)
 	{
 	case sdrplay_api_GainChange:
-		printf("sdrplay_api_EventCb: %s, tuner=%s gRdB=%d lnaGRdB=%d systemGain=%.2f\r\n",
+		DbgMsg("sdrplay_api_EventCb: %s, tuner=%s gRdB=%d lnaGRdB=%d systemGain=%.2f\r\n",
 			"sdrplay_api_GainChange", (tuner == sdrplay_api_Tuner_A) ? "sdrplay_api_Tuner_A" :
 			"sdrplay_api_Tuner_B", params->gainParams.gRdB, params->gainParams.lnaGRdB,
 			params->gainParams.currGain);
 		break;
 	case sdrplay_api_PowerOverloadChange:
-		printf("sdrplay_api_PowerOverloadChange: tuner=%s powerOverloadChangeType=%s\r\n",
+		DbgMsg("sdrplay_api_PowerOverloadChange: tuner=%s powerOverloadChangeType=%s\r\n",
 			(tuner == sdrplay_api_Tuner_A) ? "sdrplay_api_Tuner_A" : "sdrplay_api_Tuner_B",
 			(params->powerOverloadParams.powerOverloadChangeType ==
 				sdrplay_api_Overload_Detected) ? "sdrplay_api_Overload_Detected" :
@@ -139,7 +215,7 @@ void CDataFromSDR::EventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSe
 			sdrplay_api_Update_Ext1_None);
 		break;
 	case sdrplay_api_RspDuoModeChange:
-		printf("sdrplay_api_EventCb: %s, tuner=%s modeChangeType=%s\r\n",
+		DbgMsg("sdrplay_api_EventCb: %s, tuner=%s modeChangeType=%s\r\n",
 			"sdrplay_api_RspDuoModeChange", (tuner == sdrplay_api_Tuner_A) ?
 			"sdrplay_api_Tuner_A" : "sdrplay_api_Tuner_B",
 			(params->rspDuoModeParams.modeChangeType == sdrplay_api_MasterInitialised) ?
@@ -162,10 +238,10 @@ void CDataFromSDR::EventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSe
 			slaveUninitialised = 1;
 		break;
 	case sdrplay_api_DeviceRemoved:
-		printf("sdrplay_api_EventCb: %s\r\n", "sdrplay_api_DeviceRemoved");
+		DbgMsg("sdrplay_api_EventCb: %s\r\n", "sdrplay_api_DeviceRemoved");
 		break;
 	default:
-		printf("sdrplay_api_EventCb: %d, unknown event\r\n", eventId);
+		DbgMsg("sdrplay_api_EventCb: %d, unknown event\r\n", eventId);
 		break;
 	}
 }
@@ -185,25 +261,26 @@ void CDataFromSDR::open_SDR_device(void)
 	// Open API
 	if ((err = sdrplay_api_Open()) != sdrplay_api_Success)
 	{
-		printf("sdrplay_api_Open failed %s\n", sdrplay_api_GetErrorString(err));
-		system("PAUSE");
+		DbgMsg("sdrplay_api_Open failed %s\r\nfile:%s\r\nline:%d\r\n", sdrplay_api_GetErrorString(err), __FILE__, __LINE__);
+		//system("PAUSE");
 		exit(0);
 	}
 	else
 	{
-		// Enable debug logging output
-		if ((err = sdrplay_api_DebugEnable(NULL, sdrplay_api_DbgLvl_Verbose)) != sdrplay_api_Success)
+		// Enable debug logging output 
+		//if ((err = sdrplay_api_DebugEnable(NULL, sdrplay_api_DbgLvl_Verbose)) != sdrplay_api_Success)
+		if ((err = sdrplay_api_DebugEnable(NULL, sdrplay_api_DbgLvl_Error)) != sdrplay_api_Success)
 		{
-			printf("sdrplay_api_DebugEnable failed %s\n", sdrplay_api_GetErrorString(err));
+			DbgMsg("sdrplay_api_DebugEnable failed %s\n", sdrplay_api_GetErrorString(err));
 		}
 		// Check API versions match
 		if ((err = sdrplay_api_ApiVersion(&ver)) != sdrplay_api_Success)
 		{
-			printf("sdrplay_api_ApiVersion failed %s\n", sdrplay_api_GetErrorString(err));
+			DbgMsg("sdrplay_api_ApiVersion failed %s\n", sdrplay_api_GetErrorString(err));
 		}
 		if (ver != SDRPLAY_API_VERSION)
 		{
-			printf("API version don't match (local=%.2f dll=%.2f)\n", SDRPLAY_API_VERSION, ver);
+			DbgMsg("API version don't match (local=%.2f dll=%.2f)\n", SDRPLAY_API_VERSION, ver);
 			goto CloseApi;
 		}
 		// Lock API while device selection is performed
@@ -212,19 +289,19 @@ void CDataFromSDR::open_SDR_device(void)
 		if ((err = sdrplay_api_GetDevices(devs, &ndev, sizeof(devs) /
 			sizeof(sdrplay_api_DeviceT))) != sdrplay_api_Success)
 		{
-			printf("sdrplay_api_GetDevices failed %s\n", sdrplay_api_GetErrorString(err));
+			DbgMsg("sdrplay_api_GetDevices failed %s\n", sdrplay_api_GetErrorString(err));
 			goto UnlockDeviceAndCloseApi;
 		}
-		printf("MaxDevs=%d NumDevs=%d\n", sizeof(devs) / sizeof(sdrplay_api_DeviceT), ndev);
+		DbgMsg("MaxDevs=%d NumDevs=%d\n", sizeof(devs) / sizeof(sdrplay_api_DeviceT), ndev);
 		if (ndev > 0)
 		{
 			for (i = 0; i < (int)ndev; i++)
 			{
 				if (devs[i].hwVer == SDRPLAY_RSPduo_ID)
-					printf("Dev%d: SerNo=%s hwVer=%d tuner=0x%.2x rspDuoMode=0x%.2x\n", i,
+					DbgMsg("Dev%d: SerNo=%s hwVer=%d tuner=0x%.2x rspDuoMode=0x%.2x\n", i,
 						devs[i].SerNo, devs[i].hwVer, devs[i].tuner, devs[i].rspDuoMode);
 				else
-					printf("Dev%d: SerNo=%s hwVer=%d tuner=0x%.2x\n", i, devs[i].SerNo,
+					DbgMsg("Dev%d: SerNo=%s hwVer=%d tuner=0x%.2x\n", i, devs[i].SerNo,
 						devs[i].hwVer, devs[i].tuner);
 			}
 			// Choose device
@@ -238,15 +315,15 @@ void CDataFromSDR::open_SDR_device(void)
 
 			if (i == ndev)
 			{
-				printf("Couldn't find a suitable device to open - exiting\n");
+				DbgMsg("Couldn't find a suitable device to open - exiting\n");
 				goto UnlockDeviceAndCloseApi;
 			}
-			printf("chosenDevice = %d\n", chosenIdx);
+			DbgMsg("chosenDevice = %d\n", chosenIdx);
 			chosenDevice = &devs[chosenIdx];
 			// Select chosen device
 			if ((err = sdrplay_api_SelectDevice(chosenDevice)) != sdrplay_api_Success)
 			{
-				printf("sdrplay_api_SelectDevice failed %s\n", sdrplay_api_GetErrorString(err));
+				DbgMsg("sdrplay_api_SelectDevice failed %s\n", sdrplay_api_GetErrorString(err));
 				goto UnlockDeviceAndCloseApi;
 			}
 			// Unlock API now that device is selected
@@ -255,14 +332,14 @@ void CDataFromSDR::open_SDR_device(void)
 			if ((err = sdrplay_api_GetDeviceParams(chosenDevice->dev, &deviceParams)) !=
 				sdrplay_api_Success)
 			{
-				printf("sdrplay_api_GetDeviceParams failed %s\n",
+				DbgMsg("sdrplay_api_GetDeviceParams failed %s\n",
 					sdrplay_api_GetErrorString(err));
 				goto CloseApi;
 			}
 			// Check for NULL pointers before changing settings
 			if (deviceParams == NULL)
 			{
-				printf("sdrplay_api_GetDeviceParams returned NULL deviceParams pointer\n");
+				DbgMsg("sdrplay_api_GetDeviceParams returned NULL deviceParams pointer\n");
 				goto CloseApi;
 			}
 			// Configure dev parameters
@@ -289,7 +366,7 @@ void CDataFromSDR::open_SDR_device(void)
 			}
 			else
 			{
-				printf("sdrplay_api_GetDeviceParams returned NULL chParams pointer\n");
+				DbgMsg("sdrplay_api_GetDeviceParams returned NULL chParams pointer\n");
 				goto CloseApi;
 			}
 			// Assign callback functions to be passed to sdrplay_api_Init()
@@ -300,7 +377,7 @@ void CDataFromSDR::open_SDR_device(void)
 			// This will configure the device and start streaming
 			if ((err = sdrplay_api_Init(chosenDevice->dev, &CDataFromSDR::cbFns, NULL)) != sdrplay_api_Success)
 			{
-				printf("sdrplay_api_Init failed %d %s\n", err, sdrplay_api_GetErrorString(err));
+				DbgMsg("sdrplay_api_Init failed %d %s\n", err, sdrplay_api_GetErrorString(err));
 				if (err == sdrplay_api_StartPending) // This can happen if we're starting in master / slave mode as a slave and the master is not yet running
 				{
 					while (1)
@@ -312,24 +389,24 @@ void CDataFromSDR::open_SDR_device(void)
 							if ((err = sdrplay_api_Init(chosenDevice->dev, &CDataFromSDR::cbFns, NULL)) !=
 								sdrplay_api_Success)
 							{
-								printf("sdrplay_api_Init failed %s\n",
+								DbgMsg("sdrplay_api_Init failed %s\n",
 									sdrplay_api_GetErrorString(err));
 							}
 							goto CloseApi;
 						}
-						printf("Waiting for master to initialise\n");
+						DbgMsg("Waiting for master to initialise\n");
 					}
 				}
 				else
 				{
 					sdrplay_api_ErrorInfoT* errInfo = sdrplay_api_GetLastError(NULL);
 					if (errInfo != NULL)
-						printf("Error in %s: %s(): line %d: %s\n", errInfo->file, errInfo->function, errInfo->line, errInfo->message);
+						DbgMsg("Error in %s: %s(): line %d: %s\n", errInfo->file, errInfo->function, errInfo->line, errInfo->message);
 					goto CloseApi;
 				}
 			}
 			//open SDR device Success then return
-			printf("sdrplay_api_Init sdrplay_api_Success\r\n");
+			DbgMsg("sdrplay_api_Init sdrplay_api_Success\r\n");
 			SDROpened = true;
 			clsSDR.Init_ValueAddr();
 			return;
@@ -343,8 +420,8 @@ void CDataFromSDR::open_SDR_device(void)
 		// Close API
 		sdrplay_api_Close();
 
-		printf("sdr device open falild.\r\n");
-		system("PAUSE");
+		DbgMsg("sdr device open falild.\r\n");
+		//system("PAUSE");
 		exit(0);
 	}
 }
@@ -359,7 +436,7 @@ void CDataFromSDR::close_SDR_device(void)
 		// Finished with device so uninitialise it
 		if ((err = sdrplay_api_Uninit(chosenDevice->dev)) != sdrplay_api_Success)
 		{
-			printf("sdrplay_api_Uninit failed %s\n", sdrplay_api_GetErrorString(err));
+			DbgMsg("sdrplay_api_Uninit failed %s\n", sdrplay_api_GetErrorString(err));
 			if (err == sdrplay_api_StopPending)
 			{
 				// We¡¯re stopping in master/slave mode as a master and the slave is still running
@@ -373,13 +450,13 @@ void CDataFromSDR::close_SDR_device(void)
 						if ((err = sdrplay_api_Uninit(chosenDevice->dev)) !=
 							sdrplay_api_Success)
 						{
-							printf("sdrplay_api_Uninit failed %s\n",
+							DbgMsg("sdrplay_api_Uninit failed %s\n",
 								sdrplay_api_GetErrorString(err));
 						}
 						slaveUninitialised = 0;
 						goto CloseApi;
 					}
-					printf("Waiting for slave to uninitialise\n");
+					DbgMsg("Waiting for slave to uninitialise\n");
 				}
 			}
 			goto CloseApi;
@@ -391,5 +468,5 @@ void CDataFromSDR::close_SDR_device(void)
 		// Close API
 		sdrplay_api_Close();
 	}
-	printf("SDR Device Closed.\r\n");
+	DbgMsg("SDR Device Closed.\r\n");
 }

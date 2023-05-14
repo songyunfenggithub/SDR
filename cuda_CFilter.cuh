@@ -13,7 +13,7 @@ namespace METHOD {
 		CData* TargetData;
 
 		char* d_SrcData = NULL;
-		FILTER_CORE_DATA_TYPE* d_Filter_Core = NULL;
+		CFilter::FILTER_CORE_DATA_TYPE* d_Filter_Core = NULL;
 		FILTTED_DATA_TYPE* d_Result = NULL;
 
 		char* h_SrcData = NULL;
@@ -30,6 +30,9 @@ namespace METHOD {
 
 	public:
 
+		cuda_CFilter();
+		~cuda_CFilter();
+
 		void Filtting(void);
 		void UnInit(void);
 		void Init(CFilter* f);
@@ -38,4 +41,5 @@ namespace METHOD {
 	};
 }
 extern METHOD::cuda_CFilter clscudaMainFilter;
+extern METHOD::cuda_CFilter clscudaMainFilterQ;
 extern METHOD::cuda_CFilter clscudaAudioFilter;

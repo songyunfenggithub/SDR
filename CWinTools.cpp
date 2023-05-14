@@ -19,16 +19,16 @@
 #include <iostream>
 
 #include "public.h"
-#include "myDebug.h"
+#include "Debug.h"
 #include "CData.h"
 #include "CFFT.h"
 
 #include "CWinMain.h"
 #include "CDemodulatorAM.h"
 #include "CAudio.h"
-#include "CFFTWin.h"
-#include "CSignalWin.h"
-#include "CToolsWin.h"
+#include "CWinFFT.h"
+#include "CWinSignal.h"
+#include "CWinTools.h"
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -45,23 +45,23 @@ using namespace METHOD;
 #define NUMIMAGES 0
 
 
-CToolsWin clsToolsWin;
+CWinTools clsWinTools;
 
-CToolsWin::CToolsWin()
+CWinTools::CWinTools()
 {
-	OPENCONSOLE;
-	Init();
+    OPENCONSOLE_SAVED;
+    Init();
 }
 
-CToolsWin::~CToolsWin()
+CWinTools::~CWinTools()
 {
-	UnInit();
-	//CLOSECONSOLE;
+    UnInit();
+    //CLOSECONSOLE;
 }
 
 const char TAG[] = "CToolsWin";
 
-void CToolsWin::Init(void)
+void CWinTools::Init(void)
 {
     INITCOMMONCONTROLSEX icex;
     icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
@@ -70,11 +70,11 @@ void CToolsWin::Init(void)
     InitCommonControls();
 }
 
-void CToolsWin::UnInit(void)
+void CWinTools::UnInit(void)
 {
 }
 
-HWND CToolsWin::CreateToolbar(HWND hWnd, LPTBBUTTON tbb, UINT numButtons, TOOL_TIPS* tips, UINT numTips)
+HWND CWinTools::CreateToolbar(HWND hWnd, LPTBBUTTON tbb, UINT numButtons, TOOL_TIPS* tips, UINT numTips)
 {
     int iCBHeight;              // Height of the command bar 
     DWORD dwStyle;              // Style of the toolbar
@@ -127,7 +127,7 @@ HWND CToolsWin::CreateToolbar(HWND hWnd, LPTBBUTTON tbb, UINT numButtons, TOOL_T
         return NULL;
     }
 
-//    SendMessage(hwndTB, TB_SETSTYLE, 0, (LPARAM)TBSTYLE_FLAT | CCS_TOP | TBSTYLE_LIST | TBSTYLE_ALTDRAG);
+    //    SendMessage(hwndTB, TB_SETSTYLE, 0, (LPARAM)TBSTYLE_FLAT | CCS_TOP | TBSTYLE_LIST | TBSTYLE_ALTDRAG);
     SendMessage(hwndTB, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
     SendMessage(hwndTB, TB_SETEXTENDEDSTYLE, 0, (LPARAM)TBSTYLE_EX_DRAWDDARROWS);
 
@@ -175,7 +175,7 @@ HWND CToolsWin::CreateToolbar(HWND hWnd, LPTBBUTTON tbb, UINT numButtons, TOOL_T
 // g_hwndMain - A handle to the main window.
 // g_hinst    - A handle to the program instance.
 
-HWND CToolsWin::CreateComboBox(HWND hWnd)
+HWND CWinTools::CreateComboBox(HWND hWnd)
 {
     HWND hwnd;
     INITCOMMONCONTROLSEX icex;
@@ -236,7 +236,7 @@ HWND CToolsWin::CreateComboBox(HWND hWnd)
     return (hwnd);
 }
 
-void CToolsWin::CreateRebarBand(HWND hWndReBar, LPSTR title, UINT ID, UINT cx, UINT iImage, HWND hWndChild)
+void CWinTools::CreateRebarBand(HWND hWndReBar, LPSTR title, UINT ID, UINT cx, UINT iImage, HWND hWndChild)
 {
     LPREBARBANDINFO rbBand = new REBARBANDINFO;
     ZeroMemory(rbBand, sizeof(REBARBANDINFO));
@@ -264,7 +264,7 @@ void CToolsWin::CreateRebarBand(HWND hWndReBar, LPSTR title, UINT ID, UINT cx, U
 
 }
 
-HWND CToolsWin::CreateRebar(HWND hWnd)
+HWND CWinTools::CreateRebar(HWND hWnd)
 {
     REBARINFO     rbi = { 0 };
     REBARBANDINFO rbBand = { 0 };
@@ -295,7 +295,7 @@ HWND CToolsWin::CreateRebar(HWND hWnd)
     return (hwndRB);
 }
 
-HWND CToolsWin::MakeReBar(HWND hWnd)
+HWND CWinTools::MakeReBar(HWND hWnd)
 {
     HWND hWndRebar = CreateRebar(hWnd);
     static TBBUTTON tbb[7] = {
@@ -338,7 +338,7 @@ HWND CToolsWin::MakeReBar(HWND hWnd)
     return hWndRebar;
 }
 
-BOOL CToolsWin::DoNotify(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+BOOL CWinTools::DoNotify(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 #define lpnm    ((LPNMHDR)lParam)
     switch (lpnm->code)
@@ -380,7 +380,7 @@ BOOL CToolsWin::DoNotify(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {
 #define lpnmTB  ((LPNMTOOLBAR)lParam)
         // Get the coordinates of the button.
-        RECT rc;
+        RECT rc = { 0 };
         SendMessage(lpnmTB->hdr.hwndFrom, TB_GETRECT, (WPARAM)lpnmTB->iItem, (LPARAM)&rc);
         // Convert to screen coordinates.
         MapWindowPoints(lpnmTB->hdr.hwndFrom, HWND_DESKTOP, (LPPOINT)&rc, 2);
@@ -401,15 +401,13 @@ BOOL CToolsWin::DoNotify(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_VERTICAL,
             rc.left, rc.bottom, hWnd, &tpm);
         DestroyMenu(hMenuLoaded);
-        return
-            (FALSE);
+        return FALSE;
     }
     }
-    return
-        FALSE;
+    return FALSE;
 }
 
-LRESULT CToolsWin::RelabelButton(HWND hWndToolbar, UINT id, LPSTR text)
+LRESULT CWinTools::RelabelButton(HWND hWndToolbar, UINT id, LPSTR text)
 {
     TBBUTTONINFO tbInfo = { 0 };
     tbInfo.cbSize =

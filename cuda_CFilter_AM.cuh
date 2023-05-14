@@ -6,14 +6,13 @@ namespace METHOD {
 
 	class CFilter;
 
-	class cuda_CFilter3
+	class cuda_CFilter_AM
 	{
 
 	public:
 
 		CData* SrcData = NULL;
-		CData* TargetData1 = NULL;
-		CData* TargetData2 = NULL;
+		CData* TargetData = NULL;
 
 		CFilter* cFilter = NULL;
 		CFilter::PFILTER_INFO rootFilterInfo1 = NULL;
@@ -40,8 +39,8 @@ namespace METHOD {
 		FILTTED_DATA_TYPE* h_Demodulator_Result = NULL;
 
 	public:
-		cuda_CFilter3();
-		~cuda_CFilter3();
+		cuda_CFilter_AM();
+		~cuda_CFilter_AM();
 
 		void Filtting(void);
 		void UnInit(void);
@@ -50,5 +49,4 @@ namespace METHOD {
 	};
 }
 
-extern METHOD::cuda_CFilter3 clscudaMainFilter3;
-extern METHOD::cuda_CFilter3 clscudaMainFilter3Q;
+extern METHOD::cuda_CFilter_AM clscudaMainFilter_AM;

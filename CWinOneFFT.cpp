@@ -10,7 +10,7 @@
 #include <iostream>
 
 #include "public.h"
-#include "myDebug.h"
+#include "Debug.h"
 #include "CSoundCard.h"
 #include "CData.h"
 #include "CFFT.h"
@@ -57,11 +57,13 @@ using namespace WINS; using namespace DEVICES;
 #define POINT_WIDTH 5
 #define POINT_WIDTH2 10
 
+#define FFT_ZOOM_MAX		16
+
 CWinOneFFT clsWinOneFFT;
 
 CWinOneFFT::CWinOneFFT()
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 
 	RegisterWindowsClass();
 	int Y = 10;
@@ -99,7 +101,7 @@ void CWinOneFFT::RegisterWindowsClass(void)
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);//(HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName = (LPCSTR)NULL;
-	wcex.lpszClassName = FFT_ONE_WIN_CLASS;
+	wcex.lpszClassName = WIN_FFT_ONE_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	RegisterClassEx(&wcex);
@@ -116,7 +118,7 @@ LRESULT CALLBACK CWinOneFFT::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 	{
 	case WM_CREATE:
 	{
-		OPENCONSOLE;
+		OPENCONSOLE_SAVED;
 		clsWinOneFFT.hWnd = hWnd;
 
 		rfButton->ButtonInit(hWnd);
@@ -143,7 +145,7 @@ LRESULT CALLBACK CWinOneFFT::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 		}
 		break;
 	case WM_CHAR:
-		printf("WinOneFFT WM_CHAR\r\n");
+		DbgMsg("WinOneFFT WM_CHAR\r\n");
 		PostMessage(clsWinSpect.hWnd, message, wParam, lParam);
 		break;
 	case WM_LBUTTONDOWN:
@@ -262,7 +264,7 @@ void CWinOneFFT::OnMouse(void)
 	int X = (clsWinSpect.HScrollPos + MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
 	X = BOUND(X, 0, (clsWinSpect.HScrollPos + rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / clsWinSpect.HScrollZoom);
 
-	double Hz = (double)X * AdcData->SampleRate / FFTInfo_Signal.FFTSize;
+	double Hz = (double)X * AdcDataI->SampleRate / FFTInfo_Signal.FFTSize;
 	double Y = X > FFTInfo_Signal.HalfFFTSize? 0 : ((CFFT*)clsWinSpect.FFTOrignal)->FFTOutBuff[X];
 	n += sprintf(strMouse + n, " | ");
 	n += sprintf(strMouse + n, "Hz: %.03f, FFT: %s", Hz, formatKDouble(Y, 0.001, "", t));
@@ -341,7 +343,7 @@ void CWinOneFFT::Paint(void)
 				DrawText(hdc, s, strlen(s), &r, NULL);
 				//sprintf(s, "%.6fs", (double)pos / *SampleRate);
 				//formatKKDouble((double)pos / *SampleRate, "s", s);
-				sprintf(s, "%.03fhz", (double)(pos * AdcData->SampleRate / FFTInfo_Signal.FFTSize));
+				sprintf(s, "%.03fhz", (double)(pos * AdcDataI->SampleRate / FFTInfo_Signal.FFTSize));
 				r.top = WAVE_RECT_BORDER_TOP + (FFTDrawHeight)+DIVLONG;
 				DrawText(hdc, s, strlen(s), &r, NULL);
 			}
@@ -617,7 +619,7 @@ void CWinOneFFT::Paint(void)
 			"Filter: Desc=%s, decimationFactorBit=%d, SampleRate=%d\r\n"\
 			"rfHz = %s"
 			,
-			AdcData->SampleRate * (32 / clsWinSpect.HScrollZoom) / FFTInfo_Signal.FFTSize,
+			AdcDataI->SampleRate * (32 / clsWinSpect.HScrollZoom) / FFTInfo_Signal.FFTSize,
 			fomatKINT64(FFTInfo_Signal.FFTSize, t4), fomatKINT64(FFTInfo_Signal.FFTStep, t5), FFTInfo_Signal.FFTPerSec,
 			formatKDouble(clsWinOneSpectrum.Hz, 0.001, "", t6),
 			clsWinSpect.HScrollZoom, VScrollZoom,
@@ -625,10 +627,10 @@ void CWinOneFFT::Paint(void)
 			(INT)clsGetDataSDR.chParams->ctrlParams.decimation.enable,
 			(INT)clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor,
 			(INT)clsGetDataSDR.chParams->tunerParams.bwType,
-			fomatKINT64(AdcData->SampleRate, t2), fomatKINT64(AdcData->NumPerSec, t3),
-			clsMainFilter.rootFilterInfo1.CoreDescStr,
-			clsMainFilter.rootFilterInfo1.decimationFactorBit,
-			clsMainFilter.TargetData->SampleRate,
+			fomatKINT64(AdcDataI->SampleRate, t2), fomatKINT64(AdcDataI->NumPerSec, t3),
+			clsMainFilterI.rootFilterInfo1.CoreDescStr,
+			clsMainFilterI.rootFilterInfo1.decimationFactorBit,
+			clsMainFilterI.TargetData->SampleRate,
 			formatKDouble(clsGetDataSDR.chParams->tunerParams.rfFreq.rfHz, 0.001, "", t8)
 			
 		);
@@ -883,7 +885,7 @@ void CWinOneFFT::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_KEYDOWN:
-		//printf("winSpectrum KeyAndScroll WM_KEYDOWN\r\n");
+		//DbgMsg("winSpectrum KeyAndScroll WM_KEYDOWN\r\n");
 		/* Translate keyboard messages to scroll commands */
 		switch (wParam)
 		{
@@ -975,7 +977,7 @@ void CWinOneFFT::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 			SetScrollPos(hWnd, SB_VERT, VScrollPos, TRUE);
 			InvalidateRect(hWnd, NULL, TRUE);
 			UpdateWindow(hWnd);
-			//printf("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
+			//DbgMsg("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
 		}
 	case WM_HSCROLL:
 		//Calculate new horizontal scroll position
@@ -1026,7 +1028,7 @@ void CWinOneFFT::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 			//SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			//InvalidateRect(hWnd, NULL, TRUE);
 			//UpdateWindow(hWnd);
-			//printf("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
+			//DbgMsg("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
 		}
 		break;
 	}
@@ -1078,7 +1080,7 @@ void CWinOneFFT::confirmP1RfGoButtonFunc(CScreenButton* button)
 	if (P->x > WAVE_RECT_BORDER_LEFT && P->x < clsWinOneFFT.WinRect.right - WAVE_RECT_BORDER_RIGHT
 		&& P->y > WAVE_RECT_BORDER_TOP && P->y < clsWinOneFFT.WinRect.bottom - WAVE_RECT_BORDER_BOTTON)	{
 
-		double Hz = (double)(clsWinSpect.HScrollPos + P->x - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom * AdcData->SampleRate / FFTInfo_Signal.FFTSize;
+		double Hz = (double)(clsWinSpect.HScrollPos + P->x - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom * AdcDataI->SampleRate / FFTInfo_Signal.FFTSize;
 		if (button->Button->mouse_action == CScreenButton::Button_Mouse_Left) {
 			clsWinOneFFT.rfButton->RefreshMouseNumButton(clsWinOneFFT.rfButton->Button->value + Hz);
 		}
@@ -1116,7 +1118,7 @@ void CWinOneFFT::P2SubP1(void)
 			YFBlog = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTBrieflyLogBuff[X] : 0;
 			n += sprintf(strPP + n, "P1 X=%s, Hz=%s, Y=%s, Ylog=%sdb, YF=%s, YFlog=%sdb, YB=%s, YBlog=%sdb, YFB=%s, YFBlog=%sdb\r\n",
 				fomatKINT64(X, sX),
-				formatKDouble(P1Hz = (double)X * AdcData->SampleRate / FFTInfo_Signal.FFTSize, 0.001, "", sHZ),
+				formatKDouble(P1Hz = (double)X * AdcDataI->SampleRate / FFTInfo_Signal.FFTSize, 0.001, "", sHZ),
 				fomatKINT64(Y, sY),
 				formatKDouble(Ylog * 20, 0.001, "", sYlog),
 				formatKDouble(YF, 0.001, "", sYF),
@@ -1144,7 +1146,7 @@ void CWinOneFFT::P2SubP1(void)
 			YFBlog = X < FFTInfo_Filtted.HalfFFTSize ? FFTFiltted->FFTBrieflyLogBuff[X] : 0;
 			n += sprintf(strPP + n, "P2 X=%s, Hz=%s, Y=%s, Ylog=%sdb, YF=%s, YFlog=%sdb, YB=%s, YBlog=%sdb, YFB=%s, YFBlog=%sdb\r\n",
 				fomatKINT64(X, sX),
-				formatKDouble(P2Hz = (double)X * AdcData->SampleRate / FFTInfo_Signal.FFTSize, 0.001, "", sHZ),
+				formatKDouble(P2Hz = (double)X * AdcDataI->SampleRate / FFTInfo_Signal.FFTSize, 0.001, "", sHZ),
 				fomatKINT64(Y, sY),
 				formatKDouble(Ylog * 20, 0.001, "", sYlog),
 				formatKDouble(YF, 0.001, "", sYF),

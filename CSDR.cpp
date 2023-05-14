@@ -11,6 +11,7 @@
 
 #include <map>
 
+#include "Debug.h"
 #include "CFilter.h"
 #include "CDataFromSDR.h"
 #include "CWinSDR.h"
@@ -627,7 +628,7 @@ void CSDR::refresh_tree_item(HWND hWndTreeView, TVITEM* ptvi, int i)
 	static char s[1000];
 	s[0] = 0;
 
-	if (SDR_params[i].pValue == NULL) printf("refresh_tree_item, %s\r\n", SDR_params[i].txt);
+	if (SDR_params[i].pValue == NULL) DbgMsg("refresh_tree_item, %s\r\n", SDR_params[i].txt);
 
 	switch (SDR_params[i].valueType)
 	{
@@ -786,7 +787,7 @@ const char* CSDR::map_value_to_key(SDR_ENUM_MAP *pmap, int value)
 
 void CSDR::SDR_params_apply(void)
 {
-	printf("SDR_params_apply\r\n");
+	DbgMsg("SDR_params_apply\r\n");
 	//if (SDR_params[sel_SDR_params_index].valueType != SDR_PAMRAS_NONE)
 		//clsSDR.refresh_tree_item(clsWinSDR.hWndTreeView, &sel_tvi, sel_SDR_params_index);
 	if (SDR_params[sel_SDR_params_index].paramUpdateReason == sdrplay_api_Update_None) return;
@@ -794,14 +795,14 @@ void CSDR::SDR_params_apply(void)
 
 	refresh_tree_item(clsWinSDR.hWndTreeView, &sel_tvi, sel_SDR_params_index);
 
-	printf("sdrplay_api_Update %d.\r\n", SDR_params[sel_SDR_params_index].paramUpdateReason);
+	DbgMsg("sdrplay_api_Update %d.\r\n", SDR_params[sel_SDR_params_index].paramUpdateReason);
 
 	sdrplay_api_ErrT err;
 	if ((err = sdrplay_api_Update(clsGetDataSDR.chosenDevice->dev, clsGetDataSDR.chosenDevice->tuner,
 		(sdrplay_api_ReasonForUpdateT)SDR_params[sel_SDR_params_index].paramUpdateReason, sdrplay_api_Update_Ext1_None)) !=
 		sdrplay_api_Success)
 	{
-		printf("sdrplay_api_Update %d failed %s\n",
+		DbgMsg("sdrplay_api_Update %d failed %s\n",
 			SDR_params[sel_SDR_params_index].paramUpdateReason,
 			sdrplay_api_GetErrorString(err));
 	}
@@ -954,26 +955,29 @@ void CSDR::edit_check_range(void)
 void CSDR::set_params_SampleRate(int index)
 {
 	//clsSDR.SdrSampleRate = *(double*)SDR_params[index].pValue;
-	//AdcData->SampleRate = clsSDR.DecimationFactorEnable != 0 ? clsSDR.SdrSampleRate / clsSDR.DecimationFactor : clsSDR.SdrSampleRate;
+	//AdcDataI->SampleRate = clsSDR.DecimationFactorEnable != 0 ? clsSDR.SdrSampleRate / clsSDR.DecimationFactor : clsSDR.SdrSampleRate;
 	
-	clsMainFilter.SrcData->SampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ?
+	clsMainFilterI.SrcData->SampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ?
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz / clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor : 
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz;
-	clsMainFilter.TargetData->SampleRate = clsMainFilter.SrcData->SampleRate / (1 << clsMainFilter.rootFilterInfo1.decimationFactorBit);
-	clsMainFilter.ReBuildFilterCore();
-	printf("set_params_SampleRate\r\n");
+	clsMainFilterI.SrcData->SampleRate = clsMainFilterI.SrcData->SampleRate >> 1;
+	clsMainFilterI.ReBuildFilterCore();
+
+	clsMainFilterQ.SrcData->SampleRate = clsMainFilterI.SrcData->SampleRate;
+	clsMainFilterQ.ReBuildFilterCore();
+
+	DbgMsg("set_params_SampleRate\r\n");
 }
 
 void CSDR::set_params_decimationFactorEnable(int index)
 {
-	//clsSDR.DecimationFactorEnable = *(unsigned char*)SDR_params[index].pValue;
-	printf("set_params_useDecimationFactor\r\n");
-	set_params_decimationFactor(clsSDR.get_ValueIndex("decimationFactor unsigned char"));
+	DbgMsg("set_params_decimationFactorEnable\r\n");
+	//set_params_decimationFactor(clsSDR.get_ValueIndex("decimationFactor unsigned char"));
+	set_params_SampleRate(clsSDR.get_ValueIndex("fsHz double"));
 }
 
 void CSDR::set_params_decimationFactor(int index)
 {
-	//clsSDR.DecimationFactor = *(unsigned char*)SDR_params[index].pValue;
-	printf("set_params_decimationFactor\r\n");
+	DbgMsg("set_params_decimationFactor\r\n");
 	set_params_SampleRate(clsSDR.get_ValueIndex("fsHz double"));
 }

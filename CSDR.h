@@ -43,7 +43,7 @@ namespace DEVICES {
 		SDR_PAMRAS_UCHAR
 	}SDR_PAMRAS_TYPE;
 
-	typedef struct SDRParams_TAG
+	typedef struct SDRParams_STRUCT
 	{
 		int level;
 		char* txt;

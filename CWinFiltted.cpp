@@ -8,26 +8,26 @@
 #include <iostream>
 
 #include "public.h"
-#include "myDebug.h"
+#include "Debug.h"
 #include "CFilter.h"
 #include "CData.h"
 #include "CFFT.h"
 
 #include "CAudio.h"
-#include "CFFTWin.h"
-#include "CSignalWin.h"
-#include "CFilttedWin.h"
+#include "CWinFFT.h"
+#include "CWinSignal.h"
+#include "CWinFiltted.h"
 
 using namespace WINS;
 using namespace METHOD;
 
-CFilttedWin::CFilttedWin()
+CWinFiltted::CWinFiltted()
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	Init();
 }
 
-CFilttedWin::~CFilttedWin()
+CWinFiltted::~CWinFiltted()
 {
 	UnInit();
 	//CLOSECONSOLE;
@@ -35,26 +35,26 @@ CFilttedWin::~CFilttedWin()
 
 const char FilttedWinTag[] = "CFilttedWin";
 
-void CFilttedWin::Init(void)
+void CWinFiltted::Init(void)
 {
 	RegisterWindowsClass();
 	
-	m_SignalWin = new CSignalWin();
+	m_SignalWin = new CWinSignal();
 	m_SignalWin->Tag = FilttedWinTag;
-	m_SignalWin->DataOrignal = AdcDataFiltted;
+	m_SignalWin->DataOrignal = AdcDataIFiltted;
 	m_SignalWin->Init();
 
-	m_FFTWin = new CFFTWin();
+	m_FFTWin = new CWinFFT();
 	m_FFTWin->Tag = FilttedWinTag;
-	m_FFTWin->Data = AdcDataFiltted;
+	m_FFTWin->Data = AdcDataIFiltted;
 //	FFTInfo_Audio.FFTSize = 2048;
 //	FFTInfo_Audio.HalfFFTSize = FFTInfo_Audio.FFTSize / 2;
 //	FFTInfo_Audio.FFTStep = 2048;
 	((CFFT*)(m_FFTWin->fft))->FFTInfo = &FFTInfo_Filtted;
 
 	//m_FFTWin->buff_type = BUFF_DATA_TYPE::float_type;
-	//m_FFTWin->DataBuff = AdcData->FilttedBuff;
-	//m_FFTWin->DataBuffPos = &AdcData->FilttedBuffPos;
+	//m_FFTWin->DataBuff = AdcDataI->FilttedBuff;
+	//m_FFTWin->DataBuffPos = &AdcDataI->FilttedBuffPos;
 	//m_FFTWin->data_buff_data_bits = ADC_DATA_SAMPLE_BIT;
 	//m_FFTWin->data_buff_length_mask = DATA_BUFFER_MASK;
 
@@ -62,18 +62,18 @@ void CFilttedWin::Init(void)
 
 }
 
-void CFilttedWin::UnInit(void)
+void CWinFiltted::UnInit(void)
 {
 	if (m_FFTWin != NULL) free(m_FFTWin);
 	if (m_SignalWin != NULL) free(m_SignalWin);
 }
 
-void CFilttedWin::AM_Demodulator(void)
+void CWinFiltted::AM_Demodulator(void)
 {
 
 }
 
-void CFilttedWin::RegisterWindowsClass(void)
+void CWinFiltted::RegisterWindowsClass(void)
 {
 	static bool registted = false;
 	if (registted == true) return;
@@ -84,7 +84,7 @@ void CFilttedWin::RegisterWindowsClass(void)
 	wcex.cbSize = sizeof(WNDCLASSEX);
 
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc = (WNDPROC)CFilttedWin::WndProc;
+	wcex.lpfnWndProc = (WNDPROC)CWinFiltted::WndProc;
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = sizeof(long);
 	wcex.hInstance = hInst;
@@ -92,31 +92,31 @@ void CFilttedWin::RegisterWindowsClass(void)
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);//(HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName = (LPCSTR)IDC_MENU_FILTTED;
-	wcex.lpszClassName = CFILTTED_WIN_CLASS;
+	wcex.lpszClassName = WIN_CFILTTED_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	RegisterClassEx(&wcex);
 }
 
-void CFilttedWin::OpenWindow(void)
+void CWinFiltted::OpenWindow(void)
 {
 	if (hWnd == NULL) {
-			hWnd = CreateWindow(CFILTTED_WIN_CLASS, "滤波后信号 （Filtted Signal）", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+			hWnd = CreateWindow(WIN_CFILTTED_CLASS, "滤波后信号 （Filtted Signal）", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			CW_USEDEFAULT, 0, 1400, 1000, NULL, NULL, hInst, this);
 	}
 	ShowWindow(hWnd, SW_SHOW);
 	UpdateWindow(hWnd);
 }
 
-LRESULT CALLBACK CFilttedWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK CWinFiltted::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	CFilttedWin* me = (CFilttedWin*)get_WinClass(hWnd);
+	CWinFiltted* me = (CWinFiltted*)get_WinClass(hWnd);
 	switch (message)
 	{
 	case WM_CREATE:
 	{
-		OPENCONSOLE;
-		me = (CFilttedWin*)set_WinClass(hWnd, lParam);
+		OPENCONSOLE_SAVED;
+		me = (CWinFiltted*)set_WinClass(hWnd, lParam);
 
 		me->hWnd = hWnd;
 		HMENU hMenu = GetMenu(hWnd);
@@ -127,10 +127,10 @@ LRESULT CALLBACK CFilttedWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 		//uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
 		//KillTimer(hWnd, 0);//DrawInfo.uTimerId);
 
-		me->m_SignalWin->hWnd = CreateWindow(SIGNAL_WIN_CLASS, "信号", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+		me->m_SignalWin->hWnd = CreateWindow(WIN_SIGNAL_CLASS, "信号", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			0, 200, 500, 200, hWnd, NULL, hInst, me->m_SignalWin);
 		ShowWindow(me->m_SignalWin->hWnd, SW_SHOW);
-		me->m_FFTWin->hWnd = CreateWindow(FFT_WIN_CLASS, "FFT", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+		me->m_FFTWin->hWnd = CreateWindow(WIN_FFT_CLASS, "FFT", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			0, 0, 500, 200, hWnd, NULL, hInst, me->m_FFTWin);
 		ShowWindow(me->m_FFTWin->hWnd, SW_SHOW);
 	}
@@ -195,7 +195,7 @@ LRESULT CALLBACK CFilttedWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 	return 0;
 }
 
-BOOL CFilttedWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
+BOOL CWinFiltted::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	wmId = LOWORD(wParam);

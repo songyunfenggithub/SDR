@@ -11,7 +11,7 @@
 
 namespace WINS {
 
-#define SDR_SCAN_ONE_WIN_CLASS		"SDR_SCAN_ONE_WIN"
+#define WIN_SDR_SCAN_ONE_CLASS		"WIN_SDR_SCAN_ONE_CLASS"
 
 	class CWinSDRScan
 	{

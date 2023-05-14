@@ -8,11 +8,11 @@
 #include <iostream>
 
 #include "public.h"
-#include "myDebug.h"
+#include "Debug.h"
 #include "CData.h"
 
-#include "CAudioWin.h"
-#include "CSignalWin.h"
+#include "CWinAudio.h"
+#include "CWinSignal.h"
 
 using namespace WINS;
 
@@ -53,9 +53,9 @@ using namespace WINS;
 #define DIVLONG		10
 #define DIVSHORT	5
 
-CSignalWin::CSignalWin()
+CWinSignal::CWinSignal()
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 
 	//Init();
 	RegisterWindowsClass();
@@ -67,24 +67,24 @@ CSignalWin::CSignalWin()
 	DrawInfo.dwHZoomedPos = 0;
 }
 
-CSignalWin::~CSignalWin()
+CWinSignal::~CWinSignal()
 {
 	UnInit();
 	//CLOSECONSOLE;
 }
 
-void CSignalWin::Init(void)
+void CWinSignal::Init(void)
 {
 	DrawInfo.FullVotage = FULL_VOTAGE;
 	DrawInfo.VotagePerDIV = DrawInfo.FullVotage / ((UINT64)1 << (((CData*)DataOrignal)->DataBits-1));
 }
 
-void CSignalWin::UnInit(void)
+void CWinSignal::UnInit(void)
 {
 
 }
 
-void CSignalWin::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
+void CWinSignal::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	INT     iMax, iMin, iPos;
 	int		dn = 0, tbdn = 0;
@@ -236,7 +236,7 @@ void CSignalWin::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 	}
 }
 
-void CSignalWin::CaculateScrolls(void)
+void CWinSignal::CaculateScrolls(void)
 {
 	typedef enum {
 		notsure,
@@ -281,7 +281,7 @@ void CSignalWin::CaculateScrolls(void)
 	UpdateWindow(hWnd);
 }
 
-void CSignalWin::CaculateHScroll(void)
+void CWinSignal::CaculateHScroll(void)
 {
 	INT iRangeH, i;
 
@@ -330,7 +330,7 @@ void CSignalWin::CaculateHScroll(void)
 	//UpdateWindow(hWnd);
 }
 
-void CSignalWin::CaculateVScroll(void)
+void CWinSignal::CaculateVScroll(void)
 {
 	INT i;
 
@@ -363,7 +363,7 @@ void CSignalWin::CaculateVScroll(void)
 	//UpdateWindow(hWnd);
 }
 
-void CSignalWin::Paint(void)
+void CWinSignal::Paint(void)
 {
 	HDC		hDC;
 	PAINTSTRUCT ps;
@@ -479,7 +479,7 @@ void CSignalWin::Paint(void)
 
 	double z = DrawInfo.iVZoom >= 0 ? (1.0 / ((UINT64)1 << DrawInfo.iVZoom)) : ((UINT64)1 << -DrawInfo.iVZoom);
 	char tstr1[100], tstr2[100], tstradcpos[100], tstrfiltpos[100], tstrhbarpos[100], tstrfs[100];
-	//AdcData->NumPerSec = 38400;
+	//AdcDataI->NumPerSec = 38400;
 	double TimePreDiv = 32.0 / oData->SampleRate *
 		(DrawInfo.iHZoom >= 0 ? 1.0 / ((UINT64)1 << DrawInfo.iHZoom) : ((UINT64)1 << -DrawInfo.iHZoom));
 	sprintf(s, "32/DIV %sV/DIV %ss/DIV\r\n"\
@@ -535,7 +535,7 @@ void CSignalWin::Paint(void)
 	EndPaint(hWnd, &ps);
 }
 
-void CSignalWin::DrawSignal_short(HDC hdc, RECT *rt, void* Data, COLORREF Color)
+void CWinSignal::DrawSignal_short(HDC hdc, RECT *rt, void* Data, COLORREF Color)
 {
 	HPEN hPen;
 	CData* cData = (CData*)Data;
@@ -601,7 +601,7 @@ void CSignalWin::DrawSignal_short(HDC hdc, RECT *rt, void* Data, COLORREF Color)
 	DeleteObject(hPen);
 }
 
-void CSignalWin::DrawSignal_float(HDC hdc, RECT* rt, void* Data, COLORREF Color)
+void CWinSignal::DrawSignal_float(HDC hdc, RECT* rt, void* Data, COLORREF Color)
 {
 	HPEN hPen;
 	CData* cData = (CData*)Data;
@@ -664,7 +664,7 @@ void CSignalWin::DrawSignal_float(HDC hdc, RECT* rt, void* Data, COLORREF Color)
 	DeleteObject(hPen);
 }
 
-void CSignalWin::RegisterWindowsClass(void)
+void CWinSignal::RegisterWindowsClass(void)
 {
 	static bool registted = false;
 	if (registted == true) return;
@@ -677,7 +677,7 @@ void CSignalWin::RegisterWindowsClass(void)
 	wcex.cbSize = sizeof(WNDCLASSEX);
 
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc = (WNDPROC)CSignalWin::WndProc;
+	wcex.lpfnWndProc = (WNDPROC)CWinSignal::WndProc;
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
 	wcex.hInstance = hInst;
@@ -685,23 +685,23 @@ void CSignalWin::RegisterWindowsClass(void)
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);//(HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName = (LPCSTR)NULL;
-	wcex.lpszClassName = SIGNAL_WIN_CLASS;
+	wcex.lpszClassName = WIN_SIGNAL_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	RegisterClassEx(&wcex);
 }
 
-LRESULT CALLBACK CSignalWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK CWinSignal::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	CSignalWin* me = (CSignalWin*)get_WinClass(hWnd);
+	CWinSignal* me = (CWinSignal*)get_WinClass(hWnd);
 
 	switch (message)
 	{
 	case WM_CREATE:
 	{
-		OPENCONSOLE;
+		OPENCONSOLE_SAVED;
 
-		me = (CSignalWin*)set_WinClass(hWnd, lParam);
+		me = (CWinSignal*)set_WinClass(hWnd, lParam);
 
 		me->hWnd = hWnd;
 		me->RestoreValue();
@@ -736,7 +736,7 @@ LRESULT CALLBACK CSignalWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 		UpdateWindow(hWnd);
 		break;
 	case WM_SIZE:
-		printf("WM_SIZE\r\n");
+		DbgMsg("WM_SIZE\r\n");
 		me->GetRealClientRect(&me->WinRect);
 		me->DrawInfo.DrawHeight = me->WinRect.bottom - WAVE_RECT_BORDER_TOP - WAVE_RECT_BORDER_BOTTON;
 		UP_TO_ZERO(me->DrawInfo.DrawHeight);
@@ -774,7 +774,7 @@ LRESULT CALLBACK CSignalWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 	return 0;
 }
 
-bool CSignalWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
+bool CWinSignal::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	wmId = LOWORD(wParam);
@@ -845,7 +845,7 @@ bool CSignalWin::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	return TRUE;
 }
 
-void CSignalWin::OnMouse(void)
+void CWinSignal::OnMouse(void)
 {
 	RECT rt;
 	GetClientRect(hWnd, &rt);
@@ -855,7 +855,7 @@ void CSignalWin::OnMouse(void)
 	n += sprintf(strMouse + n, "X: %d, core V: %lf", X, Y);
 }
 
-void CSignalWin::GetRealClientRect(PRECT lprc)
+void CWinSignal::GetRealClientRect(PRECT lprc)
 {
 	DWORD dwStyle;
 	dwStyle = GetWindowLong(hWnd, GWL_STYLE);
@@ -866,7 +866,7 @@ void CSignalWin::GetRealClientRect(PRECT lprc)
 		lprc->right += GetSystemMetrics(SM_CXVSCROLL);
 }
 
-void CSignalWin::SaveValue(void)
+void CWinSignal::SaveValue(void)
 {
 #define VALUE_LENGTH	100
 	char section[VALUE_LENGTH];
@@ -877,7 +877,7 @@ void CSignalWin::SaveValue(void)
 	WritePrivateProfileString(section, "dwVZoomedPos", std::to_string(DrawInfo.dwVZoomedPos).c_str(), IniFilePath);
 }
 
-void CSignalWin::RestoreValue(void)
+void CWinSignal::RestoreValue(void)
 {
 #define VALUE_LENGTH	100
 	char value[VALUE_LENGTH];

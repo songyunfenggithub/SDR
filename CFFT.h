@@ -22,8 +22,6 @@ namespace METHOD {
 		HANDLE hMutexBuff = NULL;
 		HANDLE hMutexDraw = NULL;
 
-		HANDLE hFFT_Thread = NULL;
-
 		HWND hWnd = NULL;
 		CData* Data;
 
@@ -41,10 +39,11 @@ namespace METHOD {
 		double* FFT_src = NULL;
 		Complex* FFT_src_com = NULL;
 
+		HANDLE hThread = NULL;
 		bool FFTlog = true;
 		bool FFTDoing = true;
 		bool FFTNext = false;
-		bool bFFT_Thread_Exitted = true;
+		bool Thread_Exit = true;
 
 	public:
 		CFFT();
@@ -66,6 +65,6 @@ namespace METHOD {
 		double GetFFTMaxValue(void);
 
 		static LPTHREAD_START_ROUTINE FFT_Thread(LPVOID lp);
-		void FFT_func(void);
+		void FFT_Thread_func(void);
 	};
 }

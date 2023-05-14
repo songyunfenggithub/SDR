@@ -275,13 +275,13 @@ UINT WINAPI CDataFromUsart::ListenThread(void* pParam)
 		}
 		/** 读取输入缓冲区中的数据并输出显示 */
 		UINT BytesReadBlock;
-		if ((AdcData->Len << AdcData->MoveBit) - AdcData->CharPos < BytesInQue) {
-			BytesReadBlock = (AdcData->Len << AdcData->MoveBit) - AdcData->CharPos;
+		if ((AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos < BytesInQue) {
+			BytesReadBlock = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
 			BytesInQue -= BytesReadBlock;
 		}
 		else
 			BytesReadBlock = BytesInQue;
-		UINT nBytesRead = pSerialPort->ReadBytesInQue((char*)(AdcData->Buff) + AdcData->CharPos, BytesReadBlock);
+		UINT nBytesRead = pSerialPort->ReadBytesInQue((char*)(AdcDataI->Buff) + AdcDataI->CharPos, BytesReadBlock);
 		//cout << " - " << nBytesRead << ":" << BytesInQue << endl;
 		if (nBytesRead != BytesReadBlock) 
 			cout << "Usart ReadByte Error\n" 
@@ -291,13 +291,13 @@ UINT WINAPI CDataFromUsart::ListenThread(void* pParam)
 		if (count++ % 100 == 0)
 		{
 			cout << endl << "StringToHex" << endl;
-			StringToHex((char*)AdcData->Buff + AdcData->CharPos, nBytesRead);
+			StringToHex((char*)AdcDataI->Buff + AdcDataI->CharPos, nBytesRead);
 		}
 
-		AdcData->CharPos += nBytesRead;
-		AdcData->Pos = AdcData->CharPos >> 2;
-		if (AdcData->CharPos == (AdcData->Len << AdcData->MoveBit)) AdcData->CharPos = 0;
-		AdcData->GetNew = true;
+		AdcDataI->CharPos += nBytesRead;
+		AdcDataI->Pos = AdcDataI->CharPos >> 2;
+		if (AdcDataI->CharPos == (AdcDataI->Len << AdcDataI->MoveBit)) AdcDataI->CharPos = 0;
+		AdcDataI->GetNew = true;
 
 	}
 
@@ -437,7 +437,7 @@ bool CDataFromUsart::WriteData(unsigned char* pData, unsigned int length)
 
 LPTHREAD_START_ROUTINE CDataFromUsart::GetDataUsartThreadFun(LPVOID lp)
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	clsGetDataUsart.UsartGetData();
 	//CLOSECONSOLE;
 	return 0;

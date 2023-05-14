@@ -6,20 +6,21 @@
 #include <iostream>
 
 #include "public.h"
-#include "myDebug.h"
+#include "Debug.h"
 #include "CData.h"
 #include "CFFT.h"
+#include "CFilter.h"
 #include "CWinFFT.h"
 #include "CWinSpectrum.h"
 #include "CWinOneSpectrum.h"
 #include "CWinOneFFT.h"
-#include "CToolsWin.h"
+#include "CWinTools.h"
 #include "CDataFromSDR.h"
 #include "CAnalyze.h"
 
 using namespace std;
 using namespace WINS; 
-//using namespace DEVICES;
+using namespace METHOD;
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -41,20 +42,19 @@ using namespace WINS;
 #define TOOLSBAR_SET_FM_FREQ_SUB	5
 #define TOOLSBAR_TBSTYLE_DROPDOWN	6
 
+#define FFT_ZOOM_MAX		16
+
 CWinSpectrum clsWinSpect;
 
 CWinSpectrum::CWinSpectrum()
 {
-	OPENCONSOLE;
-	//hMutexBuff = CreateMutex(NULL, false, "CWinSpectrumhMutexBuff");
 	RegisterWindowsClass();
 	Init();
 }
 
 CWinSpectrum::~CWinSpectrum()
 {
-	if(hWnd) DestroyWindow(hWnd);
-	//CLOSECONSOLE;
+
 }
 
 void CWinSpectrum::RegisterWindowsClass(void)
@@ -72,7 +72,7 @@ void CWinSpectrum::RegisterWindowsClass(void)
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject( BLACK_BRUSH );//(HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName = (LPCSTR)IDC_MENU_SPECTRUM;
-	wcex.lpszClassName = SPECTRUM_WIN_CLASS;
+	wcex.lpszClassName = WIN_SPECTRUM_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	RegisterClassEx(&wcex);
@@ -81,7 +81,7 @@ void CWinSpectrum::RegisterWindowsClass(void)
 void CWinSpectrum::OpenWindow(void)
 {
 	if (hWnd == NULL) {
-		hWnd = CreateWindow(SPECTRUM_WIN_CLASS, "Spectrum windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+		hWnd = CreateWindow(WIN_SPECTRUM_CLASS, "Spectrum windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			CW_USEDEFAULT, 0, 1400, 900, NULL, NULL, hInst, NULL);
 	}
 	ShowWindow(hWnd, SW_SHOW);
@@ -101,7 +101,6 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 	{
 	case WM_CREATE:
 	{
-		OPENCONSOLE;
 		clsWinSpect.hWnd = hWnd;
 		hMenu = GetMenu(hWnd);
 		HMENU m = GetSubMenu(hMenu, 2);
@@ -129,10 +128,10 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 		
 		RestoreValue();
 		
-		hWndOneFFT = CreateWindow(FFT_ONE_WIN_CLASS, "FFT One window", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+		hWndOneFFT = CreateWindow(WIN_FFT_ONE_CLASS, "FFT One window", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			0, 200, 500, 200, hWnd, NULL, hInst, NULL);
 		ShowWindow(hWndOneFFT, SW_SHOW);
-		hWndOneSpectrum = CreateWindow(SPECTRUM_ONE_WIN_CLASS, "Spectrum One window", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+		hWndOneSpectrum = CreateWindow(WIN_SPECTRUM_ONE_CLASS, "Spectrum One window", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			0, 0, 500, 200, hWnd, NULL, hInst, NULL);
 		ShowWindow(hWndOneSpectrum, SW_SHOW);
 
@@ -140,15 +139,15 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 		
 		fft = (CFFT*)clsWinSpect.FFTOrignal;
 		fft->hWnd = hWnd;
-		fft->Data = AdcData;
+		fft->Data = AdcDataI;
 		fft->Init();
-		fft->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, fft, 0, NULL);
+		fft->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, fft, 0, NULL);
 
 		fft = (CFFT*)clsWinSpect.FFTFiltted;
 		fft->hWnd = hWnd;
-		fft->Data = AdcDataFiltted;
+		fft->Data = AdcDataIFiltted;
 		fft->Init();
-		fft->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, fft, 0, NULL);
+		fft->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, fft, 0, NULL);
 
 		uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
 	}
@@ -194,7 +193,7 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 	}
 	break;
 	case WM_CHAR:
-		printf("char:%c\r\n", wParam);
+		DbgMsg("char:%c\r\n", wParam);
 		switch (wParam)
 		{
 		case '1':
@@ -399,9 +398,8 @@ bool CWinSpectrum::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case TOOLSBAR_TBSTYLE_DROPDOWN:
 		break;
-
 	case IDM_EXIT:
-		DestroyWindow(hWnd);
+		//DestroyWindow(hWnd);
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -435,7 +433,7 @@ VOID CWinSpectrum::Paint(void)
 		rt.left, rt.top,
 		SRCCOPY);
 
-	printf("%d,%d,%d,%d\r\n", rt.top, rt.left, rt.right, rt.bottom);
+	DbgMsg("%d,%d,%d,%d\r\n", rt.top, rt.left, rt.right, rt.bottom);
 	*/
 
 
@@ -466,20 +464,20 @@ LRESULT CALLBACK CWinSpectrum::DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wPa
 				//clsWaveFFT.FFTSize = GetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, NULL, false);
 				//clsWaveFFT.FFTStep = GetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, NULL, false);
 				clsWinSpect.FFTOrignal->FFTDoing = false;
-				while (clsWinSpect.FFTOrignal->bFFT_Thread_Exitted == false);
+				while (clsWinSpect.FFTOrignal->Thread_Exit == false);
 				FFTInfo_Signal.FFTSize = fftsize;
 				FFTInfo_Signal.HalfFFTSize = fftsize / 2;
 				FFTInfo_Signal.FFTStep = fftstep;
 				clsWinSpect.FFTOrignal->Init();
-				clsWinSpect.FFTOrignal->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTOrignal, 0, NULL);
+				clsWinSpect.FFTOrignal->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTOrignal, 0, NULL);
 
 				clsWinSpect.FFTFiltted->FFTDoing = false;
-				while (clsWinSpect.FFTFiltted->bFFT_Thread_Exitted == false);
+				while (clsWinSpect.FFTFiltted->Thread_Exit == false);
 				FFTInfo_Filtted.FFTSize = fftsize;
 				FFTInfo_Filtted.HalfFFTSize = fftsize / 2;
 				FFTInfo_Filtted.FFTStep = fftstep;
 				clsWinSpect.FFTFiltted->Init();
-				clsWinSpect.FFTFiltted->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTFiltted, 0, NULL);
+				clsWinSpect.FFTFiltted->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTFiltted, 0, NULL);
 			}
 			EndDialog(hDlg, LOWORD(wParam));
 			return TRUE;
@@ -514,7 +512,7 @@ void CWinSpectrum::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_KEYDOWN:
-		//printf("winSpectrum KeyAndScroll WM_KEYDOWN\r\n");
+		//DbgMsg("winSpectrum KeyAndScroll WM_KEYDOWN\r\n");
 		/* Translate keyboard messages to scroll commands */
 		switch (wParam)
 		{
@@ -636,7 +634,7 @@ void CWinSpectrum::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			InvalidateRect(hWnd, NULL, TRUE);
 			UpdateWindow(hWnd);
-			//printf("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
+			//DbgMsg("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
 		}
 		break;
 	}
@@ -697,7 +695,7 @@ void CWinSpectrum::RestoreValue(void)
 
 HWND CWinSpectrum::MakeToolsBar(void)
 {
-	hWndRebar = clsToolsWin.CreateRebar(hWnd);
+	hWndRebar = clsWinTools.CreateRebar(hWnd);
 	static TBBUTTON tbb[9] = {
 		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"FC" },
 		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
@@ -709,7 +707,7 @@ HWND CWinSpectrum::MakeToolsBar(void)
 		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
 		{ MAKELONG(4, 0), TOOLSBAR_TBSTYLE_DROPDOWN, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"下拉" }
 	};
-	CToolsWin::TOOL_TIPS tips[9] = {
+	CWinTools::TOOL_TIPS tips[9] = {
 		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
 		{ 0, NULL }, // Separator
 		{ TOOLSBAR_SET_AM_FREQ_ADD,"P1 点频率 + 移动到AM滤波器中心频率." },
@@ -720,7 +718,7 @@ HWND CWinSpectrum::MakeToolsBar(void)
 		{ 0, NULL }, // Separator
 		{ 0, "TBSTYLE_DROPDOWN" }
 	};
-	HWND hToolBar = clsToolsWin.CreateToolbar(hWnd, tbb, 9, tips, 9);
+	HWND hToolBar = clsWinTools.CreateToolbar(hWnd, tbb, 9, tips, 9);
 
 	// Add images
 	TBADDBITMAP tbAddBmp = { 0 };
@@ -728,22 +726,22 @@ HWND CWinSpectrum::MakeToolsBar(void)
 	tbAddBmp.nID = IDB_STD_SMALL_COLOR;
 	SendMessage(hToolBar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
 
-	clsToolsWin.CreateRebarBand(hWndRebar, "BTN", 1, 500, 0, hToolBar);
+	clsWinTools.CreateRebarBand(hWndRebar, "BTN", 1, 500, 0, hToolBar);
 
 	//hWndTrack = CreateTrackbar(hWnd, 0, 100, 10);
-	clsToolsWin.CreateRebarBand(hWndRebar, "Value", 2, 0, 0, NULL);
+	clsWinTools.CreateRebarBand(hWndRebar, "Value", 2, 0, 0, NULL);
 	return hWndRebar;
 }
 
 void CWinSpectrum::ToolsbarSetFilterCenterFreq(void)
 {
-	if(clsWinOneFFT.P1_Use == false)return;
-	char str[2000];
-	int n = sprintf(str, "257, 0, 0; 2, %u, 3000", (UINT)((float)clsMainFilter.TargetData->SampleRate / FFTInfo_Filtted.FFTSize * clsWinOneFFT.ScreenP1.x));
-	DbgMsg("Filter Desc: %s\r\n", str);
-	//clsMainFilter.Cuda_Filter_N = CFilter::cuda_filter_2;
-	clsMainFilter.setFilterCoreDesc(&clsMainFilter.rootFilterInfo1, str);
-	clsMainFilter.ParseCoreDesc();
+	//if(clsWinOneFFT.P1_Use == false)return;
+	//char str[2000];
+	//int n = sprintf(str, "257, 0, 0; 2, %u, 3000", (UINT)((float)clsMainFilterI.TargetData->SampleRate / FFTInfo_Filtted.FFTSize * clsWinOneFFT.ScreenP1.x));
+	//DbgMsg("Filter Desc: %s\r\n", str);
+	////clsMainFilter.Cuda_Filter_N = CFilter::cuda_filter_2;
+	//clsMainFilterI.setFilterCoreDesc(&clsMainFilterI.rootFilterInfo1, str);
+	//clsMainFilterI.ParseCoreDesc();
 }
 
 void CWinSpectrum::ToolsbarSetAMFreqAdd(void)
@@ -752,8 +750,8 @@ void CWinSpectrum::ToolsbarSetAMFreqAdd(void)
 	if(
 		clsWinOneFFT.rfButton->RefreshMouseNumButton(
 			clsGetDataSDR.chParams->tunerParams.rfFreq.rfHz 
-			+ (UINT)((float)clsMainFilter.TargetData->SampleRate / FFTInfo_Filtted.FFTSize * clsWinOneFFT.ScreenP1.x)
-			+ clsMainFilter.rootFilterInfo1.FreqCenter
+			+ (UINT)((float)clsMainFilterI.TargetData->SampleRate / FFTInfo_Filtted.FFTSize * clsWinOneFFT.ScreenP1.x)
+			+ clsMainFilterI.rootFilterInfo1.FreqCenter
 		)
 		)
 		clsAnalyze.set_SDR_rfHz(clsWinOneFFT.rfButton->Button->value);
@@ -765,8 +763,8 @@ void CWinSpectrum::ToolsbarSetAMFreqSub(void)
 	if (
 		clsWinOneFFT.rfButton->RefreshMouseNumButton(
 			clsGetDataSDR.chParams->tunerParams.rfFreq.rfHz
-			- (UINT)((float)clsMainFilter.TargetData->SampleRate / FFTInfo_Filtted.FFTSize * clsWinOneFFT.ScreenP1.x)
-			- clsMainFilter.rootFilterInfo1.FreqCenter
+			- (UINT)((float)clsMainFilterI.TargetData->SampleRate / FFTInfo_Filtted.FFTSize * clsWinOneFFT.ScreenP1.x)
+			- clsMainFilterI.rootFilterInfo1.FreqCenter
 		)
 		)
 		clsAnalyze.set_SDR_rfHz(clsWinOneFFT.rfButton->Button->value);

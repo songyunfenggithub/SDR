@@ -9,7 +9,7 @@
 
 namespace WINS {
 
-#define SPECTRUM_ONE_WIN_CLASS		"SPECTRUM_ONE_WIN"
+#define WIN_SPECTRUM_ONE_CLASS		"WIN_SPECTRUM_ONE_CLASS"
 
 	class CWinOneSpectrum
 	{

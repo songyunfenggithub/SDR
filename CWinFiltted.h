@@ -6,12 +6,12 @@
 #include <stdlib.h>
 #include <string>
 
-#include "CFFTWin.h"
-#include "CSignalWin.h"
-
 namespace WINS {
 
-#define CFILTTED_WIN_CLASS		"CFILTTED_WIN_CLASS"
+	class CWinFFT;
+	class CWinSignal;
+
+#define WIN_CFILTTED_CLASS		"WIN_CFILTTED_CLASS"
 
 #define SPECTRUM_WIDTH	0x400
 #define SPECTRUM_WIN_WIDTH	800
@@ -28,19 +28,19 @@ namespace WINS {
 #define TIMEOUT		200
 
 
-	class CFilttedWin
+	class CWinFiltted
 	{
 	public:
-		CFFTWin* m_FFTWin = NULL;
-		CSignalWin* m_SignalWin = NULL;
+		CWinFFT* m_FFTWin = NULL;
+		CWinSignal* m_SignalWin = NULL;
 
 		HWND hWnd = NULL;
 		RECT WinRect;
 		UINT SignalWinHeight = 256;
 
 	public:
-		CFilttedWin();
-		~CFilttedWin();
+		CWinFiltted();
+		~CWinFiltted();
 
 		void Init(void);
 		void UnInit(void);

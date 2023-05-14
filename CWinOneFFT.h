@@ -12,7 +12,7 @@
 
 namespace WINS {
 
-#define FFT_ONE_WIN_CLASS		"FFT_ONE_WIN"
+#define WIN_FFT_ONE_CLASS		"WIN_FFT_ONE_CLASS"
 
 	class CWinOneFFT
 	{

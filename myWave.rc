@@ -376,6 +376,9 @@ IDC_MENU_FILTER MENU
 BEGIN
     POPUP "显示"
     BEGIN
+        MENUITEM "选择显示核1",                      IDM_FILTER_CORE_1_SHOW
+        MENUITEM "选择显示核2",                      IDM_FILTER_CORE_2_SHOW
+        MENUITEM SEPARATOR
         MENUITEM "放大\tCtrl + 1",                IDM_FILTER_ZOOM_INC
         MENUITEM "缩小\t Ctrl + 2",               IDM_FILTER_ZOOM_DEC
         MENUITEM SEPARATOR
@@ -400,6 +403,15 @@ BEGIN
         MENUITEM "1M Hz FFT",                   IDM_FFT_1MHZFFT
         MENUITEM SEPARATOR
         MENUITEM "设置...",                       IDM_SDR_SET
+    END
+END
+
+IDC_MENU_POPUP_AM MENU
+BEGIN
+    POPUP "AM"
+    BEGIN
+        MENUITEM "AM_IQ",                       IDM_AM_IQ
+        MENUITEM "AM_Get_Envelope",             IDM_AM_GET_ENVELOPE
     END
 END
 
@@ -533,19 +545,16 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "确定",IDOK,349,280,50,14
     PUSHBUTTON      "取消",IDCANCEL,406,280,50,14
-	
     EDITTEXT        IDC_EDIT1,85,18,357,14,ES_AUTOHSCROLL
     LTEXT           "描述滤波器核1",IDC_STATIC,25,20,49,8,0,WS_EX_TRANSPARENT
     CONTROL         "使用采样频率抽取率",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,39,100,10
     EDITTEXT        IDC_EDIT2,85,38,60,14,ES_AUTOHSCROLL
     LTEXT           "采样频率抽取率",IDC_STATIC,25,38,49,8
-
     EDITTEXT        IDC_EDIT3,85,68,357,14,ES_AUTOHSCROLL
     LTEXT           "描述滤波器核2",IDC_STATIC,25,70,49,8,0,WS_EX_TRANSPARENT
     CONTROL         "使用采样频率抽取率",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,89,100,10
     EDITTEXT        IDC_EDIT4,85,88,60,14,ES_AUTOHSCROLL
     LTEXT           "采样频率抽取率",IDC_STATIC,25,88,49,8
-
     LTEXT           "abc",IDC_STATIC1,25,115,417,118
 END
 

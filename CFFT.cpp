@@ -14,9 +14,10 @@
 #include <math.h>
 
 #include "public.h"
+#include "Debug.h"
 #include "CData.h"
 #include "CFFT.h"
-#include "CFFTWin.h"
+#include "CWinFFT.h"
 
 using namespace std;
 using namespace WINS;
@@ -24,7 +25,7 @@ using namespace METHOD;
 
 CFFT::CFFT()
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	hMutexBuff = CreateMutex(NULL, false, "CFFThMutexBuff");
 	hMutexDraw = CreateMutex(NULL, false, "CFFThMutexDraw");
 }
@@ -32,7 +33,7 @@ CFFT::CFFT()
 CFFT::~CFFT()
 {
 	FFTDoing = false;
-	while (bFFT_Thread_Exitted == false);
+	while (Thread_Exit == false);
 	UnInit();
 }
 
@@ -129,12 +130,12 @@ void CFFT::DFT(double* src, Complex* dst, int size)
 		dst[m].imagin = imagin;
 		dst[m].real = real;
 		/* if(imagin>=0.0)
-			 printf("%lf+%lfj\n",real,imagin);
+			 DbgMsg("%lf+%lfj\n",real,imagin);
 		 else
-			 printf("%lf%lfj\n",real,imagin);*/
+			 DbgMsg("%lf%lfj\n",real,imagin);*/
 	}
 	end = clock();
-	printf("DFT use time :%lfs for Datasize of:%d\n", (double)(end - start) / CLOCKS_PER_SEC, size);
+	DbgMsg("DFT use time :%lfs for Datasize of:%d\n", (double)(end - start) / CLOCKS_PER_SEC, size);
 
 }
 ////////////////////////////////////////////////////////////////////
@@ -162,13 +163,13 @@ void CFFT::IDFT(Complex* src, Complex* dst, int size)
 		}
 		/*
 		if(imagin>=0.0)
-			printf("%lf+%lfj\n",real,imagin);
+			DbgMsg("%lf+%lfj\n",real,imagin);
 		else
-			printf("%lf%lfj\n",real,imagin);
+			DbgMsg("%lf%lfj\n",real,imagin);
 		*/
 	}
 	end = clock();
-	printf("IDFT use time :%lfs for Datasize of:%d\n", (double)(end - start) / CLOCKS_PER_SEC, size);
+	DbgMsg("IDFT use time :%lfs for Datasize of:%d\n", (double)(end - start) / CLOCKS_PER_SEC, size);
 
 
 }
@@ -225,7 +226,7 @@ void CFFT::NormalFFT(void* Buff, BUFF_DATA_TYPE type, uint32_t pos, UINT mask)
 
 	FFT_remap(FFT_src, FFTInfo->FFTSize);
 	// for(int i=0;i<size_n;i++)
-	 //    printf("%lf\n",src[i]);
+	 //    DbgMsg("%lf\n",src[i]);
 
 	int k = FFTInfo->FFTSize;
 	int z = 0;
@@ -235,7 +236,7 @@ void CFFT::NormalFFT(void* Buff, BUFF_DATA_TYPE type, uint32_t pos, UINT mask)
 	k = z;
 	if (FFTInfo->FFTSize != (1 << k))
 	{
-		printf("file: %s. line: %d. func: %s\r\n", __FILE__, __LINE__, __FUNCTION__);
+		DbgMsg("file: %s. line: %d. func: %s\r\n", __FILE__, __LINE__, __FUNCTION__);
 		exit(0);
 	}
 	//Complex * src_com=(Complex*)malloc(sizeof(Complex)*size_n);
@@ -335,24 +336,24 @@ void CFFT::FFT(UINT pos)
 	if (TimeDelay++ == 100)
 	{
 		TimeDelay = 0;
-		//printf("CFFT use time :%lfs for Datasize of:%d\n", (double)(end - start) / CLOCKS_PER_SEC, FFTSize);
+		//DbgMsg("CFFT use time :%lfs for Datasize of:%d\n", (double)(end - start) / CLOCKS_PER_SEC, FFTSize);
 	}
 }
 
 LPTHREAD_START_ROUTINE CFFT::FFT_Thread(LPVOID lp)
 {
-	OPENCONSOLE;
-	((CFFT*)lp)->FFT_func();
+	OPENCONSOLE_SAVED;
+	((CFFT*)lp)->FFT_Thread_func();
 	//CLOSECONSOLE;
 	return 0;
 }
 
-void CFFT::FFT_func(void)
+void CFFT::FFT_Thread_func(void)
 {
 	UINT fft_pos;
 	UINT fft_between;
 	FFTDoing = true;
-	bFFT_Thread_Exitted = false;
+	Thread_Exit = false;
 	while (FFTDoing && Program_In_Process)
 	{
 		if (FFTNext == false) {	Sleep(0); continue;	}
@@ -370,8 +371,8 @@ void CFFT::FFT_func(void)
 	}
 
 	cuda_FFT_UnInit();
-	bFFT_Thread_Exitted = true;
-	hFFT_Thread = NULL;
+	Thread_Exit = true;
+	hThread = NULL;
 }
 
 double CFFT::GetFFTMaxValue(void)
@@ -385,6 +386,6 @@ double CFFT::GetFFTMaxValue(void)
 		sumIm += (double)max * sin(2 * M_PI * i / FFTInfo->FFTSize) * sin(2 * M_PI * i / FFTInfo->FFTSize);
 	}
 	double d = sqrt(sumRe * sumRe + sumIm * sumIm);
-	printf("maxvalue:%d, %lf\n", max, d);
+	DbgMsg("maxvalue:%d, %lf\n", max, d);
 	return d/16;
 }

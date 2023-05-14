@@ -17,11 +17,11 @@
 #include "CFile.h"
 #include "CWinMain.h"
 #include "CSoundCard.h"
-#include "MyDebug.h"
+#include "Debug.h"
 
 #include "CData.h"
 
-CFile		clsFile;
+CFile clsFile;
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -181,11 +181,11 @@ BOOL CFile::SaveBuffToFile(VOID)
 	}
 	else
 	{
-		DWORD dwLen = (dwSaveEndPos - dwSaveStartPos) * AdcData->SizeOfType;
+		DWORD dwLen = (dwSaveEndPos - dwSaveStartPos) * AdcDataI->SizeOfType;
 		//WriteFile(hFile, "wa", 2, &NumberOfBytesWritten, NULL);
 		//WriteFile(hFile, &clsSoundCard.FormatEx, sizeof(WAVEFORMATEX), &NumberOfBytesWritten, NULL);
 		//WriteFile(hFile, &dwLen, 8, &NumberOfBytesWritten, NULL);
-		WriteFile(hFile, (char*)AdcData->Buff + dwSaveStartPos * AdcData->SizeOfType, dwLen, &NumberOfBytesWritten, NULL);
+		WriteFile(hFile, (char*)AdcDataI->Buff + dwSaveStartPos * AdcDataI->SizeOfType, dwLen, &NumberOfBytesWritten, NULL);
 		CloseHandle(hFile);
 	}
 	return TRUE;

@@ -8,12 +8,13 @@
 #include <iostream>
 
 #include "public.h"
+#include "Debug.h"
 #include "CSoundCard.h"
 #include "CData.h"
 #include "CFilter.h"
 #include "CWinFFT.h"
 #include "CWinSDR.h"
-#include "CToolsWin.h"
+#include "CWinTools.h"
 
 #include "CWinSDRScan.h"
 
@@ -54,7 +55,7 @@ CWinSDRScan clsWinOneFFT;
 
 CWinSDRScan::CWinSDRScan()
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 
 	hMutexUseBuff = CreateMutex(NULL, false, "CWinScanhMutexUseBuff");
 
@@ -82,7 +83,7 @@ void CWinSDRScan::RegisterWindowsClass(void)
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);//(HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName = (LPCSTR)NULL;
-	wcex.lpszClassName = SDR_SCAN_ONE_WIN_CLASS;
+	wcex.lpszClassName = WIN_SDR_SCAN_ONE_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	RegisterClassEx(&wcex);
@@ -103,7 +104,7 @@ LRESULT CALLBACK CWinSDRScan::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 	{
 	case WM_CREATE:
 
-		OPENCONSOLE;
+		OPENCONSOLE_SAVED;
 		{
 			clsWinOneFFT.hWnd = hWnd;
 
@@ -113,7 +114,7 @@ LRESULT CALLBACK CWinSDRScan::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 		break;
 
 	case WM_CHAR:
-		printf("WinOneSDRScan WM_CHAR\r\n");
+		DbgMsg("WinOneSDRScan WM_CHAR\r\n");
 		//PostMessage(clsWinSpect.hWnd, message, wParam, lParam);
 		break;
 	case WM_LBUTTONDOWN:
@@ -122,7 +123,7 @@ LRESULT CALLBACK CWinSDRScan::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 	case WM_MOUSEMOVE:
 		MouseX = GET_X_LPARAM(lParam);
 		MouseY = GET_Y_LPARAM(lParam);
-		//Hz = ((double)MouseY / clsWinSpect.WinOneSpectrumVScrollZoom + clsWinSpect.WinOneSpectrumVScrollPos) * AdcData->SampleRate / clsWaveFFT.FFTSize;
+		//Hz = ((double)MouseY / clsWinSpect.WinOneSpectrumVScrollZoom + clsWinSpect.WinOneSpectrumVScrollPos) * AdcDataI->SampleRate / clsWaveFFT.FFTSize;
 		OnMouse(hWnd);
 		break;
 
@@ -214,7 +215,7 @@ void CWinSDRScan::OnMouse(HWND hWnd)
 	int n = 0;
 	n += sprintf(strMouse + n, "X: %d, core V: %lf", X, Y);
 
-	double Hz = (double)X * AdcData->SampleRate / clsWaveFFT.FFTSize;
+	double Hz = (double)X * AdcDataI->SampleRate / clsWaveFFT.FFTSize;
 	Y = X > clsWaveFFT.FFTSize / 2 ? 0 : clsWinSpect.OrignalFFTBuff[X];
 	n += sprintf(strMouse + n, " | ");
 	n += sprintf(strMouse + n, "Hz: %.03f, FFT: %s", Hz, formatKDouble(Y, 0.001, "", t));
@@ -277,7 +278,7 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 		{
 			if (!(i % 5))
 			{
-				sprintf(s, "%.02fhz", (double)(i * 32 + HScrollPos) / HScrollZoom * AdcData->SampleRate / FFTInfo_Signal.FFTSize);
+				sprintf(s, "%.02fhz", (double)(i * 32 + HScrollPos) / HScrollZoom * AdcDataI->SampleRate / FFTInfo_Signal.FFTSize);
 				r.top = WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT + DIVLONG;
 				r.left = x;
 				SetTextColor(hdc, COLOR_ORIGNAL_FFT);
@@ -484,7 +485,7 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 			"FFT Size: %d      FFT Step: %d\r\n"\
 			"Sepctrum Hz£º%.03f",
 			CoreLength,
-			AdcData->SampleRate, AdcData->NumPerSec,
+			AdcDataI->SampleRate, AdcDataI->NumPerSec,
 			FFTInfo_Signal.FFTSize, FFTInfo_Signal.FFTStep,
 			clsWinOneSpectrum.Hz
 		);
@@ -539,7 +540,7 @@ void CWinSDRScan::KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 	switch (message)
 	{
 	case WM_KEYDOWN:
-		printf("win fft WM_KEYDOWN\r\n");
+		DbgMsg("win fft WM_KEYDOWN\r\n");
 		/* Translate keyboard messages to scroll commands */
 		switch (wParam)
 		{
@@ -653,7 +654,7 @@ void CWinSDRScan::KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			InvalidateRect(hWnd, NULL, TRUE);
 			UpdateWindow(hWnd);
-			printf("CWinSDRScan HScrollPos: %d, HScrollWidth: %d.\r\n", HScrollPos, HScrollWidth);
+			DbgMsg("CWinSDRScan HScrollPos: %d, HScrollWidth: %d.\r\n", HScrollPos, HScrollWidth);
 		}
 		break;
 	}

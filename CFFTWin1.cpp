@@ -67,7 +67,7 @@ using namespace DEVICES;
 
 CFFTWin::CFFTWin()
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 
 	Init();
 
@@ -126,7 +126,7 @@ LRESULT CALLBACK CFFTWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 	{
 	case WM_CREATE:
 	{
-		OPENCONSOLE;
+		OPENCONSOLE_SAVED;
 
 		me = (CFFTWin*)set_WinClass(hWnd, lParam);
 
@@ -145,11 +145,11 @@ LRESULT CALLBACK CFFTWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		me->fft->hWnd = hWnd;
 		me->fft->Data = me->Data;
 		me->fft->Init();
-		me->fft->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, me->fft, 0, NULL);
+		me->fft->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, me->fft, 0, NULL);
 		me->fft2->hWnd = hWnd;
 		me->fft2->Data = me->Data2;
 		me->fft2->Init();
-		me->fft2->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, me->fft2, 0, NULL);
+		me->fft2->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, me->fft2, 0, NULL);
 
 		me->DrawWhich = me->fft;
 	}
@@ -272,7 +272,8 @@ LRESULT CALLBACK CFFTWin::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 		break;
 	case WM_DESTROY:
 		me->fft->FFTDoing = false;
-		while (me->fft->bFFT_Thread_Exitted == false);
+		//while (me->fft->bFFT_Thread_Exitted == false);
+		me->fft2->FFTDoing = false;
 		WaitForSingleObject(me->hDrawMutex, INFINITE);
 		me->hWnd = NULL;
 		ReleaseMutex(me->hDrawMutex);
@@ -757,7 +758,7 @@ void CFFTWin::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_KEYDOWN:
-		//printf("winSpectrum KeyAndScroll WM_KEYDOWN\r\n");
+		//DbgMsg("winSpectrum KeyAndScroll WM_KEYDOWN\r\n");
 		/* Translate keyboard messages to scroll commands */
 		switch (wParam)
 		{
@@ -928,7 +929,7 @@ void CFFTWin::SpectrumToWin(HDC hDC)
 			destWidth, spectY,
 			SRCCOPY);
 
-	//printf("%d,%d,%d,%d\r\n", rt.top, rt.left, rt.right, rt.bottom);
+	//DbgMsg("%d,%d,%d,%d\r\n", rt.top, rt.left, rt.right, rt.bottom);
 	ReleaseMutex(hDrawMutex);
 
 }
@@ -1208,12 +1209,12 @@ LRESULT CALLBACK CFFTWin::DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, 
 			{
 				CFFT* cFFT = (CFFT*)me->fft;
 				cFFT->FFTDoing = false;
-				while (cFFT->bFFT_Thread_Exitted == false);
+				while (cFFT->Thread_Exit == false);
 				cFFT->FFTInfo->FFTSize = GetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, NULL, false); 
 				cFFT->FFTInfo->HalfFFTSize = cFFT->FFTInfo->FFTSize / 2;
 				cFFT->FFTInfo->FFTStep = GetDlgItemInt(hDlg, IDC_EDIT_FFT_STEP, NULL, false);
 				cFFT->Init();
-				cFFT->hFFT_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, cFFT, 0, NULL);
+				cFFT->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, cFFT, 0, NULL);
 			}
 			EndDialog(hDlg, LOWORD(wParam));
 			return TRUE;

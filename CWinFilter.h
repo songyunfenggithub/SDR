@@ -9,14 +9,13 @@ using namespace METHOD;
 
 namespace WINS {
 
-#define FILTER_WIN_CLASS	"FILTERCORE_WIN"
+#define WIN_FILTER_CLASS	"WIN_FILTER_CLASS"
 
-	class CFilterWin
+	class CWinFilter
 	{
 	public:
 		CFilter* cFilter = NULL;
-		CFilter::FILTER_INFO* rootFilterInfo1 = NULL;
-		CFilter::FILTER_INFO* rootFilterInfo2 = NULL; 
+		CFilter::FILTER_INFO* rootFilterInfo = NULL;
 		CFilter::FILTER_INFO* pFilterInfo = NULL;
 
 		HWND	hWnd = NULL;
@@ -26,19 +25,20 @@ namespace WINS {
 
 		HMENU hMenuMain = NULL;
 		HMENU hMenuFilterItems = NULL;
+		HMENU hMenuFilterCoreItems = NULL;
 
 		int HOriginalWidth = 0;
 		int HScrollPos = 0, HScrollWidth = 0;
 		double HScrollZoom = 1.0;
 
-		FILTER_CORE_DATA_TYPE* pCore = NULL;
+		CFilter::FILTER_CORE_DATA_TYPE* pCore = NULL;
 
 		bool filterCoreShow = true;
 		bool filterCoreSpectrumShow = true;
 		bool filterCoreSpectrumLogShow = true;
 
-		typedef struct {
-			CFilterWin* pFilterWin;
+		typedef struct CORE_ANALYSE_DATA_STRUCT {
+			CWinFilter* pFilterWin;
 			CFilter::PFILTER_INFO pFilterInfo;
 		}CORE_ANALYSE_DATA;
 
@@ -51,8 +51,8 @@ namespace WINS {
 		double* CoreAnalyseFFTLogBuff = NULL;
 
 	public:
-		CFilterWin();
-		~CFilterWin();
+		CWinFilter();
+		~CWinFilter();
 
 		void RegisterWindowsClass(void);
 		void OpenWindow(void);
@@ -61,10 +61,10 @@ namespace WINS {
 		bool OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
 		void GetRealClientRect(PRECT lprc);
 		void KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
-		void InitFilterCoreAnalyse(CFilter::PFILTER_INFO pFilterInfo);
-		void set_CoreAnalyse_root_Filter(void);
+		void InitFilterCoreAnalyse(CFilter::FILTER_INFO* fi);
+		void set_CoreAnalyse_root_Filter(CFilter::FILTER_INFO* fi);
 
-		void FilterCoreAnalyse(CFilterWin* pFilterWin, CFilter::PFILTER_INFO pFilterInfo);
+		void FilterCoreAnalyse(CWinFilter* pFilterWin, CFilter::PFILTER_INFO pFilterInfo);
 
 		static LPTHREAD_START_ROUTINE FilterCoreAnalyse_thread(LPVOID lp);
 

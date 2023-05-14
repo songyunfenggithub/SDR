@@ -23,8 +23,8 @@
 #include "CWinMain.h"
 #include "CWinSpectrum.h"
 #include "CWinPMT.h"
-#include "CFilterWin.h"
-#include "CFilterFFT.h"
+#include "CWinFilter.h"
+#include "CFFTforFilterAnalyze.h"
 #include "CWinSDR.h"
 
 #include "CDataFromTcpIp.h"
@@ -37,14 +37,16 @@
 #include "cuda_CFilter2.cuh"
 
 #include "CAnalyze.h"
-#include "CAudioWin.h"
-#include "CFilttedWin.h"
+#include "CWinAudio.h"
+#include "CWinFiltted.h"
+#include "CWinTools.h"
 
-#include "MyDebug.h"
+#include "Debug.h"
 
 using namespace WINS; 
 using namespace DEVICES;
 
+#define WIN_MAIN_CLASS "WIN_MAIN_CLASS"
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -66,17 +68,11 @@ using namespace DEVICES;
 
 #define TIMEOUT		50
 
-extern CDevices	clsDevices;
-extern CFile	clsFile;
-
 CWinMain	clsWinMain;
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 CWinMain::CWinMain()
 {
+	OPENCONSOLE;
 
 	DrawInfo.wVSclMax = 256*2;
 	DrawInfo.wHSclMax = 0;
@@ -98,7 +94,7 @@ CWinMain::CWinMain()
 
 CWinMain::~CWinMain()
 {
-
+	CLOSECONSOLE;
 }
 
 LRESULT CALLBACK CWinMain::About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -123,9 +119,7 @@ BOOL CWinMain::InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    HWND hWnd;
 
-   //hInst = hInstance; // Store instance handle in our global variable
-
-   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+   hWnd = CreateWindow(WIN_MAIN_CLASS, szTitle, WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
    if (!hWnd)
@@ -139,30 +133,167 @@ BOOL CWinMain::InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
-ATOM CWinMain::MyRegisterClass(HINSTANCE hInstance)
+ATOM CWinMain::RegisterClass(HINSTANCE hInstance)
 {
 	WNDCLASSEX wcex;
 
 	wcex.cbSize = sizeof(WNDCLASSEX); 
 
 	wcex.style			= CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc	= (WNDPROC)CWinMain::WndProc;
+	wcex.lpfnWndProc	= (WNDPROC)CWinMain::StaticWndProc;
 	wcex.cbClsExtra		= 0;
 	wcex.cbWndExtra		= 0;
 	wcex.hInstance		= hInstance;
 	wcex.hIcon			= LoadIcon(hInstance, (LPCTSTR)IDI_MYWAVE);
 	wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
-	wcex.hbrBackground	= NULL;// (HBRUSH)GetStockObject( BLACK_BRUSH );(HBRUSH)(COLOR_WINDOW+1);
+	wcex.hbrBackground	= (HBRUSH)GetStockObject( BLACK_BRUSH );//(HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName	= (LPCSTR)IDC_MENU_MAIN;
-	wcex.lpszClassName	= szWindowClass;
+	wcex.lpszClassName	= WIN_MAIN_CLASS;
 	wcex.hIconSm		= LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	return RegisterClassEx(&wcex);
 }
 
+LRESULT CALLBACK CWinMain::StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	return clsWinMain.WndProc(hWnd, message, wParam, lParam);
+}
+
 LRESULT CALLBACK CWinMain::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	return clsWinMain.WndProcReal(hWnd, message, wParam, lParam);
+	switch (message)
+	{
+	case WM_CREATE:
+		this->hWnd = hWnd;
+		hMenu = GetMenu(hWnd);
+		CheckMenuItem(hMenu, IDM_WAVEAUTOSCROLL,
+			(DrawInfo.fAutoScroll ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(hMenu, IDM_WAVE_FOLLOW_ORIGNAL,
+			(DrawInfo.fFollowByOrignal ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(hMenu, IDM_WAVE_ORIGNAL_SIGNAL_SHOW,
+			(DrawInfo.bOrignalSignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(hMenu, IDM_WAVE_FILTTED_SIGNAL_SHOW,
+			(DrawInfo.bFilttedSignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+
+		DrawInfo.uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
+
+		MainInit();
+		RestoreValue();
+		clsAnalyze.Init_Params();
+		
+		CaculateHScroll();
+		CaculateVScroll();
+	
+		m_audioWin = new CWinAudio();
+		m_filttedWin = new CWinFiltted();
+		m_FilterWin = new CWinFilter();
+		m_FilterWin->cFilter = &clsMainFilterI;
+
+		hWndRebar = MakeToolsBar();
+
+		DbgMsg("CWinMain WM_CREATE\r\n");
+		break;
+	case WM_TIMER:
+	{
+		//AdcDataI->GeneratorWave();
+		if (AdcDataQ->GetNew)
+		{
+			CaculateHScroll();
+			AdcDataQ->GetNew = false;
+			InvalidateRect(hWnd, NULL, TRUE);
+			UpdateWindow(hWnd);
+		}
+	}
+	break;
+	case WM_SIZE:
+	{
+		GetClientRect(hWndRebar, &RebarRect);
+		CaculateHScroll();
+		InvalidateRect(hWnd, NULL, TRUE);
+		UpdateWindow(hWnd);
+	}
+	break;
+	case WM_NOTIFY:
+		clsWinTools.DoNotify(hWnd, message, wParam, lParam);
+	break;
+	case WM_COMMAND:
+		OnCommand(message, wParam, lParam);
+		break;
+	case WM_ERASEBKGND:
+		//不加这条消息屏幕刷新会闪烁
+		break;
+	case WM_PAINT:
+		Paint();
+		break;
+	case WM_CLOSE:
+	{
+		int res = ::MessageBox(NULL, "[WM_CLOSE] 是否确定退出", "提示", MB_OKCANCEL);
+		if (res == IDOK) { //点击 【确定】按钮
+			return DefWindowProc(hWnd, message, wParam, lParam);
+		}
+		else if (res == IDCANCEL) {//点击【取消】按钮，不调用默认的消息处理 DefWindowProc 
+		}
+		else {
+		}
+	}
+	break;
+	case WM_QUIT:
+	{
+		::MessageBox(NULL, "WM_QUIT", "提示", MB_OK);
+	}
+	break;
+	case WM_DESTROY:
+		Program_In_Process = false;
+		while (clsMainFilterI.Thread_Exit == false);
+		while (clsAudioFilter.Thread_Exit == false);
+
+		clsGetDataSDR.close_SDR_device();
+		
+		if (clsWinSDR.hWnd) 
+			DestroyWindow(clsWinSDR.hWnd);
+		if (clsWinSpect.hWnd) 
+			DestroyWindow(clsWinSpect.hWnd);
+		if (m_FilterWin->hWnd) 
+			DestroyWindow(m_FilterWin->hWnd);
+		if (m_audioWin->hWnd) 
+			DestroyWindow(m_audioWin->hWnd);
+		if (m_filttedWin->hWnd)
+			DestroyWindow(m_filttedWin->hWnd);
+
+		SaveValue();
+		clsMainFilterI.SaveValue();
+		clsMainFilterQ.SaveValue();
+		clsAudioFilter.SaveValue();
+
+		DbgMsg("Main WM_DESTROY\r\n");
+		PostQuitMessage(0);
+		break;
+	case WM_KEYDOWN:
+	//{
+	//	if (wParam == VK_ESCAPE) { //当按下ESC键时，模拟退出消息
+
+	//		::MessageBox(NULL, "WM_KEYUP消息, ESC 键盘按下", "提示", MB_OK);
+
+	//		//该函数将指定的消息发送到一个或多个窗口。此函数为指定的窗口调用窗口程序，直到窗口程序处理完消息再返回。
+	//		//LRESULT SendMessage（HWND hWnd，UINT Msg，WPARAM wParam，LPARAM IParam）；
+
+
+	//		//该函数将一个消息放入（寄送）到与指定窗口创建的线程相联系消息队列里，不等待线程处理消息就返回。
+	//		//消息队列里的消息通过调用GetMessage和PeekMessage取得
+	//		//B00L PostMessage（HWND hWnd，UINT Msg，WPARAM wParam，LPARAM lParam）；
+
+	//		::PostMessage(hWnd, WM_CLOSE, 0, 0);  //手动发送一个WM_CLOSE的消息
+	//	}
+	//}
+	case WM_KEYUP:
+	case WM_VSCROLL:
+	case WM_HSCROLL:
+		KeyAndScroll(message, wParam, lParam);
+		break;
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
 }
 
 VOID CWinMain::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
@@ -317,181 +448,6 @@ VOID CWinMain::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 	}
 }
 
-LRESULT CALLBACK CWinMain::WndProcReal(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	switch (message)
-	{
-	case WM_CREATE:
-
-		OPENCONSOLE;
-		
-		this->hWnd = hWnd;
-
-		hMenu = GetMenu(hWnd);
-		CheckMenuItem(hMenu, IDM_WAVEAUTOSCROLL,
-			(DrawInfo.fAutoScroll ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-		CheckMenuItem(hMenu, IDM_WAVE_FOLLOW_ORIGNAL,
-			(DrawInfo.fFollowByOrignal ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-		CheckMenuItem(hMenu, IDM_WAVE_ORIGNAL_SIGNAL_SHOW,
-			(DrawInfo.bOrignalSignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-		CheckMenuItem(hMenu, IDM_WAVE_FILTTED_SIGNAL_SHOW,
-			(DrawInfo.bFilttedSignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-
-		DrawInfo.uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
-
-
-		//clsSoundCard.MyWave(NULL);
-
-		//clsGetDataUSB.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CDataFromUSB::GetDataUSBThreadFun, NULL, 0, NULL);
-		//clsGetDataUsart.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CDataFromUsart::GetDataUsartThreadFun, NULL, 0, NULL);
-
-		//clsGetDataTcpIp.TcpIpThreadsStart();
-		
-		MainInit();
-
-		clsGetDataSDR.open_SDR_device();
-
-		//clsGetDataSDC.OpenIn();
-
-		//clsWaveFunc.WaveGenerate();
-
-		/*
-		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::filter_thread1, NULL, 0, NULL);
-		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::filter_thread2, NULL, 0, NULL);
-		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::filter_thread3, NULL, 0, NULL);
-		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::filter_thread4, NULL, 0, NULL);
-		*/
-
-		RestoreValue();
-
-		clsAnalyze.Init_Params();
-		
-		CaculateHScroll();
-		CaculateVScroll();
-	
-		m_audioWin = new CAudioWin();
-		m_filttedWin = new CFilttedWin();
-		m_FilterWin = new CFilterWin();
-		m_FilterWin->cFilter = &clsMainFilter;
-		m_FilterWin->rootFilterInfo1 = &clsMainFilter.rootFilterInfo1;
-		m_FilterWin->rootFilterInfo2 = &clsMainFilter.rootFilterInfo2;
-
-		DbgMsg("CWinMain WM_CREATE\r\n");
-
-		break;
-	case WM_TIMER:
-		//AdcData->GeneratorWave();
-	{
-		if (AdcData->GetNew)
-		{
-			CaculateHScroll();
-			AdcData->GetNew = false;
-			InvalidateRect(hWnd, NULL, TRUE);
-			UpdateWindow(hWnd);
-		}
-	}
-	break;
-
-	case WM_SIZE:
-		CaculateHScroll();
-		InvalidateRect(hWnd, NULL, TRUE);
-		break;
-
-	case WM_COMMAND:
-		OnCommand(message, wParam, lParam);
-		break;
-
-	case WM_ERASEBKGND:
-		//不加这条消息屏幕刷新会闪烁
-		break;
-
-	case WM_PAINT:
-		Paint();
-		break;
-	case WM_CLOSE:
-	{
-		int res = ::MessageBox(NULL, "[WM_CLOSE] 是否确定退出", "提示", MB_OKCANCEL);
-		if (res == IDOK) { //点击 【确定】按钮
-		}
-		else if (res == IDCANCEL) {//点击【取消】按钮，不调用默认的消息处理 DefWindowProc 
-
-			return 0;
-		}
-		else {
-			return 0;
-		}
-	}
-	break;
-	case WM_QUIT:
-	{
-		::MessageBox(NULL, "WM_QUIT", "提示", MB_OK);
-	}
-	break;
-	case WM_DESTROY:
-		//退出所有正在处理线程
-		Program_In_Process = false;
-		//while (!isGetDataExited);
-		Sleep(200);
-
-		clsGetDataSDR.close_SDR_device();
-		
-		clsMainFilter.cudaFilter->UnInit();
-		clsMainFilter.cudaFilter2->UnInit();
-
-		if (clsWinSDR.hWnd) 
-			DestroyWindow(clsWinSDR.hWnd);
-		if (clsWinSpect.hWnd) 
-			DestroyWindow(clsWinSpect.hWnd);
-		if (m_FilterWin->hWnd) 
-			DestroyWindow(m_FilterWin->hWnd);
-		if (m_audioWin->hWnd) 
-			DestroyWindow(m_audioWin->hWnd);
-		if (m_filttedWin->hWnd)
-			DestroyWindow(m_filttedWin->hWnd);
-
-		SaveValue();
-
-		clsMainFilter.SaveValue();
-		clsAudioFilter.SaveValue();
-
-		DbgMsg("Main WM_DESTROY\r\n");
-		
-		//system("PAUSE");
-
-		CLOSECONSOLE;
-		PostQuitMessage(0);
-		break;
-	case WM_KEYDOWN:
-	//{
-	//	if (wParam == VK_ESCAPE) { //当按下ESC键时，模拟退出消息
-
-	//		::MessageBox(NULL, "WM_KEYUP消息, ESC 键盘按下", "提示", MB_OK);
-
-	//		//该函数将指定的消息发送到一个或多个窗口。此函数为指定的窗口调用窗口程序，直到窗口程序处理完消息再返回。
-	//		//LRESULT SendMessage（HWND hWnd，UINT Msg，WPARAM wParam，LPARAM IParam）；
-
-
-	//		//该函数将一个消息放入（寄送）到与指定窗口创建的线程相联系消息队列里，不等待线程处理消息就返回。
-	//		//消息队列里的消息通过调用GetMessage和PeekMessage取得
-	//		//B00L PostMessage（HWND hWnd，UINT Msg，WPARAM wParam，LPARAM lParam）；
-
-	//		::PostMessage(hWnd, WM_CLOSE, 0, 0);  //手动发送一个WM_CLOSE的消息
-	//	}
-	//}
-	case WM_KEYUP:
-	case WM_VSCROLL:
-	case WM_HSCROLL:
-		KeyAndScroll(message, wParam, lParam);
-		break;
-
-	default:
-		return DefWindowProc(hWnd, message, wParam, lParam);
-	}
-
-	return DefWindowProc(hWnd, message, wParam, lParam);
-	//return 0;
-}
-
 VOID CWinMain::Paint(void)
 {
 	HDC		hDC;
@@ -502,6 +458,7 @@ VOID CWinMain::Paint(void)
 	hDC = BeginPaint(hWnd, &ps);
 
 	GetClientRect(hWnd, &rt);
+	rt.bottom -= RebarRect.bottom;
 
 	HDC		hdc = CreateCompatibleDC(hDC);
 	HBITMAP hbmp = CreateCompatibleBitmap(hDC, rt.right, rt.bottom);
@@ -607,47 +564,61 @@ VOID CWinMain::Paint(void)
 		bufStep = 1;
 	}
 
-	int InfolastPos;
-	double vzoom = DrawInfo.dbVZoom;// DrawInfo.iVZoom >= 0 ? (1 << DrawInfo.iVZoom) : (1.0 / (1 << (-DrawInfo.iVZoom)));
-	HPEN hPenSaved = NULL;
+	UINT h_pos = DrawInfo.iHZoom > 0
+		? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
+		: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom);
+
 	if (DrawInfo.bOrignalSignalShow) {
-		//绘制原信号--------------------------------------------------
-		hPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
-		//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
-		hPenSaved = (HPEN)SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
-		x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-		PADC_DATA_TYPE pData = (PADC_DATA_TYPE)AdcData->Buff +
-			(	DrawInfo.iHZoom > 0
-				? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
-				: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom)	);
-		
-		y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
-		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-		//printf("zoom:%f, v:%d, zoomv: %d\r\n", vzoom, *pData, y);
-		InfolastPos = -1;
-		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
-		do
-		{
-			pData += bufStep;
-			x += dwWStep;
-			if (pData == &((PADC_DATA_TYPE)AdcData->Buff)[AdcData->Pos & AdcData->Mask])InfolastPos = x;
-			y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
-			y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
-		} while (x < rt.right - WAVE_RECT_BORDER_RIGHT);
-		if (InfolastPos >= 0)
-		{
-			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
-			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-		}
-		SelectObject(hdc, hPenSaved);
-		DeleteObject(hPen);
+		DrawSignal_short(AdcDataI, h_pos, 0, hdc, dwXOffSet, bufStep, dwWStep, &rt);
+		DrawSignal_short(AdcDataQ, h_pos, 1, hdc, dwXOffSet, bufStep, dwWStep, &rt);
 	}
+
+	if (DrawInfo.bFilttedSignalShow) {
+		DrawSignal_float(AdcDataIFiltted, h_pos, 2, hdc, dwXOffSet, bufStep, dwWStep, &rt);
+		DrawSignal_float(AdcDataQFiltted, h_pos, 3, hdc, dwXOffSet, bufStep, dwWStep, &rt);
+	}
+
+	//int InfolastPos;
+	//double vzoom = DrawInfo.dbVZoom;// DrawInfo.iVZoom >= 0 ? (1 << DrawInfo.iVZoom) : (1.0 / (1 << (-DrawInfo.iVZoom)));
+	//HPEN hPenSaved = NULL;
+	//if (DrawInfo.bOrignalSignalShow) {
+	//	//绘制原信号--------------------------------------------------
+	//	hPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
+	//	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
+	//	hPenSaved = (HPEN)SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
+	//	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
+	//	PADC_DATA_TYPE pData = (PADC_DATA_TYPE)AdcDataI->Buff +
+	//		(	DrawInfo.iHZoom > 0
+	//			? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
+	//			: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom)	);
+	//	
+	//	y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
+	//	y = BOUND(y, 0, WAVE_RECT_HEIGHT);
+	//	//DbgMsg("zoom:%f, v:%d, zoomv: %d\r\n", vzoom, *pData, y);
+	//	InfolastPos = -1;
+	//	MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
+	//	do
+	//	{
+	//		pData += bufStep;
+	//		x += dwWStep;
+	//		if (pData == &((PADC_DATA_TYPE)AdcDataI->Buff)[AdcDataI->Pos & AdcDataI->Mask])InfolastPos = x;
+	//		y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
+	//		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
+	//		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
+	//	} while (x < rt.right - WAVE_RECT_BORDER_RIGHT);
+	//	if (InfolastPos >= 0)
+	//	{
+	//		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
+	//		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
+	//	}
+	//	SelectObject(hdc, hPenSaved);
+	//	DeleteObject(hPen);
+	//}
 
 	{
 		//绘制信号MASKS--------------------------------------------------
 		hPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
-		hPenSaved = (HPEN)SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
+		HPEN hPenSaved = (HPEN)SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
 		x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
 		char* pData = AdcBuffMarks +
 			(DrawInfo.iHZoom > 0
@@ -670,67 +641,66 @@ VOID CWinMain::Paint(void)
 		DeleteObject(hPen);
 	}
 
-	if (DrawInfo.bFilttedSignalShow) {
-		//绘制滤波信号--------------------------------------------------
-		hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 0));
-		//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
-		SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
-		x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-		FILTTED_DATA_TYPE* pFilterData = (FILTTED_DATA_TYPE*)AdcDataFiltted->Buff +
-			(
-				DrawInfo.iHZoom > 0
-				? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
-				: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom)
-				);
-		y = DrawInfo.dwVZoomedHeight / 2 - (*pFilterData * vzoom) - DrawInfo.dwVZoomedPos;
-		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
-		InfolastPos = -1;
-		do
-		{
-			pFilterData += bufStep;
-			x += dwWStep;
-			y = DrawInfo.dwVZoomedHeight / 2 - (*pFilterData * vzoom) - DrawInfo.dwVZoomedPos;
-			y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
-			if (pFilterData == &((FILTTED_DATA_TYPE*)AdcDataFiltted->Buff)[AdcDataFiltted->Pos & AdcDataFiltted->Mask]) {
-				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
-				LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
-				//InfolastPos = x;
-			}
-		} while (x < rt.right - WAVE_RECT_BORDER_RIGHT);
-		
-		/*
-		if (InfolastPos >= 0)
-		{
-			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
-			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-		}
-		*/
-		DeleteObject(hPen);
-	}
+	//if (DrawInfo.bFilttedSignalShow) {
+	//	//绘制滤波信号--------------------------------------------------
+	//	hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 0));
+	//	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
+	//	SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
+	//	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
+	//	FILTTED_DATA_TYPE* pFilterData = (FILTTED_DATA_TYPE*)AdcDataIFiltted->Buff +
+	//		(
+	//			DrawInfo.iHZoom > 0
+	//			? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
+	//			: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom)
+	//			);
+	//	y = DrawInfo.dwVZoomedHeight / 2 - (*pFilterData * vzoom) - DrawInfo.dwVZoomedPos;
+	//	y = BOUND(y, 0, WAVE_RECT_HEIGHT);
+	//	MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
+	//	InfolastPos = -1;
+	//	do
+	//	{
+	//		pFilterData += bufStep;
+	//		x += dwWStep;
+	//		y = DrawInfo.dwVZoomedHeight / 2 - (*pFilterData * vzoom) - DrawInfo.dwVZoomedPos;
+	//		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
+	//		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
+	//		if (pFilterData == &((FILTTED_DATA_TYPE*)AdcDataIFiltted->Buff)[AdcDataIFiltted->Pos & AdcDataIFiltted->Mask]) {
+	//			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
+	//			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
+	//			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
+	//			//InfolastPos = x;
+	//		}
+	//	} while (x < rt.right - WAVE_RECT_BORDER_RIGHT);
+	//	
+	//	/*
+	//	if (InfolastPos >= 0)
+	//	{
+	//		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
+	//		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
+	//	}
+	//	*/
+	//	DeleteObject(hPen);
+	//}
 
 	//---------------------------------------
 
 	double z = DrawInfo.iVZoom >= 0 ? (1.0 / ((UINT64)1 << DrawInfo.iVZoom)) : ((UINT64)1 << -DrawInfo.iVZoom);
 	char tstr1[100], tstr2[100], tstradcpos[100], tstrfiltpos[100], tstrfiltbuffpos[100], tstrfftpos[100];
-	//AdcData->NumPerSec = 38400;
-	double TimePreDiv = 32.0 / AdcData->SampleRate * 
+	//AdcDataI->NumPerSec = 38400;
+	double TimePreDiv = 32.0 / AdcDataI->SampleRate * 
 		( DrawInfo.iHZoom >= 0 ? 1.0 / ((UINT64)1 << DrawInfo.iHZoom) : ((UINT64)1 << -DrawInfo.iHZoom));
 	sprintf(s, "32 / DIV    %sV / DIV    %ss / DIV 中文\r\n"\
-		"Pos:%s\r\nFilttedPos:%s\r\nFilttedBuffPos=%s\r\nFFTPos:%s\r\n"\
+		"Pos:%s\r\nFilttedPos:%s\r\nFilttedBuffPos=%s\r\n"\
 		"hBarPos: %d\r\n"\
 		"AdcSampleRate: %d    Real AdcSampleRate: %d\r\n"\
 		"HZoom: %d, %d \t VZoom: %d, %d",
 		formatKKDouble(32.0 * DrawInfo.VotagePerDIV * z, "", tstr1),
 		formatKKDouble(TimePreDiv, "", tstr2),
-		fomatKINT64(AdcData->Pos, tstradcpos),
-		fomatKINT64(AdcData->ProcessPos, tstrfiltpos),
-		fomatKINT64(AdcDataFiltted->Pos, tstrfiltbuffpos),
-		fomatKINT64(clsFilterFFT.FFTPos, tstrfftpos),
+		fomatKINT64(AdcDataI->Pos, tstradcpos),
+		fomatKINT64(AdcDataI->ProcessPos, tstrfiltpos),
+		fomatKINT64(AdcDataIFiltted->Pos, tstrfiltbuffpos),
 		DrawInfo.dwHZoomedPos,
-		AdcData->SampleRate, AdcData->NumPerSec,
+		AdcDataI->SampleRate, AdcDataI->NumPerSec,
 		DrawInfo.iHZoom, DrawInfo.iHZoom >= 0 ? 1 << DrawInfo.iHZoom : -(1 << -DrawInfo.iHZoom),
 		DrawInfo.iVZoom, DrawInfo.iVZoom >= 0 ? 1 << DrawInfo.iVZoom : -(1 << -DrawInfo.iVZoom)
 	);
@@ -753,8 +723,8 @@ VOID CWinMain::Paint(void)
 	DeleteObject(SelectObject(hdc, GetStockObject(SYSTEM_FONT)));
 
 	BitBlt(hDC, 
-           0, 0, 
-           rt.right, rt.bottom, 
+           0, RebarRect.bottom,
+           rt.right, rt.bottom,
            hdc, 
            0, 0, 
            SRCCOPY);
@@ -785,13 +755,13 @@ VOID CWinMain::CaculateHScroll(void)
 	static UINT iSem = 0;
 
 	GetRealClientRect(&rc);
-	DrawInfo.dwDataWidth = AdcData->Len;//  AdcData->Pos;
+	DrawInfo.dwDataWidth = AdcDataI->Len;//  AdcDataI->Pos;
 	DrawInfo.dwHZoomedWidth = DrawInfo.dwDataWidth;
 	if (DrawInfo.iHZoom > 0)
 	{
 		for (i = 0; i < DrawInfo.iHZoom; i++)
 		{							     
-			if (DrawInfo.dwHZoomedWidth & (AdcData->Len << 5)) // 最大放大32倍
+			if (DrawInfo.dwHZoomedWidth & (AdcDataI->Len << 5)) // 最大放大32倍
 			{
 				DrawInfo.iHZoom = i;
 				break;
@@ -822,7 +792,7 @@ VOID CWinMain::CaculateHScroll(void)
 	}
 
 	if (DrawInfo.fAutoScroll) {
-		DrawInfo.dwHZoomedPos = (DrawInfo.fFollowByOrignal == true ? AdcData->Pos : AdcDataFiltted->Pos) * DrawInfo.dbHZoom -
+		DrawInfo.dwHZoomedPos = (DrawInfo.fFollowByOrignal == true ? AdcDataI->Pos : AdcDataIFiltted->Pos) * DrawInfo.dbHZoom -
 			(rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
 		if (DrawInfo.dwHZoomedPos < 0) DrawInfo.dwHZoomedPos = 0;
 	}
@@ -866,8 +836,8 @@ VOID CWinMain::CaculateVScroll(void)
 	//GetRealClientRect(hWnd, &rc);
 
 	//DrawInfo.dwDataHeight = (UINT64)1 << ADC_DATA_SAMPLE_BIT;
-	//UINT64	maxDataHeight = (UINT64)1 << (AdcData->DataBits + ADC_DATA_MAX_ZOOM_BIT);
-	DrawInfo.dwVZoomedHeight = MoveBits(MoveBits(1, AdcData->DataBits), DrawInfo.iVZoom);
+	//UINT64	maxDataHeight = (UINT64)1 << (AdcDataI->DataBits + ADC_DATA_MAX_ZOOM_BIT);
+	DrawInfo.dwVZoomedHeight = MoveBits(MoveBits(1, AdcDataI->DataBits), DrawInfo.iVZoom);
 	DrawInfo.dbVZoom = DrawInfo.iVZoom > 0 ? (UINT64)1 << DrawInfo.iVZoom : (double)1.0 / ((UINT64)1 << -DrawInfo.iVZoom);
 
 	i = DrawInfo.iVOldZoom - DrawInfo.iVZoom;
@@ -1137,4 +1107,113 @@ void CWinMain::RestoreValue(void)
 	DrawInfo.iVOldZoom = atoi(value);
 	GetPrivateProfileString("WIN_MAIN", "dwVZoomedPos", "1", value, VALUE_LENGTH, IniFilePath);
 	DrawInfo.dwVZoomedPos = std::strtoll(value, NULL, 10);
+}
+
+static HPEN hPens[4] =
+{
+	CreatePen(PS_SOLID, 1, RGB(0,255,0)),
+	CreatePen(PS_SOLID, 1, RGB(0, 255, 128)),
+	CreatePen(PS_SOLID, 1, RGB(255, 255, 0)),
+	CreatePen(PS_SOLID, 1, RGB(128, 255, 0))
+};
+
+void CWinMain::DrawSignal_short(CData* cData, UINT pos, UINT pen, HDC hdc, UINT dwXOffSet, UINT bufStep, UINT dwWStep, RECT* rt)
+{
+	int InfolastPos = -1;
+	double vzoom = DrawInfo.dbVZoom;
+	HPEN hPenSaved = (HPEN)SelectObject(hdc, hPens[pen]);//(HPEN)GetStockObject(WHITE_PEN));
+	int x, y;
+	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
+	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
+	short* buff = (short*)cData->Buff;
+	short* pData = buff + pos;
+	y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
+	y = BOUND(y, 0, WAVE_RECT_HEIGHT);
+	MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
+	do
+	{
+		pData += bufStep;
+		x += dwWStep;
+		if (pData == &buff[cData->Pos & cData->Mask])InfolastPos = x;
+		y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
+		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
+		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
+	} while (x < rt->right - WAVE_RECT_BORDER_RIGHT);
+	if (InfolastPos >= 0)
+	{
+		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
+		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
+	}
+	SelectObject(hdc, hPenSaved);
+}
+
+void CWinMain::DrawSignal_float(CData* cData, UINT pos, UINT pen, HDC hdc, UINT dwXOffSet, UINT bufStep, UINT dwWStep, RECT* rt)
+{
+	int InfolastPos;
+	double vzoom = DrawInfo.dbVZoom;// DrawInfo.iVZoom >= 0 ? (1 << DrawInfo.iVZoom) : (1.0 / (1 << (-DrawInfo.iVZoom)));
+	HPEN 	hPenSaved = (HPEN)SelectObject(hdc, hPens[pen]);//(HPEN)GetStockObject(WHITE_PEN));
+	int x, y;
+	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
+
+	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
+	float* buff = (float*)cData->Buff;
+	float* pData = (float*)buff + pos;
+	y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
+	y = BOUND(y, 0, WAVE_RECT_HEIGHT);
+	//DbgMsg("zoom:%f, v:%d, zoomv: %d\r\n", vzoom, *pData, y);
+	InfolastPos = -1;
+	MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
+	do
+	{
+		pData += bufStep;
+		x += dwWStep;
+		if (pData == &buff[cData->Pos & cData->Mask])InfolastPos = x;
+		y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
+		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
+		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
+	} while (x < rt->right - WAVE_RECT_BORDER_RIGHT);
+	if (InfolastPos >= 0)
+	{
+		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
+		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
+	}
+	SelectObject(hdc, hPenSaved);
+}
+
+HWND CWinMain::MakeToolsBar(void)
+{
+	HWND hWndRebar = clsWinTools.CreateRebar(hWnd);
+	static TBBUTTON tbb[8] = {
+		{ MAKELONG(1, 0), IDM_AUDIO_WINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"Audio" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, 
+		{ MAKELONG(2, 0), IDM_SPECTRUMWINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE,	{0}, 0, (INT_PTR)L"Spectrum" },
+		{ MAKELONG(3, 0), IDM_FILTERWINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"Filter" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, 
+		{ MAKELONG(4, 0), IDM_SDR_WINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"SDR" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP, {0}, 0, NULL }, 
+		{ MAKELONG(0, 0), 0, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN,	{0}, 0, (INT_PTR)L"下拉" }
+	};
+	CWinTools::TOOL_TIPS tips[8] = {
+		{ IDM_STARTPLAY,"打开音频信号窗口." },
+		{ 0, NULL }, // Separator
+		{ IDM_DEMODULATOR_AM,"打开信号频谱窗口." },
+		{ IDM_DEMODULATOR_FM, "打开滤波器设计窗口." },
+		{ 0, NULL }, // Separator
+		{ IDM_DEMODULATOR_FM, "打开SDR设备窗口." },
+		{ 0, NULL }, // Separator
+		{ 0, "TBSTYLE_DROPDOWN" }
+	};
+	HWND hToolBar = clsWinTools.CreateToolbar(hWnd, tbb, 8, tips, 8);
+
+	// Add images
+	TBADDBITMAP tbAddBmp = { 0 };
+	tbAddBmp.hInst = HINST_COMMCTRL;
+	tbAddBmp.nID = IDB_STD_SMALL_COLOR;
+	SendMessage(hToolBar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
+
+	clsWinTools.CreateRebarBand(hWndRebar, "窗口", 1, 500, 0, hToolBar);
+
+	//hWndTrack = CreateTrackbar(hWnd, 0, 100, 10);
+	clsWinTools.CreateRebarBand(hWndRebar, "Value", 2, 0, 0, NULL);
+	return hWndRebar;
 }

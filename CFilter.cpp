@@ -7,11 +7,12 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-#include "myDebug.h"
+#include "public.h"
+#include "Debug.h"
 #include "CDataFromTcpIp.h"
 #include "CData.h"
 #include "CFilter.h"
-#include "CFilterWin.h"
+#include "CWinFilter.h"
 #include "CWinMain.h"
 
 #include "cuda_CFilter.cuh"
@@ -22,25 +23,18 @@ using namespace std;
 using namespace WINS; 
 using namespace METHOD;
 
-//CFilter::FILTER_INFO CFilter::FilterInfos[MAX_FILTER_NUMBER];
-//double* CFilter::FilterCore = NULL;
-//int		CFilter::FilterCoreLength = 0;
-//int		CFilter::FilterInfoCount = 0;
-//UINT32	CFilter::filter_ready_poss[4] = { 0, 0, 0, 0 };
-
-CFilter::PFILTER_INFO pCurrentFilterInfo = NULL;
-
-CFilter clsMainFilter("Main");
+CFilter clsMainFilterI("MainI");
+CFilter clsMainFilterQ("MainQ");
 CFilter clsAudioFilter("Audio");
 
 CFilter::CFilter(const char* tag)
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 
 	TAG = tag;
 
-	hFilterMutex = CreateMutex(NULL, false, "hFilterMutex");		//创建互斥对象
-	hCoreMutex = CreateMutex(NULL, false, "hCoreMutex");		//创建互斥对象
+	hFilterMutex = CreateMutex(NULL, false, "hFilterMutex");		
+	hCoreMutex = CreateMutex(NULL, false, "hCoreMutex");			
 
 	RestoreValue();
 }
@@ -182,7 +176,7 @@ void CFilter::build_iterate_core(void)
 	*/
 }
 
-void CFilter::invcore(FILTER_CORE_DATA_TYPE* pBuf, UINT32 corelen)
+void CFilter::invcore(FILTER_CORE_DATA_TYPE* pBuf, UINT corelen)
 {
 	UINT16 i;
 	for (i = 0; i < corelen; i++) pBuf[i] *= -1.0;
@@ -190,7 +184,7 @@ void CFilter::invcore(FILTER_CORE_DATA_TYPE* pBuf, UINT32 corelen)
 	//*(double*)(pBuf + (pFilterInfo->CoreLength-1)/2*4) += 1000.0;
 }
 
-void CFilter::lowcore(FILTER_CORE_DATA_TYPE fc, FILTER_CORE_DATA_TYPE* pBuf, UINT32 corelen)
+void CFilter::lowcore(float fc, FILTER_CORE_DATA_TYPE* pBuf, UINT corelen)
 {
 	UINT16 K = 1;
 	UINT16 i;
@@ -216,7 +210,7 @@ void CFilter::lowcore(FILTER_CORE_DATA_TYPE fc, FILTER_CORE_DATA_TYPE* pBuf, UIN
 	for (p = pBuf, i = 0; i < corelen; i++)*p++ /= sum;
 }
 
-void CFilter::corepluse(FILTER_CORE_DATA_TYPE* pR, FILTER_CORE_DATA_TYPE* pS, UINT32 corelen)
+void CFilter::corepluse(FILTER_CORE_DATA_TYPE* pR, FILTER_CORE_DATA_TYPE* pS, UINT corelen)
 {
 	//  double *pR = FilterCore;
 	//  double *pS = FilterCore_2;
@@ -229,18 +223,11 @@ type: 0低通 1高通 2带通 3阻带
 freq0： 中心频率
 freq_width： 通带/阻带 频宽
 */
-void CFilter::core(PFILTER_INFO pFilterInfo, PFILTER_INFO rootf)
+void CFilter::core(FILTER_INFO* pFilterInfo, FILTER_INFO* rootf)
 {
 	FILTER_CORE_DATA_TYPE fl = pFilterInfo->FreqCenter - pFilterInfo->BandWidth / 2;
 	FILTER_CORE_DATA_TYPE fh = pFilterInfo->FreqCenter + pFilterInfo->BandWidth / 2;
-	UINT32 fs = SrcData->SampleRate / 
-		(
-			1 << ( 
-			rootf == &rootFilterInfo1 ? 
-			rootFilterInfo1.decimationFactorBit : 
-			rootFilterInfo1.decimationFactorBit + rootFilterInfo2.decimationFactorBit
-			)
-		);
+	UINT32 fs = rootf->SampleRate;
 	UINT32 CoreLength = pFilterInfo->CoreLength;
 
 	pFilterInfo->FreqFallWidth = 4.0 / (CoreLength - 1) * fs;
@@ -436,19 +423,24 @@ void CFilter::filter_func_short(UINT32 thread_id)
 
 LPTHREAD_START_ROUTINE CFilter::cuda_filter_thread(LPVOID lp)
 {
-
 	((CFilter*)lp)->cuda_filter_func();
-
 	return 0;
 }
 
 void CFilter::cuda_filter_func(void)
 {
 	doFiltting = true;
-	cuda_Filter_exit = false;
+	Thread_Exit = false;
 	UINT stepLen = FilterSrcLen >> 2;
 	SrcData->ProcessPos = ((UINT)(SrcData->Pos / stepLen)) * stepLen;
+	SrcData->ProcessPos &= SrcData->Mask;
 	while (doFiltting == true && Program_In_Process == true) {
+		WaitForSingleObject(hCoreMutex, INFINITE);
+		if (Cuda_Filter_N_New != Cuda_Filter_N_Doing) {
+			ReleaseMutex(hCoreMutex);
+			Sleep(100);
+			continue;
+		}
 		if (((SrcData->Pos - SrcData->ProcessPos) & SrcData->Mask) > stepLen)
 		{
 			switch (Cuda_Filter_N_Doing) {
@@ -463,13 +455,15 @@ void CFilter::cuda_filter_func(void)
 				break;
 			}
 		}
-		else Sleep(0);
+		else Sleep(10);
+		ReleaseMutex(hCoreMutex);
 	}
 	cudaFilter->UnInit();
 	cudaFilter2->UnInit();
 	cudaFilter3->UnInit();
 
-	cuda_Filter_exit = true;
+	Thread_Exit = true;
+	hThread = NULL;
 }
 
 bool CFilter::CheckCoreDesc(char* coreDesc)
@@ -495,13 +489,13 @@ bool CFilter::CheckCoreDesc(char* coreDesc)
 	}
 	if (n > MAX_FILTER_NUMBER)
 	{
-		printf("滤波器核数量大于最大值 %d / %d\r\n", n, MAX_FILTER_NUMBER);
+		DbgMsg("滤波器核数量大于最大值 %d / %d\r\n", n, MAX_FILTER_NUMBER);
 		state = false;
 		goto Exit;
 	}
 	if (n < 2)
 	{
-		printf("滤波器核数量至少有一个 %d / (1 - %d)\r\n", n, MAX_FILTER_NUMBER);
+		DbgMsg("滤波器核数量至少有一个 %d / (1 - %d)\r\n", n, MAX_FILTER_NUMBER);
 		state = false;
 		goto Exit;
 	}
@@ -520,7 +514,7 @@ bool CFilter::CheckCoreDesc(char* coreDesc)
 		}
 		if (m != 3)
 		{
-			printf("滤波器核 %d 设置值 数量应该 = 3 : %d\r\n", i, m);
+			DbgMsg("滤波器核 %d 设置值 数量应该 = 3 : %d\r\n", i, m);
 			state = false;
 			goto Exit;
 		}
@@ -529,14 +523,14 @@ bool CFilter::CheckCoreDesc(char* coreDesc)
 Exit:
 
 	if (state == false) {
-		printf("coreDesc: %s\r\n", coreDesc);
+		DbgMsg("coreDesc: %s\r\n", coreDesc);
 		for (i = 0; i < n; i++)
 		{
-			printf("%d :\r\n", i);
+			DbgMsg("%d :\r\n", i);
 			for (m = 0; m < 3; m++) {
-				printf("\t%d : %s\r\n", m, values[i][m]);
+				DbgMsg("\t%d : %s\r\n", m, values[i][m]);
 			}
-			printf("\r\n");
+			DbgMsg("\r\n");
 		}
 	}
 
@@ -556,24 +550,35 @@ void CFilter::ParseCoreDesc(void)
 	switch (Cuda_Filter_N_New) {
 	case cuda_filter_1:
 		cudaFilter->Init(this);
+		TargetData->Pos = SrcData->ProcessPos;
 		break;
 	case cuda_filter_2:
 		cudaFilter2->Init(this);
+		TargetData->Pos = SrcData->ProcessPos >> rootFilterInfo1.decimationFactorBit;
 		break;
 	case cuda_filter_3:
 		ParseOneCore(&rootFilterInfo2);
 		cudaFilter3->Init(this);
+		TargetData->Pos = SrcData->ProcessPos >> (rootFilterInfo1.decimationFactorBit + rootFilterInfo2.decimationFactorBit);
 		break;
 	}
 	Cuda_Filter_N_Doing = Cuda_Filter_N_New;
 	ReleaseMutex(hCoreMutex);
 }
 
-int CFilter::ParseOneCore(PFILTER_INFO rootFilterInfo)
+int CFilter::ParseOneCore(FILTER_INFO* rootFilterInfo)
 {
 	TargetData->SampleRate = SrcData->SampleRate / (1 << rootFilterInfo->decimationFactorBit);
+	
+	if (rootFilterInfo == &rootFilterInfo1) 
+		rootFilterInfo1.SampleRate = TargetData->SampleRate;
+
 	if(Cuda_Filter_N_Doing == cuda_filter_3) 
 		TargetData->SampleRate = SrcData->SampleRate / (1 << (rootFilterInfo1.decimationFactorBit + rootFilterInfo2.decimationFactorBit));
+
+	if (rootFilterInfo == &rootFilterInfo2)
+		rootFilterInfo2.SampleRate = TargetData->SampleRate;
+
 	if (rootFilterInfo->FilterCore != NULL) delete[] rootFilterInfo->FilterCore;
 	rootFilterInfo->FilterCore = NULL;
 	PFILTER_INFO tt, pp = rootFilterInfo->nextFilter;
@@ -605,12 +610,12 @@ int CFilter::ParseOneCore(PFILTER_INFO rootFilterInfo)
 	}
 	if (n > MAX_FILTER_NUMBER)
 	{
-		printf("滤波器核数量大于最大值 %d / %d\r\n", n, MAX_FILTER_NUMBER);
+		DbgMsg("滤波器核数量大于最大值 %d / %d\r\n", n, MAX_FILTER_NUMBER);
 		return -1;
 	}
 	if (n < 2)
 	{
-		printf("滤波器核数量至少有一个 %d / (1 - %d)\r\n", n, MAX_FILTER_NUMBER);
+		DbgMsg("滤波器核数量至少有一个 %d / (1 - %d)\r\n", n, MAX_FILTER_NUMBER);
 		return -1;
 	}
 	for (i = 0; i < n; i++)
@@ -628,18 +633,18 @@ int CFilter::ParseOneCore(PFILTER_INFO rootFilterInfo)
 		}
 		if (m != 3)
 		{
-			printf("滤波器核 %d 设置值 数量大于 3 / %d\r\n", i, m);
+			DbgMsg("滤波器核 %d 设置值 数量大于 3 / %d\r\n", i, m);
 			return -1;
 		}
 	}
 
 	for (i = 0; i < n; i++)
 	{
-		printf("%d :\r\n", i);
+		DbgMsg("%d :\r\n", i);
 		for (m = 0; m < 3; m++) {
-			printf("\t%d : %s\r\n", m, values[i][m]);
+			DbgMsg("\t%d : %s\r\n", m, values[i][m]);
 		}
-		printf("\r\n");
+		DbgMsg("\r\n");
 	}
 
 
@@ -663,19 +668,19 @@ int CFilter::ParseOneCore(PFILTER_INFO rootFilterInfo)
 
 			switch (atoi(values[i][0])) {
 			case 0:
-				pFilterInfo->Type = FilterType::FilterLowPass;
+				pFilterInfo->Type = FILTER_TYPE::FilterLowPass;
 				break;
 			case 1:
-				pFilterInfo->Type = FilterType::FilterHighPass;
+				pFilterInfo->Type = FILTER_TYPE::FilterHighPass;
 				break;
 			case 2:
-				pFilterInfo->Type = FilterType::FilterBandPass;
+				pFilterInfo->Type = FILTER_TYPE::FilterBandPass;
 				break;
 			case 3:
-				pFilterInfo->Type = FilterType::FilterBandStop;
+				pFilterInfo->Type = FILTER_TYPE::FilterBandStop;
 				break;
 			default:
-				pFilterInfo->Type = FilterType::FilterLowPass;
+				pFilterInfo->Type = FILTER_TYPE::FilterLowPass;
 				break;
 			}
 		}

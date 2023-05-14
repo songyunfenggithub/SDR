@@ -12,10 +12,11 @@ namespace DEVICES {
 using namespace DEVICES;
 
 class CDemodulatorAM;
+class CDemodulatorFM;
 
 namespace WINS {
 
-#define AUDIO_WIN_CLASS		"AUDIO_WIN_CLASS"
+#define WIN_AUDIO_CLASS		"WIN_AUDIO_CLASS"
 
 #define SPECTRUM_WIDTH	0x400
 #define SPECTRUM_WIN_WIDTH	800
@@ -33,21 +34,24 @@ namespace WINS {
 
 #define TIMEOUT		200
 
-	class CFFTWin;
-	class CSignalWin;
-	class CToolsWin;
-	class CFilterWin;
+	class CWinFFT;
+	class CWinSignal;
+	class CWinTools;
+	class CWinFilter;
 
-	class CAudioWin
+	class CWinAudio
 	{
 	public:
 		CAudio* m_Audio = NULL;
-		CFFTWin* m_FFTWin = NULL;
-		CSignalWin* m_SignalWin = NULL;
-		CFilterWin* m_FilterWin = NULL;
+		CWinFFT* m_FFTWin = NULL;
+		CWinSignal* m_SignalWin = NULL;
+		CWinFilter* m_FilterWin = NULL;
 
 		CDemodulatorAM* m_DemodulatorAM = NULL;
 		bool bDemodulatorAM = false;
+		CDemodulatorFM* m_DemodulatorFM = NULL;
+		bool bDemodulatorFM = false;
+
 		HWND hWndRebar = NULL;
 		HWND hWnd = NULL;
 		HMENU hMenu = NULL;
@@ -57,8 +61,8 @@ namespace WINS {
 		HWND hWndTrack = NULL;
 
 	public:
-		CAudioWin();
-		~CAudioWin();
+		CWinAudio();
+		~CWinAudio();
 
 		void Init(void);
 		void UnInit(void);
@@ -70,6 +74,7 @@ namespace WINS {
 		HWND MakeToolsBar(void);
 		HWND CreateTrackbar(HWND hwndDlg, UINT iMin, UINT iMax, UINT pos);
 		VOID TBNotifications(WPARAM wParam);
+		BOOL DoNotify(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 		void BuildAudioFilter(void);
 

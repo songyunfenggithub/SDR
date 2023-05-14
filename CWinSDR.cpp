@@ -13,6 +13,7 @@
 #include <map>
 
 #include "public.h"
+#include "Debug.h"
 #include "CData.h"
 #include "CWinFFT.h"
 #include "CWinSDR.h"
@@ -46,7 +47,7 @@ CWinSDR clsWinSDR;
 
 CWinSDR::CWinSDR()
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	RegisterWindowsClass();
 }
 
@@ -71,7 +72,7 @@ void CWinSDR::RegisterWindowsClass(void)
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);//(HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName = (LPCSTR)IDC_MENU_SDR;
-	wcex.lpszClassName = SDR_WIN_CLASS;
+	wcex.lpszClassName = WIN_SDR_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	RegisterClassEx(&wcex);
@@ -80,7 +81,7 @@ void CWinSDR::RegisterWindowsClass(void)
 void CWinSDR::OpenWindow(void)
 {
 	if (hWnd == NULL) {
-		hWnd = CreateWindow(SDR_WIN_CLASS, "SDR windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+		hWnd = CreateWindow(WIN_SDR_CLASS, "SDR windows", WS_OVERLAPPEDWINDOW,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			CW_USEDEFAULT, 0, 1400, 800, NULL, NULL, hInst, this);
 	}
 	ShowWindow(hWnd, SW_SHOW);
@@ -101,13 +102,13 @@ void CWinSDR::ProcessKey(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONDOWN:
 		pt.x = LOWORD(lParam);
 		pt.y = HIWORD(lParam);
-		hz = (uint32_t)(AdcData->SampleRate * pt.y / FFTInfo_Signal.FFTSize);
+		hz = (uint32_t)(AdcDataI->SampleRate * pt.y / FFTInfo_Signal.FFTSize);
 		cout << pt.x << ":" << pt.y << ":" << hz << endl;
 		break;
 
 	case WM_KEYDOWN:
 		/* Translate keyboard messages to scroll commands */
-		printf("win spectrum WM_KEYDOWN\r\n");
+		DbgMsg("win spectrum WM_KEYDOWN\r\n");
 		switch (wParam) {
 		case VK_UP:
 			PostMessage(hWnd, WM_VSCROLL, SB_LINEUP, 0L);
@@ -268,7 +269,7 @@ LRESULT CALLBACK CWinSDR::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 	{
 	case WM_CREATE:
 
-		OPENCONSOLE;
+		OPENCONSOLE_SAVED;
 
 		clsWinSDR.hWnd = hWnd;
 
@@ -419,7 +420,7 @@ VOID CWinSDR::Paint(HWND hWnd)
 		rt.left, rt.top,
 		SRCCOPY);
 
-	printf("%d,%d,%d,%d\r\n", rt.top, rt.left, rt.right, rt.bottom);
+	DbgMsg("%d,%d,%d,%d\r\n", rt.top, rt.left, rt.right, rt.bottom);
 	*/
 
 
@@ -712,15 +713,15 @@ LRESULT CALLBACK CWinSDR::DlgSDRSetProc(HWND hDlg, UINT message, WPARAM wParam, 
 					char  ListItem[256];
 					(TCHAR)SendMessage((HWND)lParam, (UINT)CB_GETLBTEXT,
 						(WPARAM)ItemIndex, (LPARAM)ListItem);
-					printf("%s\r\n", ListItem);
+					DbgMsg("%s\r\n", ListItem);
 					clsSDR.edit_check_range();
 				}
 				break;
 			case IDC_EDIT_SDR_PARAMS:
-				printf("edit %d, %d, %d\r\n", HIWORD(wParam), EN_KILLFOCUS, EN_CHANGE);
+				DbgMsg("edit %d, %d, %d\r\n", HIWORD(wParam), EN_KILLFOCUS, EN_CHANGE);
 				if (HIWORD(wParam) == EN_KILLFOCUS)
 				{
-					printf("edit_check_range EN_KILLFOCUS\r\n");
+					DbgMsg("edit_check_range EN_KILLFOCUS\r\n");
 
 					clsSDR.edit_check_range();
 				}
@@ -745,14 +746,14 @@ LRESULT CALLBACK CWinSDR::DlgSDRSetProc(HWND hDlg, UINT message, WPARAM wParam, 
 			tvi.hItem = hItem;
 			TreeView_GetItem(hWndTreeView, &tvi);
 			int i = (int)tvi.lParam;
-			printf("i:%d, oldi:%d, level:%d, t:%s\r\n", i, clsSDR.sel_SDR_params_index, SDR_params[i].level, SDR_params[i].txt);
+			DbgMsg("i:%d, oldi:%d, level:%d, t:%s\r\n", i, clsSDR.sel_SDR_params_index, SDR_params[i].level, SDR_params[i].txt);
 			if (clsSDR.sel_SDR_params_index != i)
 			{
-				printf("edit_check_range tree click.\r\n");
+				DbgMsg("edit_check_range tree click.\r\n");
 				clsSDR.edit_check_range();
 
 				clsSDR.refresh_input_panel(i);
-				//printf("%d,%d,%s\r\n", i, SDR_params[i].level, SDR_params[i].txt);
+				//DbgMsg("%d,%d,%s\r\n", i, SDR_params[i].level, SDR_params[i].txt);
 				if (SDR_params[clsSDR.sel_SDR_params_index].paramUpdateReason != SDR_params[i].paramUpdateReason && clsSDR.SDR_parmas_changed == true)
 				{
 					if(SDR_params[clsSDR.sel_SDR_params_index].paramUpdateReason != sdrplay_api_Update_None)

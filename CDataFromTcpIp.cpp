@@ -4,6 +4,7 @@
 #include "string.h"
 
 #include "public.h"
+#include "Debug.h"
 #include "CDataFromTcpIp.h"
 #include "CData.h"
 #include "CFilter.h"
@@ -47,7 +48,7 @@ void CDataFromTcpIp::TcpIpThreadsStart(void)
 
 LPTHREAD_START_ROUTINE CDataFromTcpIp::GetDataTcpIpThreadFun(LPVOID lp)
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	clsGetDataTcpIp.TcpIpGetData();
 	//CLOSECONSOLE;
 
@@ -59,7 +60,7 @@ bool CDataFromTcpIp::TcpIpGetData(void)
 	WSADATA wsadata;
 	int err = 0;
 	if ((err = WSAStartup(MAKEWORD(2, 2), &wsadata)) != 0) {
-		printf("startup error : %d\n", err);
+		DbgMsg("startup error : %d\n", err);
 		return 0;
 	}
 	SOCKADDR_IN serv_addr, client_addr;
@@ -82,7 +83,7 @@ bool CDataFromTcpIp::TcpIpGetData(void)
 			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 			(LPTSTR)&lpMsgBuf,
 			0, NULL);
-		printf(TEXT("bind SERVER_TCPIP_GET_DATA_PORT %d error :%d, %s\n"),
+		DbgMsg(TEXT("bind SERVER_TCPIP_GET_DATA_PORT %d error :%d, %s\n"),
 			SERVER_TCPIP_GET_DATA_PORT, dw, lpMsgBuf);
 		LocalFree(lpMsgBuf);
 		closesocket(hListenSocket);
@@ -90,16 +91,16 @@ bool CDataFromTcpIp::TcpIpGetData(void)
 		return 0;
 	}
 	if (SOCKET_ERROR == listen(hListenSocket, 10)) {
-		printf(TEXT("listen error :%d\n"), WSAGetLastError());
+		DbgMsg(TEXT("listen error :%d\n"), WSAGetLastError());
 		closesocket(hListenSocket);
 		WSACleanup();
 	}
-	printf(TEXT("TcpIpGetData\t\t server start at %d port.\r\n"), SERVER_TCPIP_GET_DATA_PORT);
+	DbgMsg(TEXT("TcpIpGetData\t\t server start at %d port.\r\n"), SERVER_TCPIP_GET_DATA_PORT);
 	int client_len = sizeof(client_addr);
 	while (GetDataWorking)
 	{
 		SOCKET hRecvSocket = accept(hListenSocket, (SOCKADDR*)&client_addr, &client_len);
-		printf("TcpIpGetData\t\t%s:%d connected.\n", inet_ntoa(client_addr.sin_addr), client_addr.sin_port);
+		DbgMsg("TcpIpGetData\t\t%s:%d connected.\n", inet_ntoa(client_addr.sin_addr), client_addr.sin_port);
 		fd_set read_set, except_set, rset, eset;
 		FD_ZERO(&read_set);
 		FD_ZERO(&except_set);
@@ -121,7 +122,7 @@ bool CDataFromTcpIp::TcpIpGetData(void)
 				break;
 			}
 			else if (SOCKET_ERROR == n) {
-				printf("TcpIpGetData error : %d\n", WSAGetLastError());
+				DbgMsg("TcpIpGetData error : %d\n", WSAGetLastError());
 				closesocket(hRecvSocket);
 				break;
 			}
@@ -134,36 +135,36 @@ bool CDataFromTcpIp::TcpIpGetData(void)
 						closesocket(hRecvSocket);
 						break;
 					}
-					printf("oob data len :%d\n", len);
+					DbgMsg("oob data len :%d\n", len);
 					buf[len] = 0;
-					printf("oob data buf :%s\n", buf);
+					DbgMsg("oob data buf :%s\n", buf);
 				}
 				//普通数据
 				if (FD_ISSET(hRecvSocket, &rset)) {
-					if((AdcData->Len << AdcData->MoveBit) == AdcData->CharPos) AdcData->CharPos = 0;
-					int m = (AdcData->Len << AdcData->MoveBit) - AdcData->CharPos;
+					if((AdcDataI->Len << AdcDataI->MoveBit) == AdcDataI->CharPos) AdcDataI->CharPos = 0;
+					int m = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
 					if (m > 1024) m = 1024;
-					n = recv(hRecvSocket, (char*)AdcData->Buff + AdcData->CharPos, m, MSG_WAITALL);
+					n = recv(hRecvSocket, (char*)AdcDataI->Buff + AdcDataI->CharPos, m, MSG_WAITALL);
 					if (0 == n) {
-						printf("on recv nornal data , peer closed\n");
-						printf("Rc:0\n");
+						DbgMsg("on recv nornal data , peer closed\n");
+						DbgMsg("Rc:0\n");
 						closesocket(hRecvSocket);
 						break;
 					}
-					//StringToHex((char*)(AdcData->Buff) + AdcData->CharPos, 20);
-					//printf("%d\n", len);
+					//StringToHex((char*)(AdcDataI->Buff) + AdcDataI->CharPos, 20);
+					//DbgMsg("%d\n", len);
 					if (n > 0) {
 						if ((n % 4) != 0) {
-							printf("Rc:%d\n", n);
+							DbgMsg("Rc:%d\n", n);
 							//closesocket(hRecvSocket);
 							//break;
 						}
-						AdcData->CharPos += n;
-						if (AdcData->CharPos >= (AdcData->Len << AdcData->MoveBit))
-							AdcData->CharPos -= AdcData->Len << AdcData->MoveBit;
-						AdcData->Pos = AdcData->CharPos >> AdcData->MoveBit;
-						//printf("pos:%d\n", AdcData->Pos);
-						AdcData->GetNew = true;
+						AdcDataI->CharPos += n;
+						if (AdcDataI->CharPos >= (AdcDataI->Len << AdcDataI->MoveBit))
+							AdcDataI->CharPos -= AdcDataI->Len << AdcDataI->MoveBit;
+						AdcDataI->Pos = AdcDataI->CharPos >> AdcDataI->MoveBit;
+						//DbgMsg("pos:%d\n", AdcDataI->Pos);
+						AdcDataI->GetNew = true;
 					}
 					else Sleep(100);
 				}
@@ -178,7 +179,7 @@ bool CDataFromTcpIp::TcpIpGetData(void)
 
 LPTHREAD_START_ROUTINE CDataFromTcpIp::SendFiltedDataTcpIpThreadFun(LPVOID lp)
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	clsGetDataTcpIp.TcpIpSendFiltedData();
 	//CLOSECONSOLE;
 
@@ -196,7 +197,7 @@ void CDataFromTcpIp::SendFiltedData(char *buff, int len)
 		}
 	}
 	catch (int& e) {
-		printf("Exception SendFiltedData %d", e);
+		DbgMsg("Exception SendFiltedData %d", e);
 	}
 }
 
@@ -225,7 +226,7 @@ bool CDataFromTcpIp::TcpIpSendFiltedData(void)
 	WSADATA wsadata;
 	int err = 0;
 	if ((err = WSAStartup(MAKEWORD(2, 2), &wsadata)) != 0) {
-		printf("startup error : %d\n", err);
+		DbgMsg("startup error : %d\n", err);
 		return 0;
 	}
 	SOCKADDR_IN serv_addr, client_addr;
@@ -248,7 +249,7 @@ bool CDataFromTcpIp::TcpIpSendFiltedData(void)
 			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 			(LPTSTR)&lpMsgBuf,
 			0, NULL);
-		printf(TEXT("bind SERVER_TCPIP_SEND_FILTERED_DATA_PORT %d error :%d, %s\n"), 
+		DbgMsg(TEXT("bind SERVER_TCPIP_SEND_FILTERED_DATA_PORT %d error :%d, %s\n"), 
 			SERVER_TCPIP_SEND_FILTERED_DATA_PORT, dw, lpMsgBuf);
 		LocalFree(lpMsgBuf);
 		closesocket(hListenSocket);
@@ -256,16 +257,16 @@ bool CDataFromTcpIp::TcpIpSendFiltedData(void)
 		return 0;
 	}
 	if (SOCKET_ERROR == listen(hListenSocket, 10)) {
-		printf(TEXT("listen error :%d\n"), WSAGetLastError());
+		DbgMsg(TEXT("listen error :%d\n"), WSAGetLastError());
 		closesocket(hListenSocket);
 		WSACleanup();
 	}
-	printf(TEXT("TcpIpSendFiltedData\t server start at %d port.\r\n"), SERVER_TCPIP_SEND_FILTERED_DATA_PORT);
+	DbgMsg(TEXT("TcpIpSendFiltedData\t server start at %d port.\r\n"), SERVER_TCPIP_SEND_FILTERED_DATA_PORT);
 	int client_len = sizeof(client_addr);
 	while (GetDataWorking)
 	{
 		hSendFiltedDataSocket = accept(hListenSocket, (SOCKADDR*)&client_addr, &client_len);
-		printf("TcpIpSendFiltedData\t%s:%d connected.\n", inet_ntoa(client_addr.sin_addr), client_addr.sin_port);
+		DbgMsg("TcpIpSendFiltedData\t%s:%d connected.\n", inet_ntoa(client_addr.sin_addr), client_addr.sin_port);
 		
 		/*
 		fd_set read_set, except_set, rset, eset;
@@ -289,7 +290,7 @@ bool CDataFromTcpIp::TcpIpSendFiltedData(void)
 				break;
 			}
 			else if (SOCKET_ERROR == n) {
-				printf("error : %d\n", WSAGetLastError());
+				DbgMsg("error : %d\n", WSAGetLastError());
 				closesocket(hSendFiltedDataSocket);
 				break;
 			}
@@ -302,21 +303,21 @@ bool CDataFromTcpIp::TcpIpSendFiltedData(void)
 						closesocket(hSendFiltedDataSocket);
 						break;
 					}
-					printf("oob data len :%d\n", len);
+					DbgMsg("oob data len :%d\n", len);
 					buf[len] = 0;
-					printf("oob data buf :%s\n", buf);
+					DbgMsg("oob data buf :%s\n", buf);
 				}
 				//普通数据
 				if (FD_ISSET(hSendFiltedDataSocket, &rset)) {
-					len = recv(hSendFiltedDataSocket, (char*)(AdcData->Buff) + AdcData->CharPos, 1024, 0);
+					len = recv(hSendFiltedDataSocket, (char*)(AdcDataI->Buff) + AdcDataI->CharPos, 1024, 0);
 					if (0 == len) {
 						puts("on recv nornal data , peer closed");
 						closesocket(hSendFiltedDataSocket);
 						break;
 					}
-					AdcData->CharPos += len;
-					AdcData->Pos = AdcData->CharPos >> 1;
-					AdcData->CharPos = true;
+					AdcDataI->CharPos += len;
+					AdcDataI->Pos = AdcDataI->CharPos >> 1;
+					AdcDataI->CharPos = true;
 				}
 			}
 		}
@@ -330,7 +331,7 @@ bool CDataFromTcpIp::TcpIpSendFiltedData(void)
 
 LPTHREAD_START_ROUTINE CDataFromTcpIp::SendFFTDataTcpIpThreadFun(LPVOID lp)
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	clsGetDataTcpIp.TcpIpSendFFTData();
 	//CLOSECONSOLE;
 
@@ -342,7 +343,7 @@ bool CDataFromTcpIp::TcpIpSendFFTData(void)
 	WSADATA wsadata;
 	int err = 0;
 	if ((err = WSAStartup(MAKEWORD(2, 2), &wsadata)) != 0) {
-		printf("startup error : %d\n", err);
+		DbgMsg("startup error : %d\n", err);
 		return 0;
 	}
 	SOCKADDR_IN serv_addr, client_addr;
@@ -365,7 +366,7 @@ bool CDataFromTcpIp::TcpIpSendFFTData(void)
 			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 			(LPTSTR)&lpMsgBuf,
 			0, NULL);
-		printf(TEXT("bind SERVER_TCPIP_SEND_FFT_DATA_PORT %d error :%d, %s\n"),
+		DbgMsg(TEXT("bind SERVER_TCPIP_SEND_FFT_DATA_PORT %d error :%d, %s\n"),
 			SERVER_TCPIP_SEND_FFT_DATA_PORT, dw, lpMsgBuf);
 		LocalFree(lpMsgBuf);
 		closesocket(hListenSocket);
@@ -373,16 +374,16 @@ bool CDataFromTcpIp::TcpIpSendFFTData(void)
 		return 0;
 	}
 	if (SOCKET_ERROR == listen(hListenSocket, 10)) {
-		printf(TEXT("listen error :%d\n"), WSAGetLastError());
+		DbgMsg(TEXT("listen error :%d\n"), WSAGetLastError());
 		closesocket(hListenSocket);
 		WSACleanup();
 	}
-	printf(TEXT("TcpIpSendFFTData\t server start at %d port.\r\n"), SERVER_TCPIP_SEND_FFT_DATA_PORT);
+	DbgMsg(TEXT("TcpIpSendFFTData\t server start at %d port.\r\n"), SERVER_TCPIP_SEND_FFT_DATA_PORT);
 	int client_len = sizeof(client_addr);
 	while (GetDataWorking)
 	{
 		hSendFFTDataSocket = accept(hListenSocket, (SOCKADDR*)&client_addr, &client_len);
-		printf("TcpIpSendFFTData\t%s:%d connected.\n", inet_ntoa(client_addr.sin_addr), client_addr.sin_port);
+		DbgMsg("TcpIpSendFFTData\t%s:%d connected.\n", inet_ntoa(client_addr.sin_addr), client_addr.sin_port);
 		/*
 		fd_set read_set, except_set, rset, eset;
 		FD_ZERO(&read_set);
@@ -405,7 +406,7 @@ bool CDataFromTcpIp::TcpIpSendFFTData(void)
 				break;
 			}
 			else if (SOCKET_ERROR == n) {
-				printf("error : %d\n", WSAGetLastError());
+				DbgMsg("error : %d\n", WSAGetLastError());
 				closesocket(hRecvSocket);
 				break;
 			}
@@ -418,21 +419,21 @@ bool CDataFromTcpIp::TcpIpSendFFTData(void)
 						closesocket(hRecvSocket);
 						break;
 					}
-					printf("oob data len :%d\n", len);
+					DbgMsg("oob data len :%d\n", len);
 					buf[len] = 0;
-					printf("oob data buf :%s\n", buf);
+					DbgMsg("oob data buf :%s\n", buf);
 				}
 				//普通数据
 				if (FD_ISSET(hRecvSocket, &rset)) {
-					len = recv(hRecvSocket, (char*)(AdcData->Buff) + AdcData->CharPos, 1024, 0);
+					len = recv(hRecvSocket, (char*)(AdcDataI->Buff) + AdcDataI->CharPos, 1024, 0);
 					if (0 == len) {
 						puts("on recv nornal data , peer closed");
 						closesocket(hRecvSocket);
 						break;
 					}
-					AdcData->CharPos += len;
-					AdcData->Pos = AdcData->CharPos >> 1;
-					AdcData->CharPos = true;
+					AdcDataI->CharPos += len;
+					AdcDataI->Pos = AdcDataI->CharPos >> 1;
+					AdcDataI->CharPos = true;
 				}
 			}
 		}

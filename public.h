@@ -4,7 +4,7 @@
 #include "locale.h"
 #include "stdint.h"
 
-typedef struct FFTINFO_TAG {
+typedef struct FFTINFO_STRUCT {
 	UINT FFTSize = 0;
 	UINT FFTStep = 0;
 	UINT HalfFFTSize = 0;
@@ -19,14 +19,19 @@ typedef struct FFTINFO_TAG {
 
 #ifdef _DEBUG
 
-#define OPENCONSOLE		AllocConsole();\
+#define OPENCONSOLE_SAVED	
+#define OPENCONSOLE
+#define OPENCONSOLE1		AllocConsole();\
 						_tfreopen(_T("CONOUT$"), _T("w+t"), stdout);\
 						_tfreopen(_T("CONIN$"), _T("r+t"), stdin);\
 						_tsetlocale(LC_ALL, _T("chs"));
 
-#define CLOSECONSOLE	FreeConsole();
+#define CLOSECONSOLE
+#define CLOSECONSOLE1	FreeConsole();
 
 #else // _DEBUG
+
+#define OPENCONSOLE_SAVED	
 #define OPENCONSOLE	
 #define CLOSECONSOLE
 

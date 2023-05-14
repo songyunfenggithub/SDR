@@ -19,7 +19,7 @@ namespace WINS {
 #define WAVE_RECT_BORDER_RIGHT		60
 #define WAVE_RECT_BORDER_BOTTON		25
 
-#define SDR_WIN_CLASS		"SDR_WIN"
+#define WIN_SDR_CLASS		"WIN_SDR_CLASS"
 
 #define SDR_WIDTH	0x400
 #define SDR_WIN_WIDTH	800
@@ -31,8 +31,7 @@ namespace WINS {
 	class CWinSDR
 	{
 	public:
-		typedef struct tagFFTInfo
-		{
+		typedef struct FFTInfo_STRUCT {
 			uint32_t i;			//in buffer position
 			uint32_t adc_buf_pos;	//in filtered adc buffer position
 			uint32_t fft_size;
@@ -41,9 +40,7 @@ namespace WINS {
 			double 	 fft_min_value;
 		} FFTInfo;
 
-		typedef struct tagDRAWINFO
-		{
-
+		typedef struct DRAWINFO_STRUCT {
 			int			iHZoom, iHOldZoom, iVZoom, iVOldZoom, iHFit, iVFit;
 			DWORD		dwDataWidth;
 			DWORD		dwHZoomedWidth, dwHZoomedPos;
@@ -51,10 +48,7 @@ namespace WINS {
 
 			BOOL		fAutoScroll;
 			UINT		uTimerId;
-
 		} DRAWINFO, * PDRAWINFO;
-
-
 		DRAWINFO	DrawInfo;
 
 		HWND	hWnd = NULL;

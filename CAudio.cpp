@@ -11,7 +11,7 @@
 #include <math.h>
 
 #include "public.h"
-#include "myDebug.h"
+#include "Debug.h"
 
 #include "CFilter.h"
 #include "CData.h"
@@ -24,7 +24,7 @@ CAudio mAudio;
 
 CAudio::CAudio()
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	Init();
 }
 
@@ -36,6 +36,16 @@ CAudio::~CAudio()
 
 void CAudio::Init(void)
 {
+	AudioData = new CData();
+	AudioData->Init(SOUNDCARD_BUFF_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT);
+	//AudioData->Init(DATA_BUFFER_LENGTH, short_type, SOUNDCARD_BUFF_DATA_BIT);
+	AudioDataFiltted = new CData();
+	AudioDataFiltted->Init(SOUNDCARD_BUFF_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT);
+	//AudioDataFiltted->Init(DATA_BUFFER_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT);
+
+	outData = AudioData;
+	outDataFiltted = AudioDataFiltted;
+
 	OutData.fOutOpen = FALSE;
 	InData.fInOpen = FALSE;
 
@@ -186,7 +196,7 @@ void CAudio::OpenIn(UINT pos, UINT endPos)
 		(DWORD_PTR)waveInProc, 0L, CALLBACK_FUNCTION))
 	{
 		//MessageBox(clsWinMain.hWnd, "Failed to open waveform input device.", NULL, MB_OK | MB_ICONEXCLAMATION);
-		printf("Failed to open waveform input device.\r\n");
+		DbgMsg("Failed to open waveform input device.\r\n");
 		return;
 	}
 
@@ -232,7 +242,7 @@ void CAudio::OpenOut(UINT dwBeginPos, UINT dwEndPos)
 		(DWORD_PTR)waveOutProc, 0L, CALLBACK_FUNCTION))
 	{
 		//MessageBox(clsWinMain.hWnd, "Failed to open waveform output device.", NULL, MB_OK | MB_ICONEXCLAMATION); 
-		printf("Failed to open waveform output device.\r\n");
+		DbgMsg("Failed to open waveform output device.\r\n");
 		return;
 	}
 	if (dwBeginPos > dwEndPos) dwEndPos = outData->Len;
@@ -299,7 +309,7 @@ void CAudio::StartOut(void)
 		(LPWAVEFORMATEX)&FormatEx,
 		(DWORD_PTR)waveOutProc2, 0L, CALLBACK_FUNCTION))
 	{
-		printf("Failed to open waveform output device.\r\n");
+		DbgMsg("Failed to open waveform output device.\r\n");
 		return;
 	}
 	waveHDRPos = 0;
@@ -309,6 +319,7 @@ void CAudio::StartOut(void)
 
 void CAudio::StopOut(void)
 {
+	Doing = false;
 	if (boutOpened == true) {
 		waveOutPause(hWaveOut);
 		waveOutReset(hWaveOut);	
@@ -391,4 +402,31 @@ void CAudio::GeneratorWave(void)
 		*(p++) = (AUDIODATATYPE)(sin(dbW1 += dbStep1) * 0x4F + 0x80 +
 			sin(dbW2 += dbStep2) * 0x1F);
 	}
+}
+
+LPTHREAD_START_ROUTINE CAudio::Thread_Audio_Out(LPVOID lp)
+{
+	CAudio* me = (CAudio*)lp;
+	me->Thread_Audio_Out_Func();
+	return 0;
+}
+
+void CAudio::Thread_Audio_Out_Func(void)
+{
+	Doing = true;
+	short outBuff[SOUNDCARD_STEP_LENGTH];
+	CData* out = outDataFiltted;
+	UINT pos = 0;
+	while (Doing && Program_In_Process) {
+		if (((out->Pos - pos) & out->Mask) > SOUNDCARD_STEP_LENGTH) {
+			float* srcBuff = (float*)out->Buff;
+			for (int i = 0; i < SOUNDCARD_STEP_LENGTH; i++) {
+				outBuff[i] = (short)srcBuff[pos++];
+				pos &= out->Mask;
+			}
+			WriteToOut(outBuff);
+		}
+	}
+	Doing = false;
+	hThread = NULL;
 }

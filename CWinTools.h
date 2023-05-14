@@ -9,22 +9,22 @@
 
 namespace WINS {
 
-#define TOOLS_WIN_CLASS		"TOOLS_WIN_CLASS"
+#define WIN_TOOLS_CLASS		"WIN_TOOLS_CLASS"
 
 #define BUTTON_PLAY_STOP_ID			0
 #define BUTTON_FILTER_BUILD_ID		1
 
-	class CToolsWin
+	class CWinTools
 	{
 	public:
-		typedef struct TOOL_TIPS_TAG {
+		typedef struct TOOL_TIPS_STRUCT {
 			UINT id;
 			LPSTR text;
 		} TOOL_TIPS;
 
 	public:
-		CToolsWin();
-		~CToolsWin();
+		CWinTools();
+		~CWinTools();
 
 		void Init(void);
 		void UnInit(void);
@@ -41,4 +41,4 @@ namespace WINS {
 	};
 }
 
-extern WINS::CToolsWin clsToolsWin;
+extern WINS::CWinTools clsWinTools;

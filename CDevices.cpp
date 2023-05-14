@@ -11,7 +11,7 @@
 #include <msacm.h>
 #include <winuser.h>
 
-#include "myDebug.h"
+#include "Debug.h"
 
 #include "CWinMain.h"
 #include "CDevices.h"
@@ -37,7 +37,7 @@ TCHAR           gszNo[]             = TEXT("No");
 #define APP_MAX_FILE_TITLE_CHARS    APP_MAX_FILE_PATH_CHARS
 #define APP_MAX_FILE_TITLE_BYTES    (APP_MAX_FILE_TITLE_CHARS * sizeof(TCHAR))
 
-typedef struct ACMAPPFILEDESC_TAG
+typedef struct ACMAPPFILEDESC_STRUCT
 {
     DWORD           fdwState;
 

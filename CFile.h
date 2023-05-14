@@ -32,4 +32,4 @@ public:
 
 };
 
-extern CFile	clsFile;
+extern CFile clsFile;

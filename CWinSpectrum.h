@@ -14,7 +14,7 @@ using namespace METHOD;
 
 namespace WINS {
 
-#define SPECTRUM_WIN_CLASS		"SPECTRUM_WIN"
+#define WIN_SPECTRUM_CLASS		"WIN_SPECTRUM_CLASS"
 
 #define SPECTRUM_WIDTH	0x400
 #define SPECTRUM_WIN_WIDTH	800

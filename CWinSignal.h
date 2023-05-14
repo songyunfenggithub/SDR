@@ -9,17 +9,17 @@ class CMessage;
 
 namespace WINS {
 
-#define SIGNAL_WIN_CLASS		"SIGNAL_WIN_CLASS"
+#define WIN_SIGNAL_CLASS		"WIN_SIGNAL_CLASS"
 
 #define SIGNAL_LENGTH		0x10000
 #define SIGNAL_LENGTH_MASK	(SIGNAL_LENGTH - 1)
 
 #define SIGNAL_DATA_MAX_ZOOM_BIT				5
 
-	class CSignalWin
+	class CWinSignal
 	{
 	public:
-		typedef struct tagDRAWINFO {
+		typedef struct DRAWINFO_STRUCT {
 			INT			iHZoom, iHOldZoom, iVZoom, iVOldZoom, iHFit, iVFit;
 			INT64		dwHZoomedWidth, dwHZoomedPos, dwVZoomedHeight, dwVZoomedPos, dwVZoomedFullHeight;
 			UINT16		wHSclPos, wVSclPos, wHSclMin, wHSclMax, wVSclMin, wVSclMax;
@@ -54,8 +54,8 @@ namespace WINS {
 		CMessage *msgs;
 
 	public:
-		CSignalWin();
-		~CSignalWin();
+		CWinSignal();
+		~CWinSignal();
 
 		void Init(void);
 		void UnInit(void);

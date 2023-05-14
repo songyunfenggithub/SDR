@@ -82,6 +82,9 @@ namespace DEVICES {
 
 		bool bPlay = true;
 
+		HANDLE hThread = NULL;
+		bool Doing = false;
+
 	public:
 		CAudio();
 		~CAudio();
@@ -107,6 +110,8 @@ namespace DEVICES {
 		static void CALLBACK waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
 		static void CALLBACK waveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);
 
+		void Thread_Audio_Out_Func(void);
+		static LPTHREAD_START_ROUTINE Thread_Audio_Out(LPVOID lp);
 	};
 }
 

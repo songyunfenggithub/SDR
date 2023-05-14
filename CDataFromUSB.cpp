@@ -1,10 +1,11 @@
 
 #include "stdafx.h"
 #include <iostream>
-#include "public.h"
 
 #pragma comment(lib,"setupapi.lib")  
 
+#include "public.h"
+#include "Debug.h"
 #include "CData.h"
 #include "CDataFromUSB.h"
 
@@ -16,7 +17,7 @@ CDataFromUSB clsGetDataUSB;
 #pragma warning(default:4201)
 #pragma warning(default:4214)
 
-#define NOISY(_x_) printf _x_ ;
+#define NOISY(_x_) DbgMsg _x_ ;
 
 
 CDataFromUSB::CDataFromUSB()
@@ -92,7 +93,7 @@ Return Value:
 	}
 
 	(void)StringCchCopy(devName, MAX_LENGTH, functionClassDeviceData->DevicePath);
-	printf("Attempting to open %s\n", devName);
+	DbgMsg("Attempting to open %s\n", devName);
 
 	hOut = CreateFile(
 		functionClassDeviceData->DevicePath,
@@ -104,7 +105,7 @@ Return Value:
 		NULL); // No template file
 
 	if (INVALID_HANDLE_VALUE == hOut) {
-		printf("FAILED to open %s\n", devName);
+		DbgMsg("FAILED to open %s\n", devName);
 	}
 	free(functionClassDeviceData);
 	return hOut;
@@ -280,10 +281,10 @@ Return Value:
 		completeDeviceName);
 
 	if (hDEV == INVALID_HANDLE_VALUE) {
-		printf("Failed to open (%s) = %u", completeDeviceName, GetLastError());
+		DbgMsg("Failed to open (%s) = %u", completeDeviceName, GetLastError());
 	}
 	else {
-		printf("DeviceName = (%s)\n", completeDeviceName);
+		DbgMsg("DeviceName = (%s)\n", completeDeviceName);
 	}
 
 	return hDEV;
@@ -325,7 +326,7 @@ Return Value:
 		return INVALID_HANDLE_VALUE;
 	}
 
-	printf("completeDeviceName = (%s)\n", completeDeviceName);
+	DbgMsg("completeDeviceName = (%s)\n", completeDeviceName);
 
 	h = CreateFile(completeDeviceName,
 		GENERIC_WRITE | GENERIC_READ,
@@ -366,17 +367,17 @@ Return Value:
 	static int i = 1;
 
 	if (i) {
-		printf("Usage for Read/Write test:\n");
-		printf("-r [n] where n is number of bytes to read\n");
-		printf("-w [n] where n is number of bytes to write\n");
-		printf("-c [n] where n is number of iterations (default = 1)\n");
-		printf("-i [s] where s is the input pipe\n");
-		printf("-o [s] where s is the output pipe\n");
-		printf("-v verbose -- dumps read data\n");
-		printf("-x to skip validation of read and write data\n");
+		DbgMsg("Usage for Read/Write test:\n");
+		DbgMsg("-r [n] where n is number of bytes to read\n");
+		DbgMsg("-w [n] where n is number of bytes to write\n");
+		DbgMsg("-c [n] where n is number of iterations (default = 1)\n");
+		DbgMsg("-i [s] where s is the input pipe\n");
+		DbgMsg("-o [s] where s is the output pipe\n");
+		DbgMsg("-v verbose -- dumps read data\n");
+		DbgMsg("-x to skip validation of read and write data\n");
 
-		printf("\nUsage for USB and Endpoint info:\n");
-		printf("-u to dump USB configuration and pipe info \n");
+		DbgMsg("\nUsage for USB and Endpoint info:\n");
+		DbgMsg("-u to dump USB configuration and pipe info \n");
 		i = 0;
 	}
 }
@@ -549,17 +550,17 @@ Return Value:
 	PULONG pBuf = (PULONG)b;
 
 	// dump an ordinal ULONG for each sizeof(ULONG)'th byte
-	printf("\n****** BEGIN DUMP LEN decimal %d, 0x%x\n", len, len);
+	DbgMsg("\n****** BEGIN DUMP LEN decimal %d, 0x%x\n", len, len);
 	for (i = 0; i < longLen; i++) {
-		printf("%04X ", *pBuf++);
+		DbgMsg("%04X ", *pBuf++);
 		if (i % NPERLN == (NPERLN - 1)) {
-			printf("\n");
+			DbgMsg("\n");
 		}
 	}
 	if (i % NPERLN != 0) {
-		printf("\n");
+		DbgMsg("\n");
 	}
-	printf("\n****** END DUMP LEN decimal %d, 0x%x\n", len, len);
+	DbgMsg("\n****** END DUMP LEN decimal %d, 0x%x\n", len, len);
 }
 
 
@@ -726,37 +727,37 @@ Return Value:
 
 --*/
 {
-	printf("\n===================\nUSB_CONFIGURATION_DESCRIPTOR\n");
+	DbgMsg("\n===================\nUSB_CONFIGURATION_DESCRIPTOR\n");
 
-	printf(
+	DbgMsg(
 		"bLength = 0x%x, decimal %u\n", cd->bLength, cd->bLength
 	);
 
-	printf(
+	DbgMsg(
 		"bDescriptorType = 0x%x ( %s )\n", cd->bDescriptorType, usbDescriptorTypeString(cd->bDescriptorType)
 	);
 
-	printf(
+	DbgMsg(
 		"wTotalLength = 0x%x, decimal %u\n", cd->wTotalLength, cd->wTotalLength
 	);
 
-	printf(
+	DbgMsg(
 		"bNumInterfaces = 0x%x, decimal %u\n", cd->bNumInterfaces, cd->bNumInterfaces
 	);
 
-	printf(
+	DbgMsg(
 		"bConfigurationValue = 0x%x, decimal %u\n", cd->bConfigurationValue, cd->bConfigurationValue
 	);
 
-	printf(
+	DbgMsg(
 		"iConfiguration = 0x%x, decimal %u\n", cd->iConfiguration, cd->iConfiguration
 	);
 
-	printf(
+	DbgMsg(
 		"bmAttributes = 0x%x ( %s )\n", cd->bmAttributes, usbConfigAttributesString(cd->bmAttributes)
 	);
 
-	printf(
+	DbgMsg(
 		"MaxPower = 0x%x, decimal %u\n", cd->MaxPower, cd->MaxPower
 	);
 }
@@ -778,38 +779,38 @@ Return Value:
 
 --*/
 {
-	printf("\n-----------------------------\nUSB_INTERFACE_DESCRIPTOR #%u\n", ix);
+	DbgMsg("\n-----------------------------\nUSB_INTERFACE_DESCRIPTOR #%u\n", ix);
 
 
-	printf(
+	DbgMsg(
 		"bLength = 0x%x\n", id->bLength
 	);
 
 
-	printf(
+	DbgMsg(
 		"bDescriptorType = 0x%x ( %s )\n", id->bDescriptorType, usbDescriptorTypeString(id->bDescriptorType)
 	);
 
 
-	printf(
+	DbgMsg(
 		"bInterfaceNumber = 0x%x\n", id->bInterfaceNumber
 	);
-	printf(
+	DbgMsg(
 		"bAlternateSetting = 0x%x\n", id->bAlternateSetting
 	);
-	printf(
+	DbgMsg(
 		"bNumEndpoints = 0x%x\n", id->bNumEndpoints
 	);
-	printf(
+	DbgMsg(
 		"bInterfaceClass = 0x%x\n", id->bInterfaceClass
 	);
-	printf(
+	DbgMsg(
 		"bInterfaceSubClass = 0x%x\n", id->bInterfaceSubClass
 	);
-	printf(
+	DbgMsg(
 		"bInterfaceProtocol = 0x%x\n", id->bInterfaceProtocol
 	);
-	printf(
+	DbgMsg(
 		"bInterface = 0x%x\n", id->iInterface
 	);
 }
@@ -832,38 +833,38 @@ Return Value:
 
 --*/
 {
-	printf(
+	DbgMsg(
 		"------------------------------\nUSB_ENDPOINT_DESCRIPTOR for Pipe%02d\n", i
 	);
 
-	printf(
+	DbgMsg(
 		"bLength = 0x%x\n", ed->bLength
 	);
 
-	printf(
+	DbgMsg(
 		"bDescriptorType = 0x%x ( %s )\n", ed->bDescriptorType, usbDescriptorTypeString(ed->bDescriptorType)
 	);
 
 	if (USB_ENDPOINT_DIRECTION_IN(ed->bEndpointAddress)) {
-		printf(
+		DbgMsg(
 			"bEndpointAddress= 0x%x ( INPUT )\n", ed->bEndpointAddress
 		);
 	}
 	else {
-		printf(
+		DbgMsg(
 			"bEndpointAddress= 0x%x ( OUTPUT )\n", ed->bEndpointAddress
 		);
 	}
 
-	printf(
+	DbgMsg(
 		"bmAttributes= 0x%x ( %s )\n", ed->bmAttributes, usbEndPointTypeString(ed->bmAttributes)
 	);
 
-	printf(
+	DbgMsg(
 		"wMaxPacketSize= 0x%x, decimal %u\n", ed->wMaxPacketSize, ed->wMaxPacketSize
 	);
 
-	printf(
+	DbgMsg(
 		"bInterval = 0x%x, decimal %u\n", ed->bInterval, ed->bInterval
 	);
 }
@@ -886,27 +887,27 @@ Return Value:
 
 --*/
 {
-	printf(
+	DbgMsg(
 		"------------------------------\nUSB_SUPERSPEED_ENDPOINT_COMPANION_DESCRIPTOR for Pipe%02d\n", i
 	);
 
-	printf(
+	DbgMsg(
 		"bLength = 0x%x\n", secd->bLength
 	);
 
-	printf(
+	DbgMsg(
 		"bDescriptorType = 0x%x ( %s )\n", secd->bDescriptorType, usbDescriptorTypeString(secd->bDescriptorType)
 	);
 
-	printf(
+	DbgMsg(
 		"bMaxBurst = 0x%x, decimal %u\n", secd->bMaxBurst, secd->bMaxBurst
 	);
 
-	printf(
+	DbgMsg(
 		"bmAttributes = 0x%x \n", secd->bmAttributes.AsUchar
 	);
 
-	printf(
+	DbgMsg(
 		"wBytesPerInterval = 0x%x, decimal %u\n", secd->wBytesPerInterval, secd->wBytesPerInterval
 	);
 
@@ -1074,7 +1075,7 @@ Return Value:
 
 LPTHREAD_START_ROUTINE CDataFromUSB::GetDataUSBThreadFun(LPVOID lp)
 {
-	OPENCONSOLE;
+	OPENCONSOLE_SAVED;
 	clsGetDataUSB.USBGetData();
 	//CLOSECONSOLE;
 	return 0;
@@ -1104,38 +1105,38 @@ void CDataFromUSB::USBGetData(void)
 	// send the write
 	//
 	WriteFile(hWrite, poutBuf, WriteLen, (PULONG)&nBytesWrite, NULL);
-	printf("<%s> W (%04.4u) : request %06.6d bytes -- %06.6d bytes written\n",
+	DbgMsg("<%s> W (%04.4u) : request %06.6d bytes -- %06.6d bytes written\n",
 					outPipe, i, WriteLen, nBytesWrite);
 
 	int ecount = 0;
 	while (Program_In_Process)
 	{
 
-		success = ReadFile(hRead, (char*)(AdcData->Buff) + AdcData->CharPos, 64, (PULONG)&nBytesRead, NULL);
+		success = ReadFile(hRead, (char*)(AdcDataI->Buff) + AdcDataI->CharPos, 64, (PULONG)&nBytesRead, NULL);
 
 		if (success)
 		{
 			if (nBytesRead != 64)
 			{
-				printf("<%s> R (%04.4u) : request %06.6d bytes -- %06.6d bytes read\n",
+				DbgMsg("<%s> R (%04.4u) : request %06.6d bytes -- %06.6d bytes read\n",
 					inPipe, i++, ReadLen, nBytesRead);
 
-				printf("Dumping read buffer\n");
+				DbgMsg("Dumping read buffer\n");
 				dump((PUCHAR)pinBuf, nBytesRead);
 				pinBuf[nBytesRead] = 0;
-				printf("%s\n", pinBuf);
+				DbgMsg("%s\n", pinBuf);
 				exit(0);
 			}
 		}
 		else
 		{
 			ecount++;
-			if(ecount % 2560000 == 0) printf("usb read data error! %d\n", GetLastError());
+			if(ecount % 2560000 == 0) DbgMsg("usb read data error! %d\n", GetLastError());
 		}
-		AdcData->CharPos += nBytesRead;
-		if (AdcData->CharPos == (AdcData->Len << AdcData->MoveBit)) AdcData->CharPos = 0;
-		AdcData->Pos = AdcData->CharPos >> 2;
-		AdcData->GetNew = true;
+		AdcDataI->CharPos += nBytesRead;
+		if (AdcDataI->CharPos == (AdcDataI->Len << AdcDataI->MoveBit)) AdcDataI->CharPos = 0;
+		AdcDataI->Pos = AdcDataI->CharPos >> 2;
+		AdcDataI->GetNew = true;
 	}
 
 	// close devices if needed

@@ -114,10 +114,10 @@ public:
 
 };
 
-extern CData clsData;
-
-extern CData* AdcData;
-extern CData* AdcDataFiltted;
+extern CData* AdcDataI;
+extern CData* AdcDataIFiltted;
+extern CData* AdcDataQ;
+extern CData* AdcDataQFiltted;
 
 extern CData* AudioData;
 extern CData* AudioDataFiltted;

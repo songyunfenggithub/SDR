@@ -11,6 +11,7 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#include "Debug.h"
 #include "CData.h"
 #include "cuda_CFFT.cuh"
 
@@ -52,7 +53,7 @@ void cuda_CFFT::cuda_FFT(void)
     //ReleaseMutex(cuda_FFT_hMutexBuff);
 
     CUFFT_CALL(cudaMemcpy(cuda_FFT_CompoData, cuda_FFT_d_outfftData, FFTInfo->FFTSize * sizeof(cufftDoubleComplex), cudaMemcpyDeviceToHost));// copy the result from device to host
-    //printf("Time of cudaFFT: %fms\r\n", GetTickCount() - s);
+    //DbgMsg("Time of cudaFFT: %fms\r\n", GetTickCount() - s);
 }
 
 void cuda_CFFT::cuda_FFT_Init(CData* data)
@@ -101,7 +102,7 @@ void cuda_CFFT::cuda_FFT_UnInit(void)
         cufftDestroy(cuda_FFT_fft_plan);
         cuda_FFT_fft_plan = 0;
     }
-    printf("Cuda_CFFT_Closed.\r\n");
+    DbgMsg("Cuda_CFFT_Closed.\r\n");
 }
 
 void cuda_CFFT::cuda_FFT(UINT pos)
@@ -144,7 +145,6 @@ void cuda_CFFT::cuda_FFT_Prepare_Data(UINT pos)
         }
     }
     break;
-
     }
 }
 
@@ -167,7 +167,7 @@ double cuda_CFFT::Get_FFT_Max_Value(void)
     cuda_FFT();
     int f = 1;
     maxd = sqrt(cuda_FFT_CompoData[f].x * cuda_FFT_CompoData[f].x + cuda_FFT_CompoData[f].y * cuda_FFT_CompoData[f].y);
-    printf("maxvalue:%d, %lf\n", max, maxd);
+    DbgMsg("maxvalue:%d, %lf\n", max, maxd);
     free(buff);
     return maxd;
 }

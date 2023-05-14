@@ -1,7 +1,4 @@
 #pragma once
-#include "stdafx.h"
-
-#include "public.h"
 
 class CData;
 
@@ -11,43 +8,27 @@ namespace METHOD {
 	class cuda_CFilter2;
 	class cuda_CFilter3;
 
-#define FILTER_CORE_DESC_MAX_LENGTH		8192
-
-	//#define FILTER_CORE_BUILD_LENGTH      513
-	//#define FILTER_CORE_BUILD_LENGTH      1025
-	//#define FILTER_CORE_BUILD_LENGTH      2049
-	//#define FILTER_CORE_BUILD_LENGTH      4097
-	//#define FILTER_CORE_BUILD_LENGTH		8193
-#define FILTER_CORE_BUILD_LENGTH		1025
-//#define FILTER_CORE_BUILD_LENGTH      2049
-//#define FILTER_CORE_BUILD_LENGTH      16385
-//#define FILTER_CORE_LENGTH      2049
-//#define FILTER_CORE_LENGTH      16385
-//#define FILTER_CORE_LENGTH      8193
 
 #define FILTER_WORK_THREADS		4
 
 #define MAX_FILTER_NUMBER		0x100
 
-	typedef float FILTER_CORE_DATA_TYPE;
-
-
 #define CUDA_FILTER_ADC_BUFF_SRC_LENGTH			0x20000
 #define CUDA_FILTER_AUDIO_BUFF_SRC_LENGTH		0x1000
-
-#define FILTER_DESC_LENGTH		1024
 
 	class CFilter
 	{
 	public:
 		const char* TAG = NULL;
 
-		typedef enum _FilterType {
+		typedef float FILTER_CORE_DATA_TYPE;
+
+		typedef enum FILTER_TYPE_STRUCT {
 			FilterLowPass = 0,
 			FilterHighPass = 1,
 			FilterBandPass = 2,
 			FilterBandStop = 3
-		} FilterType;
+		} FILTER_TYPE;
 
 		typedef struct FILTER_INFO;
 		typedef FILTER_INFO *PFILTER_INFO;
@@ -55,7 +36,7 @@ namespace METHOD {
 		struct FILTER_INFO
 		{
 			char* CoreDescStr = NULL;
-			FilterType Type;
+			FILTER_TYPE Type;
 			UINT	FreqCenter, BandWidth;
 			double  FreqFallWidth;
 			UINT	CoreLength;
@@ -65,14 +46,14 @@ namespace METHOD {
 			UINT	subFilterNum = 0;
 			UINT	IterateLevel = 0;
 			UINT	decimationFactorBit = 0;
+			UINT	SampleRate = 0;
 			FILTER_INFO* nextFilter = NULL;
 		};
 
-		//FILTER_INFO FilterInfos[MAX_FILTER_NUMBER];
 		FILTER_INFO rootFilterInfo1;
 		FILTER_INFO rootFilterInfo2;
 
-		typedef enum {
+		typedef enum CUDA_FILTER_N_STRUCT {
 			cuda_filter_1,
 			cuda_filter_2,
 			cuda_filter_3
@@ -84,8 +65,9 @@ namespace METHOD {
 		HANDLE hFilterMutex;
 		HANDLE hCoreMutex;
 
+		HANDLE hThread = NULL;
 		bool doFiltting = true;
-		bool cuda_Filter_exit = true;
+		bool Thread_Exit = true;
 
 		cuda_CFilter* cudaFilter = NULL;
 		cuda_CFilter2* cudaFilter2 = NULL;
@@ -102,10 +84,10 @@ namespace METHOD {
 		CFilter(const char* tag);
 		~CFilter();
 
-		void core(PFILTER_INFO pFilterInfo, PFILTER_INFO rootf);
-		void corepluse(FILTER_CORE_DATA_TYPE* pR, FILTER_CORE_DATA_TYPE* pS, UINT32 corelen);
-		void lowcore(FILTER_CORE_DATA_TYPE fc, FILTER_CORE_DATA_TYPE* pBuf, UINT32 corelen);
-		void invcore(FILTER_CORE_DATA_TYPE* pBuf, UINT32 corelen);
+		void core(FILTER_INFO* pFilterInfo, FILTER_INFO* rootf);
+		void corepluse(FILTER_CORE_DATA_TYPE* pR, FILTER_CORE_DATA_TYPE* pS, UINT corelen);
+		void lowcore(float fc, FILTER_CORE_DATA_TYPE* pBuf, UINT corelen);
+		void invcore(FILTER_CORE_DATA_TYPE* pBuf, UINT corelen);
 
 		bool CheckCoreDesc(char* coreDesc);
 		void ParseCoreDesc(void);
@@ -138,5 +120,6 @@ namespace METHOD {
 	};
 }
 
-extern METHOD::CFilter clsMainFilter;
+extern METHOD::CFilter clsMainFilterI;
+extern METHOD::CFilter clsMainFilterQ;
 extern METHOD::CFilter clsAudioFilter;

@@ -1,13 +1,15 @@
 
 #pragma once
 
+class CData;
+
 namespace WINS {
 
 #define MAX_LOADSTRING 100
 
-	class CAudioWin;
-	class CFilttedWin;
-	class CFilterWin;
+	class CWinAudio;
+	class CWinFiltted;
+	class CWinFilter;
 
 	class CWinMain
 	{
@@ -15,15 +17,15 @@ namespace WINS {
 		HWND hWnd = NULL;
 		HMENU hMenu = NULL;
 		TCHAR szTitle[MAX_LOADSTRING];								// The title bar text
-		TCHAR szWindowClass[MAX_LOADSTRING];						// The title bar text
 
-		CAudioWin* m_audioWin = NULL;
-		CFilttedWin* m_filttedWin = NULL;
-		CFilterWin* m_FilterWin = NULL;
+		HWND hWndRebar = NULL;
+		RECT RebarRect = { 0 };
 
-		typedef struct tagDRAWINFO
-		{
+		CWinAudio* m_audioWin = NULL;
+		CWinFiltted* m_filttedWin = NULL;
+		CWinFilter* m_FilterWin = NULL;
 
+		typedef struct DRAWINFO_STRUCT {
 			int			iHZoom, iHOldZoom, iVZoom, iVOldZoom, iHFit, iVFit;
 			UINT64		dwDataWidth, dwDataHeight;
 			INT64		dwHZoomedWidth, dwHZoomedPos, dwVZoomedHeight, dwVZoomedPos;
@@ -49,7 +51,7 @@ namespace WINS {
 		~CWinMain();
 
 		BOOL InitInstance(HINSTANCE hInstance, int nCmdShow);
-		ATOM MyRegisterClass(HINSTANCE hInstance);
+		ATOM RegisterClass(HINSTANCE hInstance);
 		VOID Paint(void);
 		VOID CaculateHScroll(void);
 		VOID CaculateVScroll(void);
@@ -59,9 +61,14 @@ namespace WINS {
 		void SaveValue(void);
 		void RestoreValue(void);
 
-		LRESULT CALLBACK WndProcReal(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		HWND MakeToolsBar(void);
+
+		void DrawSignal_short(CData* cData, UINT pos, UINT pen, HDC hdc, UINT dwXOffSet, UINT bufStep, UINT dwWStep, RECT* rt);
+		void DrawSignal_float(CData* cData, UINT pos, UINT pen, HDC hdc, UINT dwXOffSet, UINT bufStep, UINT dwWStep, RECT* rt);
+
+		LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 		static LRESULT CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
-		static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	};
 }

@@ -22,18 +22,27 @@
     <Filter Include="Header Files\Demodulator">
       <UniqueIdentifier>{a40b5007-fe0d-460e-8662-d6bc134aa59b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Filter">
+      <UniqueIdentifier>{847d9aa2-1123-4210-8df2-7c6c58020af4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\windows">
+      <UniqueIdentifier>{0406f350-5ea3-490e-a1e8-c9a390edb5f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devices">
+      <UniqueIdentifier>{e99e4a67-6f15-4b7e-b866-e5e232fcbc0d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\FFT">
+      <UniqueIdentifier>{359ddec8-ce83-4e7c-a8a9-9909c2315721}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="myDebug.cpp">
+    <ClCompile Include="Debug.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="myWave.cpp">
+    <ClCompile Include="Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="StdAfx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CDataFromTcpIp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CData.cpp">
@@ -42,52 +51,10 @@
     <ClCompile Include="CAnalyze.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CFilter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CWinSpectrum.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="public.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CDataFromUSB.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CWinMain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CDataFromUsart.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CFilterWin.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CWinOneSpectrum.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="CFile.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CDevices.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CSoundCard.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CDataFromSoundCard.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CDataFromSDR.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CWinSDR.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CSDR.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CWinOneFFT.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CMessage.cpp">
@@ -96,42 +63,90 @@
     <ClCompile Include="CScreenButton.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CWinSDRScan.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="CDemodulatorAM.cpp">
       <Filter>Source Files\Demodulator</Filter>
     </ClCompile>
+    <ClCompile Include="CFilter.cpp">
+      <Filter>Source Files\Filter</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinMain.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinTools.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSignal.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinOneFFT.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinOneSpectrum.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSDR.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSDRScan.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSpectrum.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinFilter.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinAudio.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
     <ClCompile Include="CAudio.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\devices</Filter>
     </ClCompile>
-    <ClCompile Include="CAudioWin.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="CDataFromSDR.cpp">
+      <Filter>Source Files\devices</Filter>
     </ClCompile>
-    <ClCompile Include="CSignalWin.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="CDataFromSoundCard.cpp">
+      <Filter>Source Files\devices</Filter>
     </ClCompile>
-    <ClCompile Include="CFFTWin.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="CDataFromTcpIp.cpp">
+      <Filter>Source Files\devices</Filter>
+    </ClCompile>
+    <ClCompile Include="CDataFromUsart.cpp">
+      <Filter>Source Files\devices</Filter>
+    </ClCompile>
+    <ClCompile Include="CDataFromUSB.cpp">
+      <Filter>Source Files\devices</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinFiltted.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CSDR.cpp">
+      <Filter>Source Files\devices</Filter>
+    </ClCompile>
+    <ClCompile Include="CSoundCard.cpp">
+      <Filter>Source Files\devices</Filter>
+    </ClCompile>
+    <ClCompile Include="CDevices.cpp">
+      <Filter>Source Files\devices</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinFFT.cpp">
+      <Filter>Source Files\windows</Filter>
     </ClCompile>
     <ClCompile Include="CFFT.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\FFT</Filter>
     </ClCompile>
-    <ClCompile Include="CFilttedWin.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="CFFTforFilterAnalyze.cpp">
+      <Filter>Source Files\FFT</Filter>
     </ClCompile>
-    <ClCompile Include="CFilterFFT.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CToolsWin.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="CDemodulatorFM.cpp">
+      <Filter>Source Files\Demodulator</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="myDebug.h">
+    <ClInclude Include="Debug.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="myWave.h">
+    <ClInclude Include="Main.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
@@ -170,7 +185,7 @@
     <ClInclude Include="CWinOneSpectrum.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CFilterWin.h">
+    <ClInclude Include="CWinFilter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CFile.h">
@@ -218,13 +233,13 @@
     <ClInclude Include="CAudio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CAudioWin.h">
+    <ClInclude Include="CWinAudio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CSignalWin.h">
+    <ClInclude Include="CWinSignal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CFFTWin.h">
+    <ClInclude Include="CWinFFT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CFFT.h">
@@ -233,16 +248,22 @@
     <ClInclude Include="cuda_CFFT.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CFilttedWin.h">
+    <ClInclude Include="CWinFiltted.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CFilterFFT.h">
+    <ClInclude Include="CFFTforFilterAnalyze.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CToolsWin.h">
+    <ClInclude Include="CWinTools.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="cuda_CFilter3.cuh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_CFilter_AM.cuh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CDemodulatorFM.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -263,17 +284,20 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="cuda_CFFT.cu">
+      <Filter>Source Files\Filter</Filter>
+    </CudaCompile>
     <CudaCompile Include="cuda_CFilter.cu">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Filter</Filter>
+    </CudaCompile>
+    <CudaCompile Include="cuda_CFilter_AM.cu">
+      <Filter>Source Files\Filter</Filter>
     </CudaCompile>
     <CudaCompile Include="cuda_CFilter2.cu">
-      <Filter>Source Files</Filter>
-    </CudaCompile>
-    <CudaCompile Include="cuda_CFFT.cu">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Filter</Filter>
     </CudaCompile>
     <CudaCompile Include="cuda_CFilter3.cu">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Filter</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

@@ -13,7 +13,7 @@
 #include "CData.h"
 #include "CWinMain.h"
 #include "CDataFromSoundCard.h"
-#include "MyDebug.h"
+#include "Debug.h"
 
 using namespace DEVICES;
 
@@ -89,15 +89,15 @@ void CALLBACK CDataFromSoundCard::waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR d
 		break;
 	case WIM_DATA:
 		LPWAVEHDR pWaveHdr = (LPWAVEHDR)dwParam1;
-		AdcData->CharPos += pWaveHdr->dwBytesRecorded;
-		//AdcData->Pos += pWaveHdr->dwBytesRecorded / clsGetDataSDC.FormatEx.nBlockAlign;
-		//if (AdcData->Pos > DATA_BUFFER_LENGTH) AdcData->Pos -= DATA_BUFFER_LENGTH;
-		if (AdcData->CharPos >= (AdcData->Len << AdcData->MoveBit))
-			AdcData->CharPos -= AdcData->Len << AdcData->MoveBit;
-		AdcData->Pos = AdcData->CharPos >> AdcData->MoveBit;
-		AdcData->GetNew = true;
+		AdcDataI->CharPos += pWaveHdr->dwBytesRecorded;
+		//AdcDataI->Pos += pWaveHdr->dwBytesRecorded / clsGetDataSDC.FormatEx.nBlockAlign;
+		//if (AdcDataI->Pos > DATA_BUFFER_LENGTH) AdcDataI->Pos -= DATA_BUFFER_LENGTH;
+		if (AdcDataI->CharPos >= (AdcDataI->Len << AdcDataI->MoveBit))
+			AdcDataI->CharPos -= AdcDataI->Len << AdcDataI->MoveBit;
+		AdcDataI->Pos = AdcDataI->CharPos >> AdcDataI->MoveBit;
+		AdcDataI->GetNew = true;
 
-		pWaveHdr->lpData = (char*)AdcData->Buff + AdcData->CharPos;
+		pWaveHdr->lpData = (char*)AdcDataI->Buff + AdcDataI->CharPos;
 		waveInAddBuffer(hwi, pWaveHdr, sizeof(WAVEHDR));
 
 		break;
@@ -162,7 +162,7 @@ void CDataFromSoundCard::OpenIn(void)
 
 	InData.fInOpen = TRUE;
 
-	InData.WaveInHdr.lpData = (char*)AdcData->Buff;
+	InData.WaveInHdr.lpData = (char*)AdcDataI->Buff;
 	InData.WaveInHdr.dwBufferLength = IN_BUFFER_LENGTH;
 	InData.WaveInHdr.dwFlags = WHDR_DONE;
 	InData.WaveInHdr.dwLoops = 0L;
@@ -191,7 +191,7 @@ void CDataFromSoundCard::OpenOut(DWORD dwPos, DWORD dwEndPos)
 	}
 	OutData.fOutOpen = TRUE;
 
-	OutData.WaveOutHdr.lpData = (char*)AdcData->Buff + dwPos * FormatEx.nBlockAlign;
+	OutData.WaveOutHdr.lpData = (char*)AdcDataI->Buff + dwPos * FormatEx.nBlockAlign;
 	OutData.WaveOutHdr.dwBufferLength = (dwEndPos - dwPos) * FormatEx.nBlockAlign;
 	OutData.WaveOutHdr.dwFlags = 0L;
 	OutData.WaveOutHdr.dwLoops = 0L;
