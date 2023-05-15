@@ -4,14 +4,14 @@
 class CFile  
 {
 public:
-	TCHAR			szFile[512];
-	TCHAR			szFileAs[512];
-	HWND			hWndGetPos;
+	TCHAR			szFile[512] = { 0 };
+	TCHAR			szFileAs[512] = { 0 };
+	HWND			hWndGetPos = NULL;
 
 private:	
-	TCHAR			szFilter[512];
-	OPENFILENAME	ofn;
-	DWORD			dwSaveStartPos, dwSaveEndPos;
+	TCHAR			szFilter[512] = { 0 };
+	OPENFILENAME	ofn = { 0 };
+	DWORD			dwSaveStartPos = 0, dwSaveEndPos = 0;
 
 public:
 	CFile();
@@ -26,7 +26,6 @@ public:
 
 	BOOL GetSaveFile(HWND hWnd, const BOOL fSaveAs);
 	BOOL GetOpenFile(HWND hWnd);
-	VOID SetFilter(LPTSTR szFilter);
 
 	static LRESULT CALLBACK DlgSaveLengthProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 

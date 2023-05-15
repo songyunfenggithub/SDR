@@ -88,172 +88,6 @@ void CWinSDR::OpenWindow(void)
 	UpdateWindow(hWnd);
 }
 
-
-void CWinSDR::ProcessKey(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	INT     iMax, iMin, iPos;
-	int		dn = 0, tbdn = 0;
-	RECT    rc;
-	POINT	pt;
-	UINT32 hz;
-
-	switch (message)
-	{
-	case WM_LBUTTONDOWN:
-		pt.x = LOWORD(lParam);
-		pt.y = HIWORD(lParam);
-		hz = (uint32_t)(AdcDataI->SampleRate * pt.y / FFTInfo_Signal.FFTSize);
-		cout << pt.x << ":" << pt.y << ":" << hz << endl;
-		break;
-
-	case WM_KEYDOWN:
-		/* Translate keyboard messages to scroll commands */
-		DbgMsg("win spectrum WM_KEYDOWN\r\n");
-		switch (wParam) {
-		case VK_UP:
-			PostMessage(hWnd, WM_VSCROLL, SB_LINEUP, 0L);
-			break;
-
-		case VK_DOWN:
-			PostMessage(hWnd, WM_VSCROLL, SB_LINEDOWN, 0L);
-			break;
-
-		case VK_PRIOR:
-			PostMessage(hWnd, WM_VSCROLL, SB_PAGEUP, 0L);
-			break;
-
-		case VK_NEXT:
-			PostMessage(hWnd, WM_VSCROLL, SB_PAGEDOWN, 0L);
-			break;
-
-		case VK_HOME:
-			PostMessage(hWnd, WM_HSCROLL, SB_PAGEUP, 0L);
-			break;
-
-		case VK_END:
-			PostMessage(hWnd, WM_HSCROLL, SB_PAGEDOWN, 0L);
-			break;
-
-		case VK_LEFT:
-			PostMessage(hWnd, WM_HSCROLL, SB_LINEUP, 0L);
-			break;
-
-		case VK_RIGHT:
-			PostMessage(hWnd, WM_HSCROLL, SB_LINEDOWN, 0L);
-			break;
-		}
-		break;
-
-	case WM_KEYUP:
-		switch (wParam) {
-		case VK_UP:
-		case VK_DOWN:
-		case VK_PRIOR:
-		case VK_NEXT:
-			PostMessage(hWnd, WM_VSCROLL, SB_ENDSCROLL, 0L);
-			break;
-
-		case VK_HOME:
-		case VK_END:
-		case VK_LEFT:
-		case VK_RIGHT:
-			PostMessage(hWnd, WM_HSCROLL, SB_ENDSCROLL, 0L);
-			break;
-		}
-		break;
-
-	case WM_VSCROLL:
-		/* Calculate new vertical scroll position */
-		GetScrollRange(hWnd, SB_VERT, &iMin, &iMax);
-		iPos = GetScrollPos(hWnd, SB_VERT);
-		GetClientRect(hWnd, &rc);
-
-		switch (GET_WM_VSCROLL_CODE(wParam, lParam)) {
-		case SB_LINEDOWN:
-			dn = rc.bottom / 16 + 1;
-			break;
-
-		case SB_LINEUP:
-			dn = -rc.bottom / 16 + 1;
-			break;
-
-		case SB_PAGEDOWN:
-			dn = rc.bottom / 2 + 1;
-			break;
-
-		case SB_PAGEUP:
-			dn = -rc.bottom / 2 + 1;
-			break;
-
-		case SB_THUMBTRACK:
-		case SB_THUMBPOSITION:
-			dn = GET_WM_VSCROLL_POS(wParam, lParam) - iPos;
-			break;
-
-		default:
-			dn = 0;
-			break;
-		}
-		/* Limit scrolling to current scroll range */
-		if (dn = BOUND(iPos + dn, iMin, iMax) - iPos)
-		{
-			ScrollWindow(hWnd, 0, -dn, NULL, NULL);
-			SetScrollPos(hWnd, SB_VERT, iPos + dn, TRUE);
-		}
-		break;
-
-	case WM_HSCROLL:
-		/* Calculate new horizontal scroll position */
-		GetScrollRange(hWnd, SB_HORZ, &iMin, &iMax);
-		iPos = GetScrollPos(hWnd, SB_HORZ);
-		GetClientRect(hWnd, &rc);
-
-		switch (GET_WM_HSCROLL_CODE(wParam, lParam)) {
-		case SB_LINEDOWN:
-			dn = rc.right / 16 + 1;
-			break;
-
-		case SB_LINEUP:
-			dn = -rc.right / 16 + 1;
-			break;
-
-		case SB_PAGEDOWN:
-			dn = rc.right / 2 + 1;
-			break;
-
-		case SB_PAGEUP:
-			dn = -rc.right / 2 + 1;
-			break;
-
-		case SB_THUMBTRACK:
-		case SB_THUMBPOSITION:
-			tbdn = GET_WM_HSCROLL_POS(wParam, lParam);//-iPos;
-			break;
-
-		default:
-			dn = 0;
-			break;
-		}
-		if (dn != 0)
-		{
-			DrawInfo.dwHZoomedPos = BOUND((int)DrawInfo.dwHZoomedPos + dn,
-				0, DrawInfo.dwHZoomedWidth);
-			DrawInfo.wHSclPos = DrawInfo.dwHZoomedPos >> DrawInfo.iHFit;
-		}
-		if (tbdn != 0)
-		{
-			DrawInfo.wHSclPos = BOUND(tbdn, 0, DrawInfo.wHSclMax);
-			DrawInfo.dwHZoomedPos = DrawInfo.wHSclPos << DrawInfo.iHFit;
-		}
-		if (dn != 0 || tbdn != 0)
-		{
-			SetScrollPos(hWnd, SB_HORZ, DrawInfo.wHSclPos, TRUE);
-			InvalidateRect(hWnd, NULL, TRUE);
-		}
-		break;
-	}
-}
-
 LRESULT CALLBACK CWinSDR::StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	return clsWinSDR.WndProc(hWnd, message, wParam, lParam);
@@ -261,9 +95,7 @@ LRESULT CALLBACK CWinSDR::StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, 
 
 LRESULT CALLBACK CWinSDR::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	RECT rt;
-
-	clsWinSDR.ProcessKey(hWnd, message, wParam, lParam);
+	RECT rt = { 0 };
 
 	switch (message)
 	{
@@ -428,11 +260,6 @@ VOID CWinSDR::Paint(HWND hWnd)
 	DeleteObject(hDC);
 
 	EndPaint(hWnd, &ps);
-}
-
-void CWinSDR::PaintFFT(void)
-{
-
 }
 
 

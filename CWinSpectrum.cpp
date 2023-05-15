@@ -7,7 +7,11 @@
 
 #include "public.h"
 #include "Debug.h"
+
+#include "CDataFromSDR.h"
+
 #include "CData.h"
+#include "CScreenButton.h"
 #include "CFFT.h"
 #include "CFilter.h"
 #include "CWinFFT.h"
@@ -15,20 +19,19 @@
 #include "CWinOneSpectrum.h"
 #include "CWinOneFFT.h"
 #include "CWinTools.h"
-#include "CDataFromSDR.h"
+#include "CWinSDRSet.h"
+
 #include "CAnalyze.h"
 
 using namespace std;
 using namespace WINS; 
+using namespace WINS::SPECTRUM; 
 using namespace METHOD;
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
 #define GET_WM_HSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_HSCROLL_POS(wp, lp)      HIWORD(wp)
-
-#define BOUND(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
-#define UP_TO_ZERO(x) (x = x < 0 ? 0 : x)
 
 #define DIVLONG		10
 #define DIVSHORT	5
@@ -43,6 +46,11 @@ using namespace METHOD;
 #define TOOLSBAR_TBSTYLE_DROPDOWN	6
 
 #define FFT_ZOOM_MAX		16
+
+#define FFT_COLOR					::COLOR_PEN::Pen_Green
+#define FFT_COLOR_LOG				::COLOR_PEN::Pen_Yellow
+#define FFT_COLOR_FILTTED			::COLOR_PEN::Pen_Red
+#define FFT_COLOR_FILTTED_LOG		::COLOR_PEN::Pen_Blue
 
 CWinSpectrum clsWinSpect;
 
@@ -103,11 +111,11 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 	{
 		clsWinSpect.hWnd = hWnd;
 		hMenu = GetMenu(hWnd);
-		HMENU m = GetSubMenu(hMenu, 2);
+		hMenuShow = GetSubMenu(hMenu, 1);
 
-		MakeToolsBar();
+		MakeReBar();
 
-		CheckMenuRadioItem(m, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
+		CheckMenuRadioItem(hMenuShow, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
 		CheckMenuItem(hMenu, IDM_SPECTRUM_ZOOMED_SHOW,
 			(clsWinOneSpectrum.bSpectrumBrieflyShow == true ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 
@@ -135,19 +143,19 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 			0, 0, 500, 200, hWnd, NULL, hInst, NULL);
 		ShowWindow(hWndOneSpectrum, SW_SHOW);
 
-		CFFT* fft;
+		clsWinSpect.FFTOrignal->hWnd = hWnd;
+		clsWinSpect.FFTOrignal->Data = AdcDataI;
+		clsWinSpect.FFTOrignal->Init(clsWinSpect.FFTOrignal->FFTInfo->FFTSize, clsWinSpect.FFTOrignal->FFTInfo->FFTStep, clsWinSpect.FFTOrignal->FFTInfo->AverageDeep);
+		clsWinSpect.FFTOrignal->hPen = Pens[FFT_COLOR];
+		clsWinSpect.FFTOrignal->hPenLog = Pens[FFT_COLOR_LOG];
+		clsWinSpect.FFTOrignal->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTOrignal, 0, NULL);
 		
-		fft = (CFFT*)clsWinSpect.FFTOrignal;
-		fft->hWnd = hWnd;
-		fft->Data = AdcDataI;
-		fft->Init();
-		fft->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, fft, 0, NULL);
-
-		fft = (CFFT*)clsWinSpect.FFTFiltted;
-		fft->hWnd = hWnd;
-		fft->Data = AdcDataIFiltted;
-		fft->Init();
-		fft->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, fft, 0, NULL);
+		clsWinSpect.FFTFiltted->hWnd = hWnd;
+		clsWinSpect.FFTFiltted->Data = AdcDataIFiltted;
+		clsWinSpect.FFTFiltted->Init(clsWinSpect.FFTFiltted->FFTInfo->FFTSize, clsWinSpect.FFTFiltted->FFTInfo->FFTStep, clsWinSpect.FFTFiltted->FFTInfo->AverageDeep);
+		clsWinSpect.FFTFiltted->hPen = Pens[FFT_COLOR_FILTTED];
+		clsWinSpect.FFTFiltted->hPenLog = Pens[FFT_COLOR_FILTTED_LOG];
+		clsWinSpect.FFTFiltted->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTFiltted, 0, NULL);
 
 		uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
 	}
@@ -155,15 +163,15 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 	case WM_TIMER:
 	{
 		if (clsWinSpect.bFFTHold == false) {
-			((CFFT*)clsWinSpect.FFTOrignal)->FFTNext = true;
-			((CFFT*)clsWinSpect.FFTFiltted)->FFTNext = true;
+			clsWinSpect.FFTOrignal->FFTNext = true;
+			clsWinSpect.FFTFiltted->FFTNext = true;
 		}
 	}
 	break;
 	case WM_FFT:
 	{
-		clsWinOneFFT.BrieflyBuff((void*)lParam);
-		clsWinOneSpectrum.PaintSpectrum((void*)lParam);
+		clsWinOneFFT.BrieflyBuff((CFFT*)lParam);
+		clsWinOneSpectrum.PaintSpectrum((CFFT*)lParam);
 	}
 	break;
 	case WM_SIZE:
@@ -187,9 +195,9 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 			//SetScrollRange(hWndSpectrumVScrollBar, SB_VERT, 0, clsWaveFFT.HalfFFTSize - WinOneSpectrumHeight, TRUE);
 		//滚动条初始化
 		GetRealClientRect(&rt);
-		HScrollWidth = ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize * HScrollZoom - (rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
-		if (HScrollWidth < 0) HScrollWidth = 0;
-		SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
+		HScrollRange = ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize * HScrollZoom - (rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+		if (HScrollRange < 0) HScrollRange = 0;
+		SetScrollRange(hWnd, SB_HORZ, 0, HScrollRange, TRUE);
 	}
 	break;
 	case WM_CHAR:
@@ -220,14 +228,6 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 	case WM_COMMAND:
 		return OnCommand(message, wParam, lParam);
 		break;
-	case WM_SYSCOMMAND:
-		if (LOWORD(wParam) == SC_CLOSE)
-		{
-			ShowWindow(hWnd, SW_HIDE);
-			break;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
-		break;
 	case WM_ERASEBKGND:
 		//不加这条消息屏幕刷新会闪烁
 		break;
@@ -241,10 +241,16 @@ LRESULT CALLBACK CWinSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 		KeyAndScroll(message, wParam, lParam);
 		break;
 	case WM_DESTROY:
+		FFTOrignal->FFTDoing = FALSE;
+		FFTFiltted->FFTDoing = FALSE;
+
 		SaveValue();
+
 		if (clsWinOneFFT.hWnd) DestroyWindow(clsWinOneFFT.hWnd);
 		if (clsWinOneSpectrum.hWnd) DestroyWindow(clsWinOneSpectrum.hWnd);
+
 		DbgMsg("WinSpectrum WM_DESTROY\r\n");
+		this->hWnd = NULL;
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -267,6 +273,9 @@ bool CWinSpectrum::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_FFT_SET:
 		DialogBox(hInst, (LPCTSTR)IDD_DLG_FFT_SET, hWnd, (DLGPROC)DlgFFTSetProc);
 		break;
+	case IDM_SDR_SET:
+		clsWinSDRSet.OpenWindow();
+		break;
 
 	case IDM_SPECTRUM_HORZ_ZOOM_INCREASE:
 		break;
@@ -286,8 +295,8 @@ bool CWinSpectrum::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_FFT_HORZ_ZOOM_INCREASE:
 		if (HScrollZoom < FFT_ZOOM_MAX) {
 			HScrollZoom *= 2;
-			HScrollWidth = ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
-			SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
+			HScrollRange = ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			SetScrollRange(hWnd, SB_HORZ, 0, HScrollRange, TRUE);
 			HScrollPos *= 2.0;
 			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			clsWinOneFFT.P2SubP1();
@@ -297,11 +306,11 @@ bool CWinSpectrum::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_FFT_HORZ_ZOOM_DECREASE:
 		if (HScrollZoom * ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize > WinRect.right) {
 			HScrollZoom /= 2.0;
-			HScrollWidth = ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
-			UP_TO_ZERO(HScrollWidth);
-			SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
+			HScrollRange = ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize * HScrollZoom - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			UP_TO_ZERO(HScrollRange);
+			SetScrollRange(hWnd, SB_HORZ, 0, HScrollRange, TRUE);
 			HScrollPos /= 2.0;
-			HScrollPos = BOUND(HScrollPos, 0, HScrollWidth);
+			HScrollPos = BOUND(HScrollPos, 0, HScrollRange);
 			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			clsWinOneFFT.P2SubP1();
 			PostMessage(clsWinOneFFT.hWnd, WM_SIZE, 0, 0);
@@ -309,8 +318,8 @@ bool CWinSpectrum::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case IDM_FFT_HORZ_ZOOM_HOME:
 		HScrollPos /= HScrollZoom;
-		HScrollWidth = ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
-		SetScrollRange(hWnd, SB_HORZ, 0, HScrollWidth, TRUE);
+		HScrollRange = ((CFFT*)clsWinSpect.FFTOrignal)->FFTInfo->HalfFFTSize - (WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+		SetScrollRange(hWnd, SB_HORZ, 0, HScrollRange, TRUE);
 		SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 		HScrollZoom = 1.0;
 		clsWinOneFFT.P2SubP1();
@@ -349,30 +358,26 @@ bool CWinSpectrum::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 
 	case IDM_SPECTRUM_ORIGNAL_SHOW:
 	{
-		HMENU m = GetSubMenu(hMenu, 2);
 		clsWinOneSpectrum.whichSignel = 0;
-		CheckMenuRadioItem(m, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
+		CheckMenuRadioItem(hMenuShow, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
 	}
 		break;
 	case IDM_SPECTRUM_ORIGNAL_LOG_SHOW:
 	{
-		HMENU m = GetSubMenu(hMenu, 2);
 		clsWinOneSpectrum.whichSignel = 1;
-		CheckMenuRadioItem(m, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
+		CheckMenuRadioItem(hMenuShow, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
 	}
 		break;
 	case IDM_SPECTRUM_FILTTED_SHOW:
 	{
-		HMENU m = GetSubMenu(hMenu, 2);
 		clsWinOneSpectrum.whichSignel = 2;
-		CheckMenuRadioItem(m, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
+		CheckMenuRadioItem(hMenuShow, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
 	}
 		break;
 	case IDM_SPECTRUM_FILTTED_LOG_SHOW:
 	{
-		HMENU m = GetSubMenu(hMenu, 2);
 		clsWinOneSpectrum.whichSignel = 3;
-		CheckMenuRadioItem(m, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
+		CheckMenuRadioItem(hMenuShow, 0, 3, clsWinOneSpectrum.whichSignel, MF_BYPOSITION);
 	}
 		break;
 	case IDM_SPECTRUM_ZOOMED_SHOW:
@@ -461,23 +466,25 @@ LRESULT CALLBACK CWinSpectrum::DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wPa
 			{
 				UINT fftsize = GetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, NULL, false);
 				UINT fftstep = GetDlgItemInt(hDlg, IDC_EDIT_FFT_STEP, NULL, false);
-				//clsWaveFFT.FFTSize = GetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, NULL, false);
-				//clsWaveFFT.FFTStep = GetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, NULL, false);
-				clsWinSpect.FFTOrignal->FFTDoing = false;
-				while (clsWinSpect.FFTOrignal->Thread_Exit == false);
-				FFTInfo_Signal.FFTSize = fftsize;
-				FFTInfo_Signal.HalfFFTSize = fftsize / 2;
-				FFTInfo_Signal.FFTStep = fftstep;
-				clsWinSpect.FFTOrignal->Init();
-				clsWinSpect.FFTOrignal->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTOrignal, 0, NULL);
+				int bit;
+				for (bit = 0; fftsize > (1 << bit); bit++);
+				fftsize = 1 << bit;
+				for (bit = 0; fftstep > (1 << bit); bit++);
+				fftstep = 1 << bit;
 
-				clsWinSpect.FFTFiltted->FFTDoing = false;
-				while (clsWinSpect.FFTFiltted->Thread_Exit == false);
-				FFTInfo_Filtted.FFTSize = fftsize;
-				FFTInfo_Filtted.HalfFFTSize = fftsize / 2;
-				FFTInfo_Filtted.FFTStep = fftstep;
-				clsWinSpect.FFTFiltted->Init();
-				clsWinSpect.FFTFiltted->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTFiltted, 0, NULL);
+				int halffftsize = fftsize / 2;
+
+				clsWinSpect.HScrollPos = (clsWinSpect.HScrollPos * (halffftsize / FFTInfo_Signal.HalfFFTSize));
+				clsWinSpect.HScrollRange = halffftsize * clsWinSpect.HScrollZoom - (clsWinSpect.WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+				SetScrollRange(clsWinOneFFT.hWnd, SB_HORZ, 0, clsWinSpect.HScrollRange, false);
+				SetScrollPos(clsWinOneFFT.hWnd, SB_HORZ, clsWinSpect.HScrollPos, true);
+
+				clsWinSpect.FFTOrignal->Init(fftsize, fftstep, FFTInfo_Signal.AverageDeep);
+				clsWinSpect.FFTFiltted->Init(
+					fftsize / (AdcDataI->SampleRate / AdcDataIFiltted->SampleRate), 
+					fftstep / (AdcDataI->SampleRate / AdcDataIFiltted->SampleRate), 
+					FFTInfo_Filtted.AverageDeep
+				);
 			}
 			EndDialog(hDlg, LOWORD(wParam));
 			return TRUE;
@@ -623,18 +630,18 @@ void CWinSpectrum::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		if (dn != 0)
 		{
-			HScrollPos = BOUND(HScrollPos + dn, 0, HScrollWidth);
+			HScrollPos = BOUND(HScrollPos + dn, 0, HScrollRange);
 		}
 		if (tbdn != 0)
 		{
-			HScrollPos = BOUND(tbdn, 0, HScrollWidth);
+			HScrollPos = BOUND(tbdn, 0, HScrollRange);
 		}
 		if (dn != 0 || tbdn != 0)
 		{
 			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			InvalidateRect(hWnd, NULL, TRUE);
 			UpdateWindow(hWnd);
-			//DbgMsg("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
+			//DbgMsg("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollRange: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollRange);
 		}
 		break;
 	}
@@ -693,43 +700,104 @@ void CWinSpectrum::RestoreValue(void)
 	DbgMsg("CWinSpectrum::RestoreValue\r\n");
 }
 
-HWND CWinSpectrum::MakeToolsBar(void)
+HWND CWinSpectrum::MakeReBar(void)
 {
 	hWndRebar = clsWinTools.CreateRebar(hWnd);
-	static TBBUTTON tbb[9] = {
+	static TBBUTTON tbb[13] = {
 		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"FC" },
-		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, 
 		{ MAKELONG(1, 0), TOOLSBAR_SET_AM_FREQ_ADD, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"AM Go +" },
 		{ MAKELONG(1, 0), TOOLSBAR_SET_AM_FREQ_SUB, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"AM Go -" },
-		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, 
 		{ MAKELONG(2, 0), TOOLSBAR_SET_FM_FREQ_ADD, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"FM Go +" },
 		{ MAKELONG(2, 0), TOOLSBAR_SET_FM_FREQ_SUB, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"FM Go -" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL },
+		{ MAKELONG(2, 0), IDM_FFT_SET, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"FFT设置..." },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, 
+		{ MAKELONG(2, 0), IDM_SDR_SET, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"SDR设置..." },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, 
+		{ MAKELONG(4, 0), TOOLSBAR_TBSTYLE_DROPDOWN, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"下拉" }
+	};
+	CWinTools::TOOL_TIPS tips[13] = {
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ 0, NULL }, 
+		{ TOOLSBAR_SET_AM_FREQ_ADD,"P1 点频率 + 移动到AM滤波器中心频率." },
+		{ TOOLSBAR_SET_AM_FREQ_SUB,"P1 点频率 - 移动到AM滤波器中心频率." },
+		{ 0, NULL }, 
+		{ TOOLSBAR_SET_FM_FREQ_ADD, "P1 点频率 + 移动到FM滤波器中心频率." },
+		{ TOOLSBAR_SET_FM_FREQ_SUB, "P1 点频率 - 移动到FM滤波器中心频率." },
+		{ 0, NULL }, 
+		{ IDM_FFT_SET, "FFT 设置." },
+		{ 0, NULL }, 
+		{ IDM_SDR_SET, "SDR 设备设置." },
+		{ 0, NULL }, 
+		{ 0, "TBSTYLE_DROPDOWN" }
+	};
+
+	hWndFreqToolbar = clsWinTools.CreateToolbar(hWnd, tbb, 13, tips, 13);
+	// Add images
+	TBADDBITMAP tbAddBmp = { 0 };
+	tbAddBmp.hInst = HINST_COMMCTRL;
+	tbAddBmp.nID = IDB_STD_SMALL_COLOR;
+	SendMessage(hWndFreqToolbar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
+
+	clsWinTools.CreateRebarBand(hWndRebar, "频率", 1, 500, 0, hWndFreqToolbar);
+
+	static TBBUTTON tbbSDR[21] = {
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"采样频率" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"SDR滤波器" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"采样频率" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"SDR滤波器" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"采样频率" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"SDR滤波器" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"采样频率" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"SDR滤波器" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"采样频率" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"SDR滤波器" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"采样频率" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"SDR滤波器" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"采样频率" },
+		{ MAKELONG(3, 0), TOOLSBAR_SET_FILTER_CENTER_FREQ, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"SDR滤波器" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
+		{ MAKELONG(1, 0), TOOLSBAR_SET_AM_FREQ_ADD, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"自动增益" },
+		{ MAKELONG(1, 0), TOOLSBAR_SET_AM_FREQ_SUB, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"增益" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
+		{ MAKELONG(2, 0), TOOLSBAR_SET_FM_FREQ_ADD, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"FM Go +" },
 		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, // Separator
 		{ MAKELONG(4, 0), TOOLSBAR_TBSTYLE_DROPDOWN, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"下拉" }
 	};
-	CWinTools::TOOL_TIPS tips[9] = {
+	CWinTools::TOOL_TIPS tipsSDR[21] = {
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
+		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
 		{ TOOLSBAR_SET_FILTER_CENTER_FREQ,"P1点频率指定为滤波器中心频率." },
 		{ 0, NULL }, // Separator
 		{ TOOLSBAR_SET_AM_FREQ_ADD,"P1 点频率 + 移动到AM滤波器中心频率." },
 		{ TOOLSBAR_SET_AM_FREQ_SUB,"P1 点频率 - 移动到AM滤波器中心频率." },
 		{ 0, NULL }, // Separator
 		{ TOOLSBAR_SET_FM_FREQ_ADD, "P1 点频率 + 移动到FM滤波器中心频率." },
-		{ TOOLSBAR_SET_FM_FREQ_SUB, "P1 点频率 - 移动到FM滤波器中心频率." },
 		{ 0, NULL }, // Separator
 		{ 0, "TBSTYLE_DROPDOWN" }
 	};
-	HWND hToolBar = clsWinTools.CreateToolbar(hWnd, tbb, 9, tips, 9);
 
+	hWndSDRToolbar = clsWinTools.CreateToolbar(hWnd, tbbSDR, 21, tipsSDR, 21);
 	// Add images
-	TBADDBITMAP tbAddBmp = { 0 };
-	tbAddBmp.hInst = HINST_COMMCTRL;
-	tbAddBmp.nID = IDB_STD_SMALL_COLOR;
-	SendMessage(hToolBar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
+	//TBADDBITMAP tbAddBmp = { 0 };
+	//tbAddBmp.hInst = HINST_COMMCTRL;
+	//tbAddBmp.nID = IDB_STD_SMALL_COLOR;
+	SendMessage(hWndSDRToolbar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
 
-	clsWinTools.CreateRebarBand(hWndRebar, "BTN", 1, 500, 0, hToolBar);
-
-	//hWndTrack = CreateTrackbar(hWnd, 0, 100, 10);
-	clsWinTools.CreateRebarBand(hWndRebar, "Value", 2, 0, 0, NULL);
+	clsWinTools.CreateRebarBand(hWndRebar, "SDR", 2, 0, 0, hWndSDRToolbar);
 	return hWndRebar;
 }
 
@@ -777,4 +845,42 @@ void CWinSpectrum::ToolsbarSetFMFreqAdd(void)
 void CWinSpectrum::ToolsbarSetFMFreqSub(void)
 {
 
+}
+
+bool CWinSpectrum::DoNotify(UINT msg, WPARAM wParam, LPARAM lParam)
+{
+#define lpnm    ((LPNMHDR)lParam)
+	switch (lpnm->code)
+	{
+	case TBN_DROPDOWN:
+	{
+#define lpnmTB  ((LPNMTOOLBAR)lParam)
+		// Get the coordinates of the button.
+		RECT rc = { 0 };
+		SendMessage(lpnmTB->hdr.hwndFrom, TB_GETRECT, (WPARAM)lpnmTB->iItem, (LPARAM)&rc);
+		// Convert to screen coordinates.
+		MapWindowPoints(lpnmTB->hdr.hwndFrom, HWND_DESKTOP, (LPPOINT)&rc, 2);
+		// Get the menu.
+		HMENU hMenuLoaded = LoadMenu(hInst, MAKEINTRESOURCE(lpnmTB->iItem == IDM_DEMODULATOR_AM ? IDC_MENU_POPUP_AM : IDC_MENUMAIN));
+		// Get the submenu for the first menu item.
+		HMENU hPopupMenu = GetSubMenu(hMenuLoaded, 0);
+		// Set up the pop-up menu.
+		// In case the toolbar is too close to the bottom of the screen,
+		// set rcExclude equal to the button rectangle and the menu will appear above
+		// the button, and not below it.
+		TPMPARAMS tpm = { 0 };
+		tpm.cbSize = sizeof(TPMPARAMS);
+		tpm.rcExclude = rc;
+		// Show the menu and wait for input. Using Toolbar Controls Windows common controls demo(CppWindowsCommonControls)
+		// If the user selects an item, its WM_COMMAND is sent.
+		TrackPopupMenuEx(hPopupMenu,
+			TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_VERTICAL,
+			rc.left, rc.bottom, hWnd, &tpm);
+		DestroyMenu(hMenuLoaded);
+
+		DbgMsg("TBN_DROPDOWN %d, %d\r\n", lpnmTB->iItem, IDM_DEMODULATOR_AM);
+		return FALSE;
+	}
+	}
+	return FALSE;
 }

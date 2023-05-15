@@ -23,7 +23,7 @@
     <SccLocalPath />
     <ProjectGuid>{317647A5-1559-4B4A-9160-24AC351477CB}</ProjectGuid>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>myWave.SDR</ProjectName>
+    <ProjectName>SDR</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -261,14 +261,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CAudio.cpp" />
-    <ClCompile Include="CDemodulatorFM.cpp" />
+    <ClCompile Include="CFM.cpp" />
+    <ClCompile Include="CWinControls.cpp" />
+    <ClCompile Include="CWinMsg.cpp" />
     <ClCompile Include="CWinAudio.cpp" />
     <ClCompile Include="CDataFromSDR.cpp" />
     <ClCompile Include="CDataFromSoundCard.cpp" />
     <ClCompile Include="CDataFromTcpIp.cpp" />
     <ClCompile Include="CDataFromUsart.cpp" />
     <ClCompile Include="CDataFromUSB.cpp" />
-    <ClCompile Include="CDemodulatorAM.cpp" />
+    <ClCompile Include="CAM.cpp" />
     <ClCompile Include="CDevices.cpp" />
     <ClCompile Include="CFFT.cpp" />
     <ClCompile Include="CWinFFT.cpp" />
@@ -277,6 +279,7 @@
     <ClCompile Include="CScreenButton.cpp" />
     <ClCompile Include="CSDR.cpp" />
     <ClCompile Include="CWinFiltted.cpp" />
+    <ClCompile Include="CWinSDRSet.cpp" />
     <ClCompile Include="CWinSignal.cpp" />
     <ClCompile Include="CSoundCard.cpp" />
     <ClCompile Include="CAnalyze.cpp" />
@@ -284,15 +287,19 @@
     <ClCompile Include="CFilter.cpp" />
     <ClCompile Include="CWinFilter.cpp" />
     <ClCompile Include="CFFTforFilterAnalyze.cpp" />
+    <ClCompile Include="CWinSpectrumScanFFT.cpp" />
+    <ClCompile Include="CWinSpectrumScanFFTShow.cpp" />
+    <ClCompile Include="CWinSpectrumScanSet.cpp" />
+    <ClCompile Include="CWinSpectrumScanShow.cpp" />
     <ClCompile Include="CWinTools.cpp" />
     <ClCompile Include="CWinOneFFT.cpp" />
     <ClCompile Include="CWinOneSpectrum.cpp" />
     <ClCompile Include="CWinSDR.cpp" />
-    <ClCompile Include="CWinSDRScan.cpp" />
+    <ClCompile Include="CWinSpectrumScan.cpp" />
     <ClCompile Include="CWinSpectrum.cpp" />
     <ClCompile Include="Debug.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="public.cpp" />
+    <ClCompile Include="Public.cpp" />
     <ClCompile Include="StdAfx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -310,14 +317,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CAudio.h" />
-    <ClInclude Include="CDemodulatorFM.h" />
+    <ClInclude Include="CFM.h" />
+    <ClInclude Include="CWinControls.h" />
+    <ClInclude Include="CWinMsg.h" />
     <ClInclude Include="CWinAudio.h" />
     <ClInclude Include="CDataFromSDR.h" />
     <ClInclude Include="CDataFromSoundCard.h" />
     <ClInclude Include="CDataFromTcpIp.h" />
     <ClInclude Include="CDataFromUsart.h" />
     <ClInclude Include="CDataFromUSB.h" />
-    <ClInclude Include="CDemodulatorAM.h" />
+    <ClInclude Include="CAM.h" />
     <ClInclude Include="CDevices.h" />
     <ClInclude Include="CFFT.h" />
     <ClInclude Include="CWinFFT.h" />
@@ -326,6 +335,7 @@
     <ClInclude Include="CScreenButton.h" />
     <ClInclude Include="CSDR.h" />
     <ClInclude Include="CWinFiltted.h" />
+    <ClInclude Include="CWinSDRSet.h" />
     <ClInclude Include="CWinSignal.h" />
     <ClInclude Include="CSoundCard.h" />
     <ClInclude Include="CAnalyze.h" />
@@ -333,13 +343,17 @@
     <ClInclude Include="CFilter.h" />
     <ClInclude Include="CWinFilter.h" />
     <ClInclude Include="CFFTforFilterAnalyze.h" />
+    <ClInclude Include="CWinSpectrumScanFFT.h" />
+    <ClInclude Include="CWinSpectrumScanFFTShow.h" />
+    <ClInclude Include="CWinSpectrumScanSet.h" />
+    <ClInclude Include="CWinSpectrumScanShow.h" />
     <ClInclude Include="CWinTools.h" />
     <ClInclude Include="cuda_CFilter3.cuh" />
     <ClInclude Include="cuda_CFilter_AM.cuh" />
     <ClInclude Include="CWinOneFFT.h" />
     <ClInclude Include="CWinOneSpectrum.h" />
     <ClInclude Include="CWinSDR.h" />
-    <ClInclude Include="CWinSDRScan.h" />
+    <ClInclude Include="CWinSpectrumScan.h" />
     <ClInclude Include="CWinSpectrum.h" />
     <ClInclude Include="cuda_CFilter.cuh" />
     <ClInclude Include="cuda_CFilter2.cuh" />
@@ -349,7 +363,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="StdAfx.h" />
     <ClInclude Include="CWinMain.h" />
-    <ClInclude Include="public.h" />
+    <ClInclude Include="Public.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="myWave.ico" />

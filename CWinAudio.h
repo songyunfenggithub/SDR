@@ -11,8 +11,10 @@ namespace DEVICES {
 }
 using namespace DEVICES;
 
-class CDemodulatorAM;
-class CDemodulatorFM;
+namespace DEMODULATOR {
+	class CAM;
+	class CFM;
+}using namespace DEMODULATOR;
 
 namespace WINS {
 
@@ -47,15 +49,20 @@ namespace WINS {
 		CWinSignal* m_SignalWin = NULL;
 		CWinFilter* m_FilterWin = NULL;
 
-		CDemodulatorAM* m_DemodulatorAM = NULL;
-		bool bDemodulatorAM = false;
-		CDemodulatorFM* m_DemodulatorFM = NULL;
-		bool bDemodulatorFM = false;
+		CAM* m_AM = NULL;
+		bool bAM = false;
+		CFM* m_FM = NULL;
+		bool bFM = false;
 
-		HWND hWndRebar = NULL;
 		HWND hWnd = NULL;
+		HWND hWndRebar = NULL;
+		HWND hWndToolBar = NULL;
+
 		HMENU hMenu = NULL;
-		RECT WinRect;
+		HMENU hMenuFollow = NULL;
+		HMENU hMenuSpectrum = NULL;
+
+		RECT WinRect = { 0 };
 		UINT SignalWinHeight = 256;
 
 		HWND hWndTrack = NULL;
@@ -77,8 +84,10 @@ namespace WINS {
 		BOOL DoNotify(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 		void BuildAudioFilter(void);
+		void ClearAudioFilterPoints(void);
 
 		static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 		static LRESULT CALLBACK DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+		static LRESULT CALLBACK DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 	};
 }

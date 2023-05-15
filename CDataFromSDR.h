@@ -20,6 +20,9 @@ namespace DEVICES {
 
 		static sdrplay_api_CallbackFnsT cbFns;
 
+		void getData(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params, unsigned int numSamples, unsigned int reset, void* cbContext);
+		void getDataIQ(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params, unsigned int numSamples, unsigned int reset, void* cbContext);
+
 		static void StreamACallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params, unsigned int
 			numSamples, unsigned int reset, void* cbContext);
 		static void StreamBCallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params, unsigned int

@@ -11,8 +11,14 @@ namespace METHOD {
 }
 using namespace METHOD;
 
-
 namespace WINS {
+
+	namespace SDR_SET {
+		class CWinSDRSet;
+	}
+	using namespace SDR_SET;
+
+	namespace SPECTRUM {
 
 #define WIN_SPECTRUM_CLASS		"WIN_SPECTRUM_CLASS"
 
@@ -20,7 +26,7 @@ namespace WINS {
 #define SPECTRUM_WIN_WIDTH	800
 
 #define SPECTRUM_ZOOM_MAX	16
-	//#define SPECTRUM_ZOOM_MIN	0.16
+		//#define SPECTRUM_ZOOM_MIN	0.16
 
 #define WAVE_RECT_HEIGHT			0X200
 #define WAVE_RECT_BORDER_TOP		25
@@ -29,60 +35,67 @@ namespace WINS {
 #define WAVE_RECT_BORDER_BOTTON		25
 
 #define TIMEOUT		200
-	class CWinSpectrum
-	{
-	public:
 
-		//HANDLE hMutexBuff = NULL;
+		class CWinSpectrum
+		{
+		public:
 
-		UINT uTimerId;
+			//HANDLE hMutexBuff = NULL;
 
-		HWND hWnd = NULL;
-		RECT WinRect;
+			UINT uTimerId;
 
-		HWND hWndOneSpectrum = NULL;
-		HWND hWndOneFFT = NULL;
-		HWND hWndRebar = NULL;
+			HWND hWnd = NULL;
+			RECT WinRect;
 
-		HMENU hMenu;
+			HWND hWndOneSpectrum = NULL;
+			HWND hWndOneFFT = NULL;
+			HWND hWndRebar = NULL;
+			HWND hWndFreqToolbar = NULL;
+			HWND hWndSDRToolbar = NULL;
 
-		int HScrollPos = 0, VScrollPos = 0, HScrollWidth = 0;
-		double HScrollZoom = 1.0;
-		double VScrollZoom = 1.0;
+			HWND hSDRSet = NULL;
 
-		CFFT* FFTOrignal = NULL;
-		CFFT* FFTFiltted = NULL;
+			HMENU hMenu = NULL;
+			HMENU hMenuShow = NULL;
 
-		bool bFFTHold = false;
-		
-	public:
-		CWinSpectrum();
-		~CWinSpectrum();
+			int HScrollPos = 0, VScrollPos = 0, HScrollRange = 0;
+			double HScrollZoom = 1.0;
+			double VScrollZoom = 1.0;
 
-		void RegisterWindowsClass(void);
-		void OpenWindow(void);
+			CFFT* FFTOrignal = NULL;
+			CFFT* FFTFiltted = NULL;
 
-		void Init(void);
-		void Paint(void);
-		bool OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
-		void KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
+			bool bFFTHold = false;
 
-		void GetRealClientRect(PRECT lprc);
+		public:
+			CWinSpectrum();
+			~CWinSpectrum();
 
-		HWND MakeToolsBar(void);
-		void ToolsbarSetFilterCenterFreq(void);
-		void ToolsbarSetAMFreqAdd(void);
-		void ToolsbarSetAMFreqSub(void);
-		void ToolsbarSetFMFreqAdd(void);
-		void ToolsbarSetFMFreqSub(void);
-	
-		void RestoreValue(void);
-		void SaveValue(void);
+			void RegisterWindowsClass(void);
+			void OpenWindow(void);
 
-		LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-		static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-		static LRESULT CALLBACK DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
-	};
+			void Init(void);
+			void Paint(void);
+			bool OnCommand(UINT message, WPARAM wParam, LPARAM lParam);
+			void KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
+
+			void GetRealClientRect(PRECT lprc);
+
+			HWND MakeReBar(void);
+			bool DoNotify(UINT msg, WPARAM wParam, LPARAM lParam);
+			void ToolsbarSetFilterCenterFreq(void);
+			void ToolsbarSetAMFreqAdd(void);
+			void ToolsbarSetAMFreqSub(void);
+			void ToolsbarSetFMFreqAdd(void);
+			void ToolsbarSetFMFreqSub(void);
+
+			void RestoreValue(void);
+			void SaveValue(void);
+
+			LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+			static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+			static LRESULT CALLBACK DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+		};
+	}
 }
-
-extern WINS::CWinSpectrum clsWinSpect;
+extern WINS::SPECTRUM::CWinSpectrum clsWinSpect;

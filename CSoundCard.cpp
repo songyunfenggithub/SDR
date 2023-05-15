@@ -16,9 +16,11 @@
 #include "Debug.h"
 
 #include "CData.h"
-#include "CWinMain.h"
 #include "CAudio.h"
 #include "CSoundCard.h"
+
+#include "CWinMain.h"
+#include "CWinSignal.h"
 
 using namespace DEVICES;
 
@@ -89,8 +91,8 @@ LRESULT CALLBACK CSoundCard::DlgGotoProc(HWND hDlg, UINT message, WPARAM wParam,
 			case IDOK:
 				{
 				DWORD dwPos = GetDlgItemInt(hDlg, IDC_EDITGOTO, 0, 0);
-				clsWinMain.DrawInfo.dwHZoomedPos = 
-					clsWinMain.DrawInfo.iHZoom > 0 ? (dwPos << clsWinMain.DrawInfo.iHZoom) : (dwPos >> - clsWinMain.DrawInfo.iHZoom);
+				clsWinMain.m_signalWin->DrawInfo.dwHZoomedPos =
+					clsWinMain.m_signalWin->DrawInfo.iHZoom > 0 ? (dwPos << clsWinMain.m_signalWin->DrawInfo.iHZoom) : (dwPos >> - clsWinMain.m_signalWin->DrawInfo.iHZoom);
 				}
 			case IDCANCEL:
 				EndDialog(hDlg, LOWORD(wParam));
@@ -118,7 +120,7 @@ LRESULT CALLBACK CSoundCard::DlgPlayStopPosProc(HWND hDlg, UINT message, WPARAM 
 				if (HIWORD(wParam) == STN_CLICKED) 
                 {
 					SetDlgItemInt(hDlg,	IDC_EDIT_PLAY_STOP_POSITION, 
-						clsWinMain.DrawInfo.dwHZoomedPos, TRUE);
+						clsWinMain.m_signalWin->DrawInfo.dwHZoomedPos, TRUE);
 				}
 				break;
 			case IDOK:
@@ -126,10 +128,10 @@ LRESULT CALLBACK CSoundCard::DlgPlayStopPosProc(HWND hDlg, UINT message, WPARAM 
 				clsSoundCard.dwPlayStopPosition = GetDlgItemInt(hDlg, 
 					IDC_EDIT_PLAY_STOP_POSITION, 0, 0);
 				clsSoundCard.dwPlayStopPosition = 
-					clsWinMain.DrawInfo.iHZoom > 0 ?
-					(clsSoundCard.dwPlayStopPosition << clsWinMain.DrawInfo.iHZoom)
+					clsWinMain.m_signalWin->DrawInfo.iHZoom > 0 ?
+					(clsSoundCard.dwPlayStopPosition << clsWinMain.m_signalWin->DrawInfo.iHZoom)
 					:
-					(clsSoundCard.dwPlayStopPosition >> - clsWinMain.DrawInfo.iHZoom);
+					(clsSoundCard.dwPlayStopPosition >> - clsWinMain.m_signalWin->DrawInfo.iHZoom);
 				}
 			case IDCANCEL:
 				EndDialog(hDlg, LOWORD(wParam));

@@ -5,6 +5,10 @@
 #include "stdafx.h"
 #include <stdio.h>
 
+#include <string.h>
+
+#include "CWinMsg.h"
+
 #include "Debug.h"
 
 //////////////////////////////////////////////////////////////////////
@@ -22,14 +26,37 @@ void myMsgBox(HWND hWnd, LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
 
 void myDbgMsg (PSTR sz,...)
 {
-    CHAR ach[1024];
+    CHAR ach[16384];
     va_list args;
 
     va_start(args, sz);
 
 //    wvsprintf (ach, sz, args);   /* Format the string */
     vsprintf (ach, sz, args);   /* Format the string */
+	clsWinMsg.SetMsg(ach);
 	OutputDebugString(ach);
+	//printf(ach);
+//    MessageBox (NULL, ach, NULL, MB_OK|MB_ICONEXCLAMATION|MB_APPLMODAL);
+}
+
+void myDbgMultiMsg(PSTR sz, ...)
+{
+	CHAR ach[16384];
+	CHAR oneline[16384];
+	va_list args;
+
+	va_start(args, sz);
+
+	//    wvsprintf (ach, sz, args);   /* Format the string */
+	vsprintf(ach, sz, args);   /* Format the string */
+
+	const char delim[] = "\r\n";
+	char* p = strtok(ach, delim);
+	while (p != NULL) {
+		clsWinMsg.SetMsg(p);
+		p = strtok(NULL, delim);
+	}
+	//OutputDebugString(ach);
 	//printf(ach);
 //    MessageBox (NULL, ach, NULL, MB_OK|MB_ICONEXCLAMATION|MB_APPLMODAL);
 }

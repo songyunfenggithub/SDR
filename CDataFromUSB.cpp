@@ -1125,7 +1125,7 @@ void CDataFromUSB::USBGetData(void)
 				dump((PUCHAR)pinBuf, nBytesRead);
 				pinBuf[nBytesRead] = 0;
 				DbgMsg("%s\n", pinBuf);
-				exit(0);
+				EXIT(0);
 			}
 		}
 		else

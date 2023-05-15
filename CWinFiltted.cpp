@@ -40,17 +40,11 @@ void CWinFiltted::Init(void)
 	RegisterWindowsClass();
 	
 	m_SignalWin = new CWinSignal();
-	m_SignalWin->Tag = FilttedWinTag;
-	m_SignalWin->DataOrignal = AdcDataIFiltted;
-	m_SignalWin->Init();
+	m_SignalWin->Flag = FilttedWinTag;
+	m_SignalWin->Init(AdcDataIFiltted, NULL, NULL, NULL);
 
 	m_FFTWin = new CWinFFT();
-	m_FFTWin->Tag = FilttedWinTag;
-	m_FFTWin->Data = AdcDataIFiltted;
-//	FFTInfo_Audio.FFTSize = 2048;
-//	FFTInfo_Audio.HalfFFTSize = FFTInfo_Audio.FFTSize / 2;
-//	FFTInfo_Audio.FFTStep = 2048;
-	((CFFT*)(m_FFTWin->fft))->FFTInfo = &FFTInfo_Filtted;
+	m_FFTWin->Flag = FilttedWinTag;
 
 	//m_FFTWin->buff_type = BUFF_DATA_TYPE::float_type;
 	//m_FFTWin->DataBuff = AdcDataI->FilttedBuff;
@@ -120,12 +114,18 @@ LRESULT CALLBACK CWinFiltted::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 
 		me->hWnd = hWnd;
 		HMENU hMenu = GetMenu(hWnd);
-		me->m_SignalWin->hMenu = hMenu;
-		me->m_FFTWin->hMenu = hMenu;
-		me->m_FFTWin->hMenuSpect = GetSubMenu(hMenu, 3);
+		//me->m_SignalWin->hMenu = hMenu;
+		//me->m_FFTWin->hMenu = hMenu;
+		//me->m_FFTWin->hMenuSpect = GetSubMenu(hMenu, 3);
 
 		//uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
 		//KillTimer(hWnd, 0);//DrawInfo.uTimerId);
+
+		me->m_FFTWin->Data = AdcDataIFiltted;
+		//	FFTInfo_Audio.FFTSize = 2048;
+		//	FFTInfo_Audio.HalfFFTSize = FFTInfo_Audio.FFTSize / 2;
+		//	FFTInfo_Audio.FFTStep = 2048;
+		me->m_FFTWin->fft->FFTInfo = &FFTInfo_Filtted;
 
 		me->m_SignalWin->hWnd = CreateWindow(WIN_SIGNAL_CLASS, "пе╨е", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			0, 200, 500, 200, hWnd, NULL, hInst, me->m_SignalWin);

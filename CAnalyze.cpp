@@ -4,10 +4,11 @@
 
 #include "CAnalyze.h"
 #include "CData.h"
+#include "CScreenButton.h"
 
 #include "CDataFromSDR.h"
 #include "CFFT.h"
-#include "CDemodulatorAM.h"
+#include "CAM.h"
 
 #include "CWinSpectrum.h"
 #include "CWinOneFFT.h"
@@ -16,7 +17,7 @@
 #include "cuda_CFilter.cuh"
 #include "cuda_CFilter2.cuh"
 #include "cuda_CFilter3.cuh"
-#include "CDemodulatorAM.h"
+#include "CAM.h"
 
 #pragma comment(lib,"SDRPlay_API.3.09/API/x64/sdrplay_api.lib")
 
@@ -110,23 +111,22 @@ void CAnalyze::set_FFT_FFTSize(UINT fftsize, UINT fftstep)
 #define TIMEOUT	1000
 void CAnalyze::Init_Params(void)
 {
-	UINT sampleRate = 8000000;
+	UINT sampleRate = 2000000;
 
-	AdcDataI = new CData();
-	AdcDataI->Init(DATA_BUFFER_LENGTH, short_type, ADC_DATA_SAMPLE_BIT);
-	AdcDataIFiltted = new CData();
-	AdcDataIFiltted->Init(DATA_BUFFER_LENGTH, float_type, ADC_DATA_SAMPLE_BIT);
-	AdcDataQ = new CData();
-	AdcDataQ->Init(DATA_BUFFER_LENGTH, short_type, ADC_DATA_SAMPLE_BIT);
-	AdcDataQFiltted = new CData();
-	AdcDataQFiltted->Init(DATA_BUFFER_LENGTH, float_type, ADC_DATA_SAMPLE_BIT);
+	AdcDataI 		= new CData(DATA_BUFFER_LENGTH, BUFF_DATA_TYPE::short_type, ADC_DATA_SAMPLE_BIT, (const UCHAR*)"AdcI",	 Pens[COLOR_PEN::Pen_Green]);
+	AdcDataIFiltted	= new CData(DATA_BUFFER_LENGTH, BUFF_DATA_TYPE::float_type, ADC_DATA_SAMPLE_BIT, (const UCHAR*)"AdcI_F", Pens[COLOR_PEN::Pen_Red]);
+	//AdcDataQ 		= new CData(DATA_BUFFER_LENGTH, BUFF_DATA_TYPE::short_type, ADC_DATA_SAMPLE_BIT, (const UCHAR*)"AdcQ",	 Pens[COLOR_PEN::Pen_Yellow]);
+	//AdcDataQFiltted	= new CData(DATA_BUFFER_LENGTH, BUFF_DATA_TYPE::float_type, ADC_DATA_SAMPLE_BIT, (const UCHAR*)"AdcQ_F", Pens[COLOR_PEN::Pen_Blue]);
 
 	clsMainFilterI.SrcData = AdcDataI;
 	clsMainFilterI.TargetData = AdcDataIFiltted;
-	clsMainFilterQ.SrcData = AdcDataQ;
-	clsMainFilterQ.TargetData = AdcDataQFiltted;
+	//clsMainFilterI.fscale = 0.1;
+	//clsMainFilterQ.SrcData = AdcDataQ;
+	//clsMainFilterQ.TargetData = AdcDataQFiltted;
+	//clsMainFilterQ.fscale = 0.1;
 
 	INT64 rf = 11000000;
+	INT64 rfHz_Step = 0;
 	clsGetDataSDR.open_SDR_device();
 	this->set_SDR_bwType_Bw_MHzT(sdrplay_api_Bw_MHzT::sdrplay_api_BW_0_600);
 	this->set_SDR_decimationFactorEnable(1);
@@ -142,39 +142,26 @@ void CAnalyze::Init_Params(void)
 	AdcDataI->SampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ?
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz / clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor :
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz;
-	AdcDataI->SampleRate = AdcDataI->SampleRate >> 1;
-	AdcDataQ->SampleRate = AdcDataI->SampleRate;
+	//AdcDataI->SampleRate = AdcDataI->SampleRate >> 1;
+	//AdcDataQ->SampleRate = AdcDataI->SampleRate;
 
 	//clsMainFilterI.Cuda_Filter_N_Doing = clsMainFilterI.Cuda_Filter_N_New = CFilter::cuda_filter_3;
 	clsMainFilterI.set_cudaFilter(&clscudaMainFilter, &clscudaMainFilter2, &clscudaMainFilter3, CUDA_FILTER_ADC_BUFF_SRC_LENGTH);
 	clsMainFilterI.ParseCoreDesc();
-	clsMainFilterI.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::cuda_filter_thread, &clsMainFilterI, 0, NULL);
+	//clsMainFilterI.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::cuda_filter_thread, &clsMainFilterI, 0, NULL);
 
 	//clsMainFilterQ.Cuda_Filter_N_Doing = clsMainFilterQ.Cuda_Filter_N_New = CFilter::cuda_filter_3;
-	clsMainFilterQ.set_cudaFilter(&clscudaMainFilterQ, &clscudaMainFilter2Q, &clscudaMainFilter3Q, CUDA_FILTER_ADC_BUFF_SRC_LENGTH);
-	clsMainFilterQ.ParseCoreDesc();
-	clsMainFilterQ.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::cuda_filter_thread, &clsMainFilterQ, 0, NULL);
+	//clsMainFilterQ.set_cudaFilter(&clscudaMainFilterQ, &clscudaMainFilter2Q, &clscudaMainFilter3Q, CUDA_FILTER_ADC_BUFF_SRC_LENGTH);
+	//clsMainFilterQ.ParseCoreDesc();
+	//clsMainFilterQ.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::cuda_filter_thread, &clsMainFilterQ, 0, NULL);
 
-	FFTInfo_Signal.FFTSize = FFT_SIZE;
-	FFTInfo_Signal.HalfFFTSize = FFT_SIZE / 2;
-	FFTInfo_Signal.FFTStep = FFT_STEP;
-	FFTInfo_Signal.AverageDeep = FFT_DEEP;
-
-	FFTInfo_Filtted.FFTSize = FFT_SIZE >> clsMainFilterI.rootFilterInfo1.decimationFactorBit;
-	FFTInfo_Filtted.HalfFFTSize = FFTInfo_Filtted.FFTSize / 2;
-	FFTInfo_Filtted.FFTStep = FFT_STEP >> clsMainFilterI.rootFilterInfo1.decimationFactorBit;
-	FFTInfo_Filtted.AverageDeep = FFT_DEEP;
-
-	clsWinSpect.FFTOrignal = new CFFT();
+	clsWinSpect.FFTOrignal = new CFFT("AdcI", &FFTInfo_Signal);
 	clsWinSpect.FFTOrignal->Data = AdcDataI;
 
-	clsWinSpect.FFTOrignal->FFTInfo = &FFTInfo_Signal;
-
-	clsWinSpect.FFTFiltted = new CFFT();
+	clsWinSpect.FFTFiltted = new CFFT("AdcI_F", &FFTInfo_Filtted);
 	clsWinSpect.FFTFiltted->Data = AdcDataIFiltted;
-	clsWinSpect.FFTFiltted->FFTInfo = &FFTInfo_Filtted;
 
-	SetTimer(NULL, 0, TIMEOUT, (TIMERPROC)CAnalyze::PerSecTimer_Func);
+	uTimerId = SetTimer(NULL, 0, TIMEOUT, (TIMERPROC)CAnalyze::PerSecTimer_Func);
 }
 
 TIMERPROC CAnalyze::PerSecTimer_Func(void)
@@ -199,6 +186,9 @@ TIMERPROC CAnalyze::PerSecTimer_Func(void)
 
 		FFTInfo_AudioFiltted.FFTPerSec = (FFTInfo_AudioFiltted.FFTCount - FFTInfo_AudioFiltted.SavedFFTCount) / 10.0;
 		FFTInfo_AudioFiltted.SavedFFTCount = FFTInfo_AudioFiltted.FFTCount;
+
+		FFTInfo_Spectrum_Scan.FFTPerSec = (FFTInfo_Spectrum_Scan.FFTCount - FFTInfo_Spectrum_Scan.SavedFFTCount) / 10.0;
+		FFTInfo_Spectrum_Scan.SavedFFTCount = FFTInfo_Spectrum_Scan.FFTCount;
 	}
 	if (AdcDataI != NULL) {
 		AdcDataI->NumPerSec = (AdcDataI->Pos - AdcDataI->SavedPos) & AdcDataI->Mask;

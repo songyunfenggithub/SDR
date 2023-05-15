@@ -16,8 +16,8 @@
 
 CData* AdcDataI = NULL;
 CData* AdcDataIFiltted = NULL;
-CData* AdcDataQ = NULL;
-CData* AdcDataQFiltted = NULL;
+//CData* AdcDataQ = NULL;
+//CData* AdcDataQFiltted = NULL;
 
 CData* AudioData = NULL;
 CData* AudioDataFiltted = NULL;
@@ -29,16 +29,22 @@ CData::CData()
 
 }
 
+CData::CData(UINT len, BUFF_DATA_TYPE dataType, INT dataBits, const UCHAR* flag, HPEN hPen)
+{
+	Init(len, dataType, dataBits, flag, hPen);
+}
+
 CData::~CData()
 {
 	UnInit();
 }
 
-void CData::Init(UINT len, BUFF_DATA_TYPE dataType, INT dataBits)
+void CData::Init(UINT len, BUFF_DATA_TYPE dataType, INT dataBits, const UCHAR* flag, HPEN hPen)
 {
 	UnInit();
-
+	Flag = flag;
 	DataType = dataType;
+	this->hPen = hPen;
 	Pos = 0;
 	SavedPos = 0;
 	ProcessPos = 0;
@@ -50,8 +56,13 @@ void CData::Init(UINT len, BUFF_DATA_TYPE dataType, INT dataBits)
 	DataBits = dataBits;
 
 	switch (dataType) {
+	case u_short_type:
+		SizeOfType = sizeof(unsigned short);		
+		Buff = new unsigned short[len];
+		MoveBit = 1;
+		break;
 	case short_type:
-		SizeOfType = sizeof(short);		
+		SizeOfType = sizeof(short);
 		Buff = new short[len];
 		MoveBit = 1;
 		break;

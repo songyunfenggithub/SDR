@@ -15,7 +15,7 @@ typedef enum BUFF_DATA_TYPE_ENUM {
 
 //#define GET_BUFFER_LENGTH	1024
 //16M buffer
-#define DATA_BUFFER_LENGTH					0x2000000UL
+#define DATA_BUFFER_LENGTH					0x8000000UL
 
 //#define ADS1262
 //#define W801
@@ -53,8 +53,8 @@ typedef INT16    ADC_DATA_TYPE, *PADC_DATA_TYPE;
 #define DATA_BYTE_TO_POSITION_MOVEBIT		1
 #define ADC_DATA_SAMPLE_BIT					16
 #define ADC_SAMPLE_RATE						2000000UL
-typedef short		ADC_DATA_TYPE,	* PADC_DATA_TYPE;
-typedef	float		FILTTED_DATA_TYPE, * PFILTEDDATATYPE;
+typedef short								ADC_DATA_TYPE,	* PADC_DATA_TYPE;
+typedef	float								FILTTED_DATA_TYPE, * PFILTEDDATATYPE;
 #endif
 
 #ifdef USART
@@ -73,40 +73,37 @@ typedef INT32    ADC_DATA_TYPE, * PADC_DATA_TYPE;
 
 class CData
 {
-
 public:
+	void* Buff = NULL;
+	const UCHAR* Flag = NULL;
 
+	HPEN hPen = NULL;
+	bool bShow = true;
+
+	UINT Len = 0;
+	UINT Mask = 0;
+
+	UINT Pos = 0;
+	UINT CharPos = 0;
+	UINT ProcessPos = 0;
+	UINT SavedPos = 0;
+
+	BUFF_DATA_TYPE DataType;
 	int SizeOfType = 0;
 	int MoveBit = 0;
 	int DataBits = 0;
-	void* Buff = NULL;
-	UINT Pos = 0;
-	UINT ProcessPos = 0;
-	UINT SavedPos = 0;
-	UINT CharPos = 0;
-	UINT Len = 0;
-	UINT Mask = 0;
-	bool GetNew = false;
+
 	UINT SampleRate = 0;
 
-	BUFF_DATA_TYPE DataType;
-	//ADC_DATA_TYPE	Buff[DATA_BUFFER_LENGTH];
-	//UINT Pos = 0;
-	//UINT CharPos = 0;
-	//bool GetNew = false;
-	//UINT AdcSampleRate;
-
+	bool GetNew = false;
 	UINT NumPerSec = 0;
-
-	//FILTTED_DATA_TYPE  FilttedBuff[DATA_BUFFER_LENGTH];
-	//UINT8 FilttedFlag[DATA_BUFFER_LENGTH] = {0};
-	//UINT  FilttingPos = 0, FilttedPos = 0, FilttedBuffPos = 0;
 
 public:
 	CData();
-	virtual ~CData();
+	CData(UINT len, BUFF_DATA_TYPE dataType, INT dataBits, const UCHAR* flag, HPEN hPen);
+	~CData();
 
-	void Init(UINT len, BUFF_DATA_TYPE dataType, INT dataBits);
+	void Init(UINT len, BUFF_DATA_TYPE dataType, INT dataBits, const UCHAR* flag, HPEN hPen);
 	void UnInit(void);
 
 	void GeneratorWave(void);
@@ -116,8 +113,8 @@ public:
 
 extern CData* AdcDataI;
 extern CData* AdcDataIFiltted;
-extern CData* AdcDataQ;
-extern CData* AdcDataQFiltted;
+//extern CData* AdcDataQ;
+//extern CData* AdcDataQFiltted;
 
 extern CData* AudioData;
 extern CData* AudioDataFiltted;

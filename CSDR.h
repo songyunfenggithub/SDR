@@ -22,6 +22,14 @@ namespace DEVICES {
 
 	typedef std::map<const char*, int>	SDR_ENUM_MAP;
 
+	typedef enum sdrplay_api_sampleRateT_ENUM {
+		sampleRate_2_M = 2000000,
+		sampleRate_4_M = 4000000,
+		sampleRate_6_M = 6000000,
+		sampleRate_8_M = 8000000,
+		sampleRate_10_M = 10000000
+	}sdrplay_api_sampleRateT;
+
 	typedef enum sdrplay_api_decimationFactorT_ENUM {
 		decimationFactor1 = 1,
 		decimationFactor2 = 2,
@@ -40,8 +48,14 @@ namespace DEVICES {
 		SDR_PAMRAS_INT,
 		SDR_PAMRAS_UINT,
 		SDR_PAMRAS_USHORT,
-		SDR_PAMRAS_UCHAR
+		SDR_PAMRAS_UCHAR,
+		SDR_PAMRAS_ENABLE_DISABLE,
 	}SDR_PAMRAS_TYPE;
+
+	typedef enum sdrplay_api_EnableDisableT_ENUM {
+		Disable = 0,
+		Enable = 1
+	}sdrplay_api_EnableDisableT;
 
 	typedef struct SDRParams_STRUCT
 	{
@@ -50,6 +64,7 @@ namespace DEVICES {
 		double data, default, min, max;
 		SDR_ENUM_MAP* pEnumMap;
 		SDR_PAMRAS_TYPE	valueType;
+		SDR_PAMRAS_TYPE	enumValueType;
 		void* pValue;
 		int paramUpdateReason;
 		const char* comment;
@@ -61,6 +76,7 @@ namespace DEVICES {
 	public:
 
 		int sel_SDR_params_index = -1;
+		UINT max_index = 0;
 		TVITEM sel_tvi = { 0 };
 		bool SDR_parmas_changed = false;
 		bool editInCheck = false;

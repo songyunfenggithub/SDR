@@ -24,7 +24,7 @@
 #include "CFFT.h"
 
 #include "CWinMain.h"
-#include "CDemodulatorAM.h"
+#include "CAM.h"
 #include "CAudio.h"
 #include "CWinFFT.h"
 #include "CWinSignal.h"
@@ -410,9 +410,7 @@ BOOL CWinTools::DoNotify(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 LRESULT CWinTools::RelabelButton(HWND hWndToolbar, UINT id, LPSTR text)
 {
     TBBUTTONINFO tbInfo = { 0 };
-    tbInfo.cbSize =
-        sizeof
-        (TBBUTTONINFO);
+    tbInfo.cbSize = sizeof(TBBUTTONINFO);
     tbInfo.dwMask = TBIF_TEXT;
     tbInfo.pszText = text;
     return SendMessage(hWndToolbar, TB_SETBUTTONINFO, (WPARAM)id, (LPARAM)&tbInfo);

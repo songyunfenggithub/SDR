@@ -11,16 +11,19 @@
 #include "Debug.h"
 #include "CSoundCard.h"
 #include "CData.h"
+#include "CFFT.h"
 #include "CFilter.h"
 #include "CWinFFT.h"
 #include "CWinSDR.h"
 #include "CWinTools.h"
 
-#include "CWinSDRScan.h"
+#include "CWinSpectrumScan.h"
+#include "CWinSpectrumScanShow.h"
 
 using namespace std;
-using namespace WINS; 
-//using namespace DEVICES;
+using namespace WINS;
+using namespace WINS::SPECTRUM_SCAN;
+using namespace DEVICES;
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -51,71 +54,65 @@ using namespace WINS;
 #define DIVLONG		10
 #define DIVSHORT	5
 
-CWinSDRScan clsWinOneFFT;
+CWinSpectrumScanShow clsWinSpectrumScanShow;
 
-CWinSDRScan::CWinSDRScan()
+CWinSpectrumScanShow::CWinSpectrumScanShow()
 {
 	OPENCONSOLE_SAVED;
-
-	hMutexUseBuff = CreateMutex(NULL, false, "CWinScanhMutexUseBuff");
-
+	hMutex = CreateMutex(NULL, false, "CWinScanShowhMutex");
 	RegisterWindowsClass();
-
 }
 
-CWinSDRScan::~CWinSDRScan()
+CWinSpectrumScanShow::~CWinSpectrumScanShow()
 {
 	//CLOSECONSOLE;
 }
 
-void CWinSDRScan::RegisterWindowsClass(void)
+void CWinSpectrumScanShow::RegisterWindowsClass(void)
 {
-	WNDCLASSEX wcex;
+	static bool registted = false;
+	if (registted == true) return;
+	registted = true;
+
+	WNDCLASSEX wcex = { 0 };
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
 
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc = (WNDPROC)CWinSDRScan::StaticWndProc;
+	wcex.lpfnWndProc = (WNDPROC)CWinSpectrumScanShow::StaticWndProc;
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
 	wcex.hInstance = hInst;
 	wcex.hIcon = LoadIcon(hInst, (LPCTSTR)IDI_MYWAVE);
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);//(HBRUSH)(COLOR_WINDOW+1);
-	wcex.lpszMenuName = (LPCSTR)NULL;
-	wcex.lpszClassName = WIN_SDR_SCAN_ONE_CLASS;
+	wcex.lpszMenuName = (LPCSTR)IDC_MENU_SPECTRUM_SCAN;
+	wcex.lpszClassName = WIN_SPECTRUM_SCAN_SHOW_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
 	RegisterClassEx(&wcex);
 }
 
-LRESULT CALLBACK CWinSDRScan::StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK CWinSpectrumScanShow::StaticWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	return clsWinOneFFT.WndProc(hWnd, message, wParam, lParam);
+	return clsWinSpectrumScanShow.WndProc(hWnd, message, wParam, lParam);
 }
 
-LRESULT CALLBACK CWinSDRScan::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK CWinSpectrumScanShow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	RECT rt;
-
-	//ProcessKey(hWnd, message, wParam, lParam);
 
 	switch (message)
 	{
 	case WM_CREATE:
-
-		OPENCONSOLE_SAVED;
-		{
-			clsWinOneFFT.hWnd = hWnd;
-
-			uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
-			//KillTimer(hWnd, uTimerId);
-		}
-		break;
-
+	{
+		this->hWnd = hWnd;
+		uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
+		//KillTimer(hWnd, uTimerId);
+	}
+	break;
 	case WM_CHAR:
-		DbgMsg("WinOneSDRScan WM_CHAR\r\n");
-		//PostMessage(clsWinSpect.hWnd, message, wParam, lParam);
+		DbgMsg("WinOneSDRScanShow WM_CHAR\r\n");
 		break;
 	case WM_LBUTTONDOWN:
 		//clsWinSpect.ActivehWnd = NULL;
@@ -123,52 +120,34 @@ LRESULT CALLBACK CWinSDRScan::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 	case WM_MOUSEMOVE:
 		MouseX = GET_X_LPARAM(lParam);
 		MouseY = GET_Y_LPARAM(lParam);
-		//Hz = ((double)MouseY / clsWinSpect.WinOneSpectrumVScrollZoom + clsWinSpect.WinOneSpectrumVScrollPos) * AdcDataI->SampleRate / clsWaveFFT.FFTSize;
-		OnMouse(hWnd);
+		OnMouse();
 		break;
-
 	case WM_TIMER:
-		if (bFFTHold == false && FFTNeedReDraw == false) {
-			FFTNeedReDraw = true;
-		}
 		//InvalidateRect(hWnd, NULL, TRUE);
 		//UpdateWindow(hWnd);
 		break;
-
 	case WM_SIZE:
-		GetRealClientRect(hWnd, &rt);
-		WinWidth = rt.right;
+		GetClientRect(hWnd, &WinRect);
 		break;
-
 	case WM_COMMAND:
-		return OnCommand(hWnd, message, wParam, lParam);
+		return OnCommand(message, wParam, lParam);
 		break;
-
-	case WM_SYSCOMMAND:
-		if (LOWORD(wParam) == SC_CLOSE)
-		{
-			ShowWindow(hWnd, SW_HIDE);
-			break;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
-		break;
-
 	case WM_ERASEBKGND:
 		//不加这条消息屏幕刷新会闪烁
 		break;
 	case WM_PAINT:
-		Paint(hWnd);
+		Paint();
 		break;
 
 	case WM_KEYDOWN:
 	case WM_KEYUP:
 	case WM_VSCROLL:
 	case WM_HSCROLL:
-		KeyAndScroll(hWnd, message, wParam, lParam);
+		KeyAndScroll(message, wParam, lParam);
 		break;
 
 	case WM_DESTROY:
-		PostQuitMessage(0);
+
 		break;
 
 	default:
@@ -178,7 +157,7 @@ LRESULT CALLBACK CWinSDRScan::WndProc(HWND hWnd, UINT message, WPARAM wParam, LP
 	return 0;
 }
 
-BOOL CWinSDRScan::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+BOOL CWinSpectrumScanShow::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	wmId = LOWORD(wParam);
@@ -199,35 +178,11 @@ BOOL CWinSDRScan::OnCommand(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	return TRUE;
 }
 
-void CWinSDRScan::OnMouse(HWND hWnd)
+void CWinSpectrumScanShow::OnMouse(void)
 {
-	/*
-	RECT rt;
-	GetClientRect(hWnd, &rt);
-
-	int i = 0;
-	char s[500], t[100];
-	FILTER_CORE_DATA_TYPE* pFilterCore = clsFilter.pCurrentFilterInfo == NULL ? clsFilter.FilterCore : clsFilter.pCurrentFilterInfo->FilterCore;
-	int FilterLength = clsFilter.pCurrentFilterInfo == NULL ? clsFilter.FilterCoreLength : clsFilter.pCurrentFilterInfo->CoreLength;
-	int X = (clsWinSpect.HScrollPos + MouseX - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
-	X = BOUND(X, 0, (clsWinSpect.HScrollPos + rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / clsWinSpect.HScrollZoom);
-	double Y = X > FilterLength ? 0 : pFilterCore[X];
-	int n = 0;
-	n += sprintf(strMouse + n, "X: %d, core V: %lf", X, Y);
-
-	double Hz = (double)X * AdcDataI->SampleRate / clsWaveFFT.FFTSize;
-	Y = X > clsWaveFFT.FFTSize / 2 ? 0 : clsWinSpect.OrignalFFTBuff[X];
-	n += sprintf(strMouse + n, " | ");
-	n += sprintf(strMouse + n, "Hz: %.03f, FFT: %s", Hz, formatKDouble(Y, 0.001, "", t));
-
-	int Ypos = BOUND(MouseY - WAVE_RECT_BORDER_TOP, 0, WAVE_RECT_HEIGHT);
-	double Ylog = 20 * (X > clsWaveFFT.FFTSize / 2 ? 0 : clsWinSpect.FilttedFFTBuffLog[X]);
-	n += sprintf(strMouse + n, " | ");
-	n += sprintf(strMouse + n, "Y: %.03fdb, logFFT: %fdb", -(double)Ypos / 64 * 20, Ylog);
-	*/
 }
 
-VOID CWinSDRScan::Paint(HWND hWnd)
+VOID CWinSpectrumScanShow::Paint(void)
 {
 	HDC		hDC;
 	PAINTSTRUCT ps;
@@ -335,141 +290,8 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 	double CoreCenter = 256;
 	int FFTLength = FFTInfo_Signal.HalfFFTSize;
 
-	WaitForSingleObject(hMutexUseBuff, INFINITE);
+	WaitForSingleObject(hMutex, INFINITE);
 
-	//绘制滤波 FFT 信号--------------------------------------------------
-	double* pOriBuf = OrignalScanBuff;
-	double* pFilBuf = FilttedScanBuff;
-	double fftvmax;
-	double fftvmin;
-	if (pOriBuf && pFilBuf) fftvmax = max(pOriBuf[FFTLength], pFilBuf[FFTLength]);
-	double scale = 2 * CoreCenter / fftvmax;
-	int Xstep = HScrollZoom > 1.0 ? HScrollZoom : 1;
-	int istep = HScrollZoom < 1.0 ? ((double)1.0 / HScrollZoom) : 1;
-	if (bFFTOrignalShow && pOriBuf)
-	{
-		i = HScrollPos / HScrollZoom;
-		if (i < FFTLength) Y = 2 * CoreCenter - pOriBuf[i] * scale;
-		X = WAVE_RECT_BORDER_LEFT;
-		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT);
-		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-		{
-			X += Xstep;
-			Y = 2 * CoreCenter - pOriBuf[i] * scale;
-			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
-		}
-		DeleteObject(hPen);
-	}
-	if (bFFTFilttedShow && pFilBuf)
-	{
-		i = HScrollPos / HScrollZoom;
-		if (i < FFTLength) Y = 2 * CoreCenter - pFilBuf[i] * scale;
-		X = WAVE_RECT_BORDER_LEFT;
-		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT);
-		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-		{
-			X += Xstep;
-			Y = 2 * CoreCenter - pFilBuf[i] * scale;
-			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
-		}
-		DeleteObject(hPen);
-	}
-
-	double* pOriLogBuf = OrignalScanBuffLog;
-	if (bFFTOrignalLogShow && pOriLogBuf) {
-		//绘制滤波 FFT Log10 信号--------------------------------------------------
-		fftvmax = pOriLogBuf[FFTLength];
-		i = HScrollPos / HScrollZoom;
-		if (i < FFTLength)
-			Y = pOriLogBuf[i] * -64;
-		Y = BOUND(Y, 0, 64 * 12);
-		X = WAVE_RECT_BORDER_LEFT;
-		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT_LOG);
-		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-		{
-			X += Xstep;
-			Y = pOriLogBuf[i] * -64;
-			Y = BOUND(Y, 0, 64 * 12);
-			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
-		}
-		DeleteObject(hPen);
-	}
-
-	double* pFilLogBuf = FilttedScanBuffLog;
-	if (bFFTFilttedLogShow && pFilLogBuf) {
-		//绘制滤波 FFT Log10 信号--------------------------------------------------
-		i = HScrollPos / HScrollZoom;
-		if (i < FFTLength)
-			Y = pFilLogBuf[i] * -64;
-		Y = BOUND(Y, 0, 64 * 12);
-		X = WAVE_RECT_BORDER_LEFT;
-		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT_LOG);
-		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * HScrollZoom - HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-		{
-			X += Xstep;
-			Y = pFilLogBuf[i] * -64;
-			Y = BOUND(Y, 0, 64 * 12);
-			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
-		}
-		DeleteObject(hPen);
-	}
-
-	{
-		//绘制图列-------------------------------------------------------
-		r.top = WAVE_RECT_BORDER_TOP + DIVLONG + 20;
-		r.left = rt.right - WAVE_RECT_BORDER_RIGHT - 100;
-		r.right = rt.right;
-		r.bottom = rt.bottom;
-		SetBkMode(hdc, TRANSPARENT);
-
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT);
-		SelectObject(hdc, hPen);
-		MoveToEx(hdc, r.left - 20, r.top + 10, NULL);
-		LineTo(hdc, r.left - 5, r.top + 10);
-		DeleteObject(hPen);
-		SetTextColor(hdc, COLOR_ORIGNAL_FFT);
-		sprintf(s, "orignal fft");
-		DrawText(hdc, s, strlen(s), &r, NULL);
-		r.top += 20;
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT_LOG);
-		SelectObject(hdc, hPen);
-		MoveToEx(hdc, r.left - 20, r.top + 10, NULL);
-		LineTo(hdc, r.left - 5, r.top + 10);
-		DeleteObject(hPen);
-		SetTextColor(hdc, COLOR_ORIGNAL_FFT_LOG);
-		sprintf(s, "orignal fft log");
-		DrawText(hdc, s, strlen(s), &r, NULL);
-		r.top += 20;
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT);
-		SelectObject(hdc, hPen);
-		MoveToEx(hdc, r.left - 20, r.top + 10, NULL);
-		LineTo(hdc, r.left - 5, r.top + 10);
-		DeleteObject(hPen);
-		SetTextColor(hdc, COLOR_FILTTED_FFT);
-		sprintf(s, "filtted fft");
-		DrawText(hdc, s, strlen(s), &r, NULL);
-		r.top += 20;
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT_LOG);
-		SelectObject(hdc, hPen);
-		MoveToEx(hdc, r.left - 20, r.top + 10, NULL);
-		LineTo(hdc, r.left - 5, r.top + 10);
-		DeleteObject(hPen);
-		SetTextColor(hdc, COLOR_FILTTED_FFT_LOG);
-		sprintf(s, "filtted fft log");
-		DrawText(hdc, s, strlen(s), &r, NULL);
-	}
-
-	//---------------------------------------
-	{
-		//绘制
 #define DRAW_TEXT_X		(WAVE_RECT_BORDER_LEFT + 10)	
 #define DRAW_TEXT_Y		(WAVE_RECT_BORDER_TOP + DIVLONG + 20)
 		double FullVotage = 5.0;
@@ -480,11 +302,9 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 		r.right = rt.right;
 		r.bottom = rt.bottom;
 		sprintf(s, "32pix / DIV\r\n"\
-			"Core Length: %d\r\n"\
 			"AdcSampleRate: %d    Real AdcSampleRate: %d\r\n"\
 			"FFT Size: %d      FFT Step: %d\r\n"\
 			"Sepctrum Hz：%.03f",
-			CoreLength,
 			AdcDataI->SampleRate, AdcDataI->NumPerSec,
 			FFTInfo_Signal.FFTSize, FFTInfo_Signal.FFTStep,
 			clsWinOneSpectrum.Hz
@@ -503,17 +323,6 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 		//sprintf(s, "vzoom %.40f", vzoom);
 		r.top += 40;
 		//DrawText(hdc, s, strlen(s), &r, NULL);
-	}
-
-	{
-		//绘制鼠标提示消息
-		r.top = WAVE_RECT_BORDER_TOP + DIVLONG + 5;
-		r.left = WAVE_RECT_BORDER_LEFT + 10;
-		r.right = r.left + 700;
-		r.bottom = r.top + 20;
-		SetTextColor(hdc, COLOR_ORIGNAL_FFT);
-		DrawText(hdc, strMouse, strlen(strMouse), &r, NULL);
-	}
 
 	DeleteObject(SelectObject(hdc, GetStockObject(SYSTEM_FONT)));
 
@@ -526,12 +335,12 @@ VOID CWinSDRScan::Paint(HWND hWnd)
 	DeleteObject(hdc);
 	DeleteObject(hbmp);
 
-	ReleaseMutex(hMutexUseBuff);
+	ReleaseMutex(hMutex);
 
 	EndPaint(hWnd, &ps);
 }
 
-void CWinSDRScan::KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+void CWinSpectrumScanShow::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	INT     iMax, iMin, iPos;
 	int		dn = 0, tbdn = 0;
@@ -643,32 +452,20 @@ void CWinSDRScan::KeyAndScroll(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 		}
 		if (dn != 0)
 		{
-			HScrollPos = BOUND(HScrollPos + dn, 0, HScrollWidth);
+			HScrollPos = BOUND(HScrollPos + dn, 0, HScrollRange);
 		}
 		if (tbdn != 0)
 		{
-			HScrollPos = BOUND(tbdn, 0, HScrollWidth);
+			HScrollPos = BOUND(tbdn, 0, HScrollRange);
 		}
 		if (dn != 0 || tbdn != 0)
 		{
 			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			InvalidateRect(hWnd, NULL, TRUE);
 			UpdateWindow(hWnd);
-			DbgMsg("CWinSDRScan HScrollPos: %d, HScrollWidth: %d.\r\n", HScrollPos, HScrollWidth);
+			DbgMsg("CWinSDRScan HScrollPos: %d, HScrollRange: %d.\r\n", HScrollPos, HScrollRange);
 		}
 		break;
 	}
 }
-
-VOID CWinSDRScan::GetRealClientRect(HWND hWnd, PRECT lprc)
-{
-	DWORD dwStyle;
-	dwStyle = GetWindowLong(hWnd, GWL_STYLE);
-	GetClientRect(hWnd, lprc);
-	if (dwStyle & WS_HSCROLL)
-		lprc->bottom += GetSystemMetrics(SM_CYHSCROLL);
-	if (dwStyle & WS_VSCROLL)
-		lprc->right += GetSystemMetrics(SM_CXVSCROLL);
-}
-
 

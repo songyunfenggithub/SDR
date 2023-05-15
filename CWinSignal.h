@@ -6,6 +6,7 @@
 #include <string>
 
 class CMessage;
+class CData;
 
 namespace WINS {
 
@@ -28,20 +29,29 @@ namespace WINS {
 		} DRAWINFO, * PDRAWINFO;
 		DRAWINFO	DrawInfo;
 
-
-		const char* Tag = NULL;
+		const char* Flag = NULL;
 
 		HWND hWnd = NULL;
-		HMENU hMenu = NULL;
 
 		UINT uTimerId;
 
-		void* DataOrignal = NULL;
-		void* DataFiltted = NULL;
+		CData* Datas[4];
 
-		bool bDrawOrignalSignal = true;
-		bool bDrawFilttedSignal = true;
-		bool bFollowByOrignal = true;
+		bool bDrawDataI = true;
+		bool bDrawDataI_Filtted = true;
+		bool bDrawDataQ = true;
+		bool bDrawDataQ_Filtted = true;
+
+		typedef enum DRAW_SELECT_DATA_ENUM {
+			Select_DataI		 = 0,
+			Select_DataI_Filtted = 1,
+			Select_DataQ		 = 2,
+			Select_DataQ_Filtted = 3
+		}DRAW_SELECT_DATA;
+		DRAW_SELECT_DATA FollowBy = Select_DataI;
+
+		bool bFollowByDataI = true;
+
 		bool bAutoScroll = true;
 
 		INT MouseX;
@@ -57,7 +67,7 @@ namespace WINS {
 		CWinSignal();
 		~CWinSignal();
 
-		void Init(void);
+		void Init(CData* i, CData* i_f, CData* q, CData* q_f);
 		void UnInit(void);
 
 		void RegisterWindowsClass(void);
@@ -66,8 +76,9 @@ namespace WINS {
 		void OnMouse(void);
 		void GetRealClientRect(PRECT lprc);
 
-		void DrawSignal_short(HDC hdc, RECT* rt, void* Data, COLORREF Color);
-		void DrawSignal_float(HDC hdc, RECT* rt, void* Data, COLORREF Color);
+		void DrawSignal_unsigned_short(HDC hdc, RECT* rt, DRAW_SELECT_DATA select);
+		void DrawSignal_short(HDC hdc, RECT* rt, DRAW_SELECT_DATA select);
+		void DrawSignal_float(HDC hdc, RECT* rt, DRAW_SELECT_DATA select);
 
 
 		void CaculateScrolls(void);

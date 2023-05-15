@@ -7,7 +7,7 @@
 #include <limits>
 #include <iostream>
 
-#include "public.h"
+#include "Public.h"
 #include "Debug.h"
 #include "CData.h"
 #include "CFFT.h"
@@ -17,8 +17,8 @@
 #include "CAudio.h"
 
 #include "CWinMain.h"
-#include "CDemodulatorAM.h"
-#include "CDemodulatorFM.h"
+#include "CAM.h"
+#include "CFM.h"
 #include "CWinFilter.h"
 #include "CWinFFT.h"
 #include "CWinSignal.h"
@@ -30,6 +30,12 @@ using namespace METHOD;
 
 #define TRACK_MIN	0
 #define TRACK_MAX	100
+
+#define AUDIO_COLOR					::COLOR_PEN::Pen_Green
+#define AUDIO_COLOR_LOG				::COLOR_PEN::Pen_Yellow
+#define AUDIO_COLOR_FILTTED			::COLOR_PEN::Pen_Red
+#define AUDIO_COLOR_FILTTED_LOG		::COLOR_PEN::Pen_Blue
+
 
 CWinAudio::CWinAudio()
 {
@@ -55,13 +61,13 @@ void CWinAudio::Init(void)
 	m_FilterWin->cFilter = &clsAudioFilter;
 
 	m_SignalWin = new CWinSignal();
-	m_SignalWin->Tag = AudioWinTag;
+	m_SignalWin->Flag = AudioWinTag;
 	
 	m_FFTWin = new CWinFFT();
-	m_FFTWin->Tag = AudioWinTag;
+	m_FFTWin->Flag = AudioWinTag;
 
-	m_DemodulatorAM = new CDemodulatorAM();
-	m_DemodulatorFM = new CDemodulatorFM();
+	m_AM = new CAM();
+	m_FM = new CFM();
 }
 
 void CWinAudio::UnInit(void)
@@ -76,7 +82,7 @@ void CWinAudio::RegisterWindowsClass(void)
 	if (registted == true) return;
 	registted = true;
 
-	WNDCLASSEX wcex;
+	WNDCLASSEX wcex = { 0 };
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
 
@@ -118,42 +124,41 @@ LRESULT CALLBACK CWinAudio::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 
 		me->hWnd = hWnd;
 		me->hMenu = GetMenu(hWnd);
-		me->m_SignalWin->hMenu = me->hMenu;
-		me->m_FFTWin->hMenu = me->hMenu;
-		me->m_FFTWin->hMenuSpect = GetSubMenu(me->hMenu, 8);
+		//me->m_SignalWin->hMenu = me->hMenu;
+		//me->m_FFTWin->hMenu = me->hMenu;
+		//me->m_FFTWin->hMenuSpect = GetSubMenu(me->hMenu, 8);
 
-		me->m_SignalWin->DataOrignal = me->m_Audio->outData;
-		me->m_SignalWin->DataFiltted = me->m_Audio->outDataFiltted;
-		me->m_SignalWin->Init();
+		me->m_SignalWin->Init(me->m_Audio->outData, me->m_Audio->outDataFiltted, NULL, NULL);
+		
+		me->m_Audio->outData->hPen = Pens[AUDIO_COLOR];
+		me->m_Audio->outDataFiltted->hPen = Pens[AUDIO_COLOR_FILTTED];
 
 		me->m_FFTWin->Data = me->m_Audio->outData;
 		FFTInfo_Audio.FFTSize = 2048;
 		FFTInfo_Audio.HalfFFTSize = FFTInfo_Audio.FFTSize / 2;
 		FFTInfo_Audio.FFTStep = 2048;
 		FFTInfo_Audio.AverageDeep = FFT_DEEP;
-		me->m_FFTWin->fft->FFTInfo = &FFTInfo_Audio;
-		me->m_FFTWin->fft->Color = RGB(0, 255, 0);
-		me->m_FFTWin->fft->ColorLog = RGB(0, 0, 255);
+		me->m_FFTWin->fft = new CFFT("Audio", &FFTInfo_Audio);
+		me->m_FFTWin->fft->hPen = Pens[AUDIO_COLOR];
+		me->m_FFTWin->fft->hPenLog = Pens[AUDIO_COLOR_LOG];
 
 		me->m_FFTWin->Data2 = me->m_Audio->outDataFiltted;
 		FFTInfo_AudioFiltted.FFTSize = 2048;
 		FFTInfo_AudioFiltted.HalfFFTSize = FFTInfo_AudioFiltted.FFTSize / 2;
 		FFTInfo_AudioFiltted.FFTStep = 2048;
 		FFTInfo_AudioFiltted.AverageDeep = FFT_DEEP;
-		me->m_FFTWin->fft2->FFTInfo = &FFTInfo_AudioFiltted;
-		me->m_FFTWin->fft2->Color = RGB(255, 0, 0);
-		me->m_FFTWin->fft2->ColorLog = RGB(255, 255, 0);
+		me->m_FFTWin->fft2 = new CFFT("Audio_F", &FFTInfo_AudioFiltted);
+		me->m_FFTWin->fft2->hPen = Pens[AUDIO_COLOR_FILTTED];
+		me->m_FFTWin->fft2->hPenLog = Pens[AUDIO_COLOR_FILTTED_LOG];
 
 		me->m_FFTWin->isDrawBriefly = false;
 		me->m_FFTWin->isSpectrumZoomedShow = false;
 
-
-//		clsAudioFilter.SrcData = AudioData;
 		clsAudioFilter.SrcData = me->m_Audio->outData;
 		clsAudioFilter.TargetData = me->m_Audio->outDataFiltted;
 		clsAudioFilter.set_cudaFilter(&clscudaAudioFilter, &clscudaAudioFilter2, NULL, CUDA_FILTER_AUDIO_BUFF_SRC_LENGTH);
 		clsAudioFilter.ParseCoreDesc();
-		clsAudioFilter.scale = &me->m_Audio->Am_zoom;
+		clsAudioFilter.Scale = &me->m_Audio->Am_zoom;
 
 		me->m_Audio->SampleRate = &AdcDataIFiltted->SampleRate;
 
@@ -167,6 +172,25 @@ LRESULT CALLBACK CWinAudio::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 		me->m_FFTWin->hWnd = CreateWindow(WIN_FFT_CLASS, "FFT", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
 			0, 0, 500, 200, hWnd, NULL, hInst, me->m_FFTWin);
 		ShowWindow(me->m_FFTWin->hWnd, SW_SHOW);
+
+		me->hMenuFollow = GetSubMenu(me->hMenu, 6);
+		CheckMenuRadioItem(me->hMenuFollow, 10, 11, 10, MF_BYPOSITION);
+
+		me->hMenuSpectrum = GetSubMenu(me->hMenu, 8);
+		CheckMenuRadioItem(me->hMenuSpectrum, 0, 3, 1, MF_BYPOSITION);
+
+		CheckMenuItem(me->hMenu, IDM_WAVEAUTOSCROLL, (me->m_SignalWin->bAutoScroll ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+
+		CheckMenuItem(me->hMenu, IDM_WAVE_IDATA_SHOW, (me->m_SignalWin->bDrawDataI ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(me->hMenu, IDM_WAVE_IDATA_FILTTED_SHOW, (me->m_SignalWin->bDrawDataI_Filtted ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+
+		CheckMenuItem(me->hMenu, IDM_FFT_ORIGNAL_SHOW, (me->m_FFTWin->fft->bShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(me->hMenu, IDM_FFT_ORIGNAL_LOG_SHOW, (me->m_FFTWin->fft->bLogShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(me->hMenu, IDM_FFT_FILTTED_SHOW, (me->m_FFTWin->fft2->bShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(me->hMenu, IDM_FFT_FILTTED_LOG_SHOW, (me->m_FFTWin->fft2->bLogShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+
+		me->bAM = false;
+		me->bFM = false;
 
 	}
 	break;
@@ -227,11 +251,10 @@ LRESULT CALLBACK CWinAudio::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 	}
 	break;
 	case WM_DESTROY:
-		me->m_DemodulatorAM->Doing = false;
+		me->m_AM->Doing = false;
 		//while (me->m_DemodulatorAM->h_AM_Demodulator_Thread != NULL);
 
 		me->m_Audio->StopOut();
-		clsAudioFilter.doFiltting = false;
 
 		DestroyWindow(me->m_SignalWin->hWnd);
 		DestroyWindow(me->m_FFTWin->hWnd);
@@ -256,25 +279,23 @@ bool CWinAudio::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	switch (wmId)
 	{
 	case IDM_DEMODULATOR_AM:
-		m_DemodulatorAM->Doing = false;
-		bDemodulatorAM = !bDemodulatorAM;
-		CheckMenuItem(hMenu, IDM_SPECTRUM_ZOOMED_SHOW,
-			(bDemodulatorAM ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-		if (bDemodulatorAM == true) {
-			while (m_DemodulatorAM->hThread != NULL);
-			m_DemodulatorAM->hThread = 
-				CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CDemodulatorAM::AM_Demodulator_Thread, m_DemodulatorAM, 0, NULL);
+		m_AM->Doing = false;
+		bAM = !bAM;
+		CheckMenuItem(hMenu, IDM_SPECTRUM_ZOOMED_SHOW, (bAM ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		if (bAM == true) {
+			while (m_AM->hThread != NULL);
+			m_AM->hThread =	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CAM::AM_Demodulator_Thread, m_AM, 0, NULL);
 		}
 		break;
 	case IDM_DEMODULATOR_FM:
-		m_DemodulatorFM->Doing = false;
-		bDemodulatorFM = !bDemodulatorFM;
+		m_FM->Doing = false;
+		bFM = !bFM;
 		CheckMenuItem(hMenu, IDM_SPECTRUM_ZOOMED_SHOW,
-			(bDemodulatorFM ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-		if (bDemodulatorFM == true) {
-			while (m_DemodulatorFM->hThread != NULL);
-			m_DemodulatorFM->hThread =
-				CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CDemodulatorFM::Demodulator_Thread, m_DemodulatorFM, 0, NULL);
+			(bFM ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		if (bFM == true) {
+			while (m_FM->hThread != NULL);
+			m_FM->hThread =
+				CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFM::Demodulator_Thread, m_FM, 0, NULL);
 		}
 		break;
 	case IDM_STARTPLAY:
@@ -298,22 +319,97 @@ bool CWinAudio::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_AUDIO_BUILD_FILTER:
 		BuildAudioFilter();
 		break;
+	case IDM_AUDIO_CLEAR_FILTER_POINTS:
+		ClearAudioFilterPoints();
+		break;
+
+	case IDM_AM_MOVE_FREQUENCY:
+	{
+		m_AM->AmMode = CAM::AM_DEMODULATOR_MODE::Am_Move_Frequency_Mode;
+		if (bAM) {
+			bAM = false;
+			SendMessage(hWnd, WM_COMMAND, (WPARAM)IDM_DEMODULATOR_AM, NULL);
+		}
+		char str[100];
+		GetMenuString(LoadMenu(hInst, MAKEINTRESOURCE(IDC_MENU_POPUP_AM)), IDM_AM_MOVE_FREQUENCY, str, 100, MF_BYCOMMAND);
+		clsWinTools.RelabelButton(hWndToolBar, IDM_DEMODULATOR_AM, str);
+	}
+	break;
+	case IDM_AM_IQ:
+	{
+		m_AM->AmMode = CAM::AM_DEMODULATOR_MODE::Am_IQ_Mode;
+		if (bAM) {
+			bAM = false;
+			SendMessage(hWnd, WM_COMMAND, (WPARAM)IDM_DEMODULATOR_AM, NULL);
+		}
+		char str[100];
+		GetMenuString(LoadMenu(hInst, MAKEINTRESOURCE(IDC_MENU_POPUP_AM)), IDM_AM_IQ, str, 100, MF_BYCOMMAND);
+		clsWinTools.RelabelButton(hWndToolBar, IDM_DEMODULATOR_AM, str);
+	}
+	break;
+	case IDM_AM_GET_ENVELOPE:
+	{
+		m_AM->AmMode = CAM::AM_DEMODULATOR_MODE::Am_Get_Envelope_Mode;
+		if (bAM) {
+			bAM = false;
+			SendMessage(hWnd, WM_COMMAND, (WPARAM)IDM_DEMODULATOR_AM, NULL);
+		}
+		char str[100];
+		GetMenuString(LoadMenu(hInst, MAKEINTRESOURCE(IDC_MENU_POPUP_AM)), IDM_AM_GET_ENVELOPE, str, 100, MF_BYCOMMAND);
+		clsWinTools.RelabelButton(hWndToolBar, IDM_DEMODULATOR_AM, str);
+	}
+	break;
+
 	case IDM_WAVEHZOOMRESET:
 	case IDM_WAVEHZOOMINCREASE:
 	case IDM_WAVEHZOOMDECREASE:
 	case IDM_WAVEVZOOMRESET:
 	case IDM_WAVEVZOOMINCREASE:
 	case IDM_WAVEVZOOMDECREASE:
+		PostMessage(m_SignalWin->hWnd, message, wParam, lParam);
+		break;
 	case IDM_WAVEAUTOSCROLL:
-	case IDM_WAVE_FOLLOW_ORIGNAL:
+		SendMessage(m_SignalWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_WAVEAUTOSCROLL, (m_SignalWin->bAutoScroll ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
+	case IDM_WAVE_FOLLOW_IDATA:
+		CheckMenuRadioItem(hMenuFollow, 10, 11, 10, MF_BYPOSITION);
+		PostMessage(m_SignalWin->hWnd, message, wParam, lParam);
+		break;
+	case IDM_WAVE_FOLLOW_FILTTED_IDATA:
+		CheckMenuRadioItem(hMenuFollow, 10, 11, 11, MF_BYPOSITION);
 		PostMessage(m_SignalWin->hWnd, message, wParam, lParam);
 		break;
 
+	case IDM_WAVE_IDATA_SHOW:
+		SendMessage(m_SignalWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_WAVE_IDATA_SHOW, (m_SignalWin->bDrawDataI ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
+	case IDM_WAVE_IDATA_FILTTED_SHOW:
+		SendMessage(m_SignalWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_WAVE_IDATA_FILTTED_SHOW, (m_SignalWin->bDrawDataI_Filtted ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
+
 	case IDM_SPECTRUM_ORIGNAL_SHOW:
+		SendMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		CheckMenuRadioItem(hMenuSpectrum, 0, 3, 0, MF_BYPOSITION);
+		break;
 	case IDM_SPECTRUM_ORIGNAL_LOG_SHOW:
+		SendMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		CheckMenuRadioItem(hMenuSpectrum, 0, 3, 1, MF_BYPOSITION);
+		break;
 	case IDM_SPECTRUM_FILTTED_SHOW:
+		SendMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		CheckMenuRadioItem(hMenuSpectrum, 0, 3, 2, MF_BYPOSITION);
+		break;
 	case IDM_SPECTRUM_FILTTED_LOG_SHOW:
+		SendMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		CheckMenuRadioItem(hMenuSpectrum, 0, 3, 3, MF_BYPOSITION);
+		break;
 	case IDM_SPECTRUM_ZOOMED_SHOW:
+		SendMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_SPECTRUM_ZOOMED_SHOW, (m_FFTWin->isSpectrumZoomedShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
 
 	case IDM_FFT_HORZ_ZOOM_INCREASE:
 	case IDM_FFT_HORZ_ZOOM_DECREASE:
@@ -321,8 +417,27 @@ bool CWinAudio::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_FFT_VERT_ZOOM_INCREASE:
 	case IDM_FFT_VERT_ZOOM_DECREASE:
 	case IDM_FFT_VERT_ZOOM_HOME:
-	case IDM_FFT_SET:
 		PostMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		break;
+
+	case IDM_FFT_ORIGNAL_SHOW:
+		SendMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_FFT_ORIGNAL_SHOW, (m_FFTWin->fft->bShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
+	case IDM_FFT_ORIGNAL_LOG_SHOW:
+		SendMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_FFT_ORIGNAL_LOG_SHOW, (m_FFTWin->fft->bLogShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
+	case IDM_FFT_FILTTED_SHOW:
+		SendMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_FFT_FILTTED_SHOW, (m_FFTWin->fft2->bShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
+	case IDM_FFT_FILTTED_LOG_SHOW:
+		SendMessage(m_FFTWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_FFT_FILTTED_LOG_SHOW, (m_FFTWin->fft2->bLogShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
+	case IDM_FFT_SET:
+		DialogBoxParam(hInst, (LPCTSTR)IDD_DLG_FFT_SET, hWnd, (DLGPROC)DlgFFTSetProc, (LPARAM)this);
 		break;
 	case IDM_AUDIO_FILTER_SET:
 		m_FilterWin->OpenWindow();
@@ -355,6 +470,20 @@ void CWinAudio::BuildAudioFilter(void)
 	if (clsAudioFilter.CheckCoreDesc(str) == false) return;
 	clsAudioFilter.setFilterCoreDesc(&clsAudioFilter.rootFilterInfo1, str);
 	clsAudioFilter.ParseCoreDesc();
+}
+
+void CWinAudio::ClearAudioFilterPoints(void)
+{
+	CWinFFT::POIINT_SERIAL *tp, *cp = m_FFTWin->FilterPsHead;
+	if (cp == NULL) return;
+	cp = cp->next;
+	if (cp == NULL) return;
+	while (cp->next != NULL) {
+		tp = cp;
+		cp = cp->next;
+		free(tp);
+	}
+	m_FFTWin->FilterPsHead->next = cp;
 }
 
 LRESULT CALLBACK CWinAudio::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -416,30 +545,36 @@ LRESULT CALLBACK CWinAudio::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM wP
 
 HWND CWinAudio::MakeToolsBar(void)
 {
-	HWND hWndRebar = clsWinTools.CreateRebar(hWnd);
-	static TBBUTTON tbb[5] = {
-		{ MAKELONG(TOOLS_BTN_PLAY_STOP_ID, 0), IDM_STARTPLAY, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_CHECK, {0}, 0, (INT_PTR)L"Play" },
-		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP, {0}, 0, NULL }, // Separator
-		{ MAKELONG(TOOLS_BTN_DEMODULATOR_AM_ID, 0), IDM_DEMODULATOR_AM, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_CHECK | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"AM" },
-		{ MAKELONG(TOOLS_BTN_DEMODULATOR_FM_ID, 0), IDM_DEMODULATOR_FM, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_CHECK,	{0}, 0, (INT_PTR)L"FM" },
+	hWndRebar = clsWinTools.CreateRebar(hWnd);
+	static TBBUTTON tbb[8] = {
+		{ MAKELONG(1, 0), IDM_STARTPLAY, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_CHECK, {0}, 0, (INT_PTR)L"Play" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP, {0}, 0, NULL }, 
+		{ MAKELONG(2, 0), IDM_DEMODULATOR_AM, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_CHECK | TBSTYLE_DROPDOWN, {0}, 0, (INT_PTR)L"AM_Move_Frequency" },
+		{ MAKELONG(2, 0), IDM_DEMODULATOR_FM, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_CHECK,	{0}, 0, (INT_PTR)L"FM" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP, {0}, 0, NULL }, 
+		{ MAKELONG(3, 0), IDM_AUDIO_BUILD_FILTER, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"建立滤波器" },
+		{ MAKELONG(3, 0), IDM_AUDIO_CLEAR_FILTER_POINTS, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"清除滤波器设置点" },
 		{ MAKELONG(0, 0), 0, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN,	{0}, 0, (INT_PTR)L"下拉" }
 	};
-	CWinTools::TOOL_TIPS tips[5] = {
+	CWinTools::TOOL_TIPS tips[8] = {
 		{ IDM_STARTPLAY,"开始 / 停止 播放音频信号." },
-		{ 0, NULL }, // Separator
+		{ 0, NULL },
 		{ IDM_DEMODULATOR_AM,"开启 / 关闭 调幅解码." },
 		{ IDM_DEMODULATOR_FM, "开启 / 关闭 调频解码." },
+		{ 0, NULL },
+		{ IDM_AUDIO_BUILD_FILTER,"建立滤波器." },
+		{ IDM_AUDIO_CLEAR_FILTER_POINTS, "清除滤波器设置点." },
 		{ 0, "TBSTYLE_DROPDOWN" }
 	};
-	HWND hToolBar = clsWinTools.CreateToolbar(hWnd, tbb, 5, tips, 5);
+	hWndToolBar = clsWinTools.CreateToolbar(hWnd, tbb, 8, tips, 8);
 
 	// Add images
 	TBADDBITMAP tbAddBmp = { 0 };
 	tbAddBmp.hInst = HINST_COMMCTRL;
 	tbAddBmp.nID = IDB_STD_SMALL_COLOR;
-	SendMessage(hToolBar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
+	SendMessage(hWndToolBar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
 
-	clsWinTools.CreateRebarBand(hWndRebar, "BTN", 1, 500, 0, hToolBar);
+	clsWinTools.CreateRebarBand(hWndRebar, "BTN", 1, 500, 0, hWndToolBar);
 
 	hWndTrack = CreateTrackbar(hWnd, 0, 100, 10);
 	clsWinTools.CreateRebarBand(hWndRebar, "Value", 2, 0, 0, hWndTrack);
@@ -519,9 +654,7 @@ BOOL CWinAudio::DoNotify(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		// Convert to screen coordinates.
 		MapWindowPoints(lpnmTB->hdr.hwndFrom, HWND_DESKTOP, (LPPOINT)&rc, 2);
 		// Get the menu.
-		HMENU hMenuLoaded = LoadMenu(hInst, MAKEINTRESOURCE(
-			lpnmTB->iItem == IDM_DEMODULATOR_AM ? IDC_MENU_AM : IDC_MENUMAIN
-		));
+		HMENU hMenuLoaded = LoadMenu(hInst, MAKEINTRESOURCE(lpnmTB->iItem == IDM_DEMODULATOR_AM ? IDC_MENU_POPUP_AM : IDC_MENUMAIN));
 		// Get the submenu for the first menu item.
 		HMENU hPopupMenu = GetSubMenu(hMenuLoaded, 0);
 		// Set up the pop-up menu.
@@ -541,6 +674,52 @@ BOOL CWinAudio::DoNotify(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		DbgMsg("TBN_DROPDOWN %d, %d\r\n", lpnmTB->iItem, IDM_DEMODULATOR_AM);
 		return FALSE;
 	}
+	}
+	return FALSE;
+}
+
+LRESULT CALLBACK CWinAudio::DlgFFTSetProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	CWinAudio* me = (CWinAudio*)get_DlgWinClass(hDlg);
+
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		me = (CWinAudio*)set_DlgWinClass(hDlg, lParam);
+		//DWORD dwPos = GetDlgItemInt(hDlg, IDC_EDITGOTO, 0, 0);
+		//SetDlgItemInt(hDlg, IDC_EDIT_PLAY_STOP_POSITION,	clsSoundCard.dwPlayStopPosition, TRUE);
+		SetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, me->m_FFTWin->fft->FFTInfo->FFTSize, false);
+		SetDlgItemInt(hDlg, IDC_EDIT_FFT_STEP, me->m_FFTWin->fft->FFTInfo->FFTStep, false);
+		return TRUE;
+
+	case WM_COMMAND:
+		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+		{
+			if (LOWORD(wParam) == IDOK)
+			{
+				UINT fftsize = GetDlgItemInt(hDlg, IDC_EDIT_FFT_SIZE, NULL, false);
+				UINT fftstep = GetDlgItemInt(hDlg, IDC_EDIT_FFT_STEP, NULL, false);
+				int bit;
+				for (bit = 0; fftsize > (1 << bit); bit++);
+				fftsize = 1 << bit;
+				for (bit = 0; fftstep > (1 << bit); bit++);
+				fftstep = 1 << bit;
+
+				int halffftsize = fftsize / 2;
+
+				me->m_FFTWin->HScrollPos = (me->m_FFTWin->HScrollPos * (halffftsize / me->m_FFTWin->fft->FFTInfo->HalfFFTSize));
+				me->m_FFTWin->HScrollRange = halffftsize * me->m_FFTWin->HScrollZoom - (me->m_FFTWin->WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+				UP_TO_ZERO(me->m_FFTWin->HScrollRange);
+				SetScrollRange(me->m_FFTWin->hWnd, SB_HORZ, 0, me->m_FFTWin->HScrollRange, false);
+				SetScrollPos(me->m_FFTWin->hWnd, SB_HORZ, me->m_FFTWin->HScrollPos, true);
+
+				me->m_FFTWin->fft->Init(fftsize, fftstep, me->m_FFTWin->fft->FFTInfo->AverageDeep);
+				me->m_FFTWin->fft2->Init(fftsize, fftstep, me->m_FFTWin->fft2->FFTInfo->AverageDeep);
+			}
+			EndDialog(hDlg, LOWORD(wParam));
+			return TRUE;
+		}
+		break;
 	}
 	return FALSE;
 }

@@ -15,7 +15,16 @@ typedef struct FFTINFO_STRUCT {
 	UINT SavedFFTCount = 0;
 	float FFTPerSec = 0.0;
 	bool FFTNew = false;
-}FFT_INFO;
+} FFT_INFO;
+
+typedef enum COLOR_PENS_ENUM {
+	Pen_Red = 0,
+	Pen_Green = 1,
+	Pen_Blue = 2,
+	Pen_Yellow = 3
+} COLOR_PEN;
+
+extern HPEN Pens[4];
 
 #ifdef _DEBUG
 
@@ -29,11 +38,16 @@ typedef struct FFTINFO_STRUCT {
 #define CLOSECONSOLE
 #define CLOSECONSOLE1	FreeConsole();
 
+#define EXIT(x)	exit(x)
+
 #else // _DEBUG
 
 #define OPENCONSOLE_SAVED	
 #define OPENCONSOLE	
 #define CLOSECONSOLE
+
+
+#define EXIT(x)		exit(x)
 
 
 #endif // _DEBUG
@@ -56,7 +70,7 @@ typedef struct FFTINFO_STRUCT {
 #define FFT_DEEP		0x10
 
 #define BOUND(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
-#define UP_TO_ZERO(x) (x = x < 0 ? 0 : x)
+#define UP_TO_ZERO(x) (x = (x) < 0 ? 0 : (x))
 
 typedef void(*GetStrFunction)(char*);
 
@@ -73,6 +87,9 @@ extern FFT_INFO FFTInfo_Signal;
 extern FFT_INFO FFTInfo_Filtted;
 extern FFT_INFO FFTInfo_Audio;
 extern FFT_INFO FFTInfo_AudioFiltted;
+extern FFT_INFO FFTInfo_Spectrum_Scan;
+
+void WaitForExit(void);
 
 void* set_WinClass(HWND hWnd, LPARAM lParam);
 void* get_WinClass(HWND hWnd);

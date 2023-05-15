@@ -12,7 +12,9 @@
 #include <msacm.h>
 #include <commdlg.h>
 
-#include "public.h"
+#include "Public.h"
+#include "Debug.h"
+
 #include "CSoundCard.h"
 #include "CDevices.h"
 #include "CFile.h"
@@ -26,6 +28,7 @@
 #include "CWinFilter.h"
 #include "CFFTforFilterAnalyze.h"
 #include "CWinSDR.h"
+#include "CWinMsg.h"
 
 #include "CDataFromTcpIp.h"
 #include "CDataFromUSB.h"
@@ -40,8 +43,10 @@
 #include "CWinAudio.h"
 #include "CWinFiltted.h"
 #include "CWinTools.h"
+#include "CWinSignal.h"
+#include "CWinSpectrumScan.h"
 
-#include "Debug.h"
+#include <CL/cl.h>
 
 using namespace WINS; 
 using namespace DEVICES;
@@ -73,23 +78,6 @@ CWinMain	clsWinMain;
 CWinMain::CWinMain()
 {
 	OPENCONSOLE;
-
-	DrawInfo.wVSclMax = 256*2;
-	DrawInfo.wHSclMax = 0;
-	
-	DrawInfo.iHZoom = 0;
-	DrawInfo.iHOldZoom = 0;
-	DrawInfo.iVZoom = -23;
-	DrawInfo.iVOldZoom = 0;
-	DrawInfo.dwHZoomedPos = 0;
-	
-	DrawInfo.FullVotage = FULL_VOTAGE;
-	DrawInfo.VotagePerDIV = DrawInfo.FullVotage / ((UINT64)1 << (ADC_DATA_SAMPLE_BIT - 1));
-
-	DrawInfo.fAutoScroll	= TRUE;
-	DrawInfo.bOrignalSignalShow = TRUE;
-	DrawInfo.bFilttedSignalShow = TRUE;
-
 }
 
 CWinMain::~CWinMain()
@@ -119,7 +107,7 @@ BOOL CWinMain::InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    HWND hWnd;
 
-   hWnd = CreateWindow(WIN_MAIN_CLASS, szTitle, WS_OVERLAPPEDWINDOW,
+   hWnd = CreateWindow(WIN_MAIN_CLASS, "SDR ver 1.0", WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
    if (!hWnd)
@@ -164,25 +152,16 @@ LRESULT CALLBACK CWinMain::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
 	switch (message)
 	{
 	case WM_CREATE:
+
+		clsWinMsg.OpenWindow();
+		
 		this->hWnd = hWnd;
 		hMenu = GetMenu(hWnd);
-		CheckMenuItem(hMenu, IDM_WAVEAUTOSCROLL,
-			(DrawInfo.fAutoScroll ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-		CheckMenuItem(hMenu, IDM_WAVE_FOLLOW_ORIGNAL,
-			(DrawInfo.fFollowByOrignal ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-		CheckMenuItem(hMenu, IDM_WAVE_ORIGNAL_SIGNAL_SHOW,
-			(DrawInfo.bOrignalSignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-		CheckMenuItem(hMenu, IDM_WAVE_FILTTED_SIGNAL_SHOW,
-			(DrawInfo.bFilttedSignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 
-		DrawInfo.uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
+		uTimerId = SetTimer(hWnd, 0, TIMEOUT, NULL);
 
 		MainInit();
-		RestoreValue();
 		clsAnalyze.Init_Params();
-		
-		CaculateHScroll();
-		CaculateVScroll();
 	
 		m_audioWin = new CWinAudio();
 		m_filttedWin = new CWinFiltted();
@@ -191,24 +170,38 @@ LRESULT CALLBACK CWinMain::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
 
 		hWndRebar = MakeToolsBar();
 
+		m_signalWin = new CWinSignal();
+		m_signalWin->Flag = "Main";
+
+		m_signalWin->Init(AdcDataI, AdcDataIFiltted, NULL, NULL);
+		m_signalWin->hWnd = CreateWindow(WIN_SIGNAL_CLASS, "信号", WS_CHILDWINDOW | WS_BORDER,// & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+			0, 200, 500, 200, hWnd, NULL, hInst, m_signalWin);
+		ShowWindow(m_signalWin->hWnd, SW_SHOW);
+
+		hMenuFollow = GetSubMenu(hMenu, 8);
+		CheckMenuRadioItem(hMenuFollow, 10, 13, 10, MF_BYPOSITION);
+
+		CheckMenuItem(hMenu, IDM_WAVEAUTOSCROLL, (m_signalWin->bAutoScroll ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+
+		CheckMenuItem(hMenu, IDM_WAVE_IDATA_SHOW, (m_signalWin->bDrawDataI ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(hMenu, IDM_WAVE_QDATA_SHOW, (m_signalWin->bDrawDataQ ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(hMenu, IDM_WAVE_IDATA_FILTTED_SHOW, (m_signalWin->bDrawDataI_Filtted ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		CheckMenuItem(hMenu, IDM_WAVE_QDATA_FILTTED_SHOW, (m_signalWin->bDrawDataQ_Filtted ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+
 		DbgMsg("CWinMain WM_CREATE\r\n");
 		break;
 	case WM_TIMER:
 	{
-		//AdcDataI->GeneratorWave();
-		if (AdcDataQ->GetNew)
-		{
-			CaculateHScroll();
-			AdcDataQ->GetNew = false;
-			InvalidateRect(hWnd, NULL, TRUE);
-			UpdateWindow(hWnd);
-		}
 	}
 	break;
 	case WM_SIZE:
 	{
+		GetClientRect(hWnd, &WinRect);
 		GetClientRect(hWndRebar, &RebarRect);
-		CaculateHScroll();
+		//RebarRect.bottom += 10;
+		MoveWindow(hWndRebar, 0, 0, WinRect.right, RebarRect.bottom, true);
+		if(m_signalWin)	MoveWindow(m_signalWin->hWnd, 0, RebarRect.bottom, WinRect.right, WinRect.bottom - RebarRect.bottom, true);
+
 		InvalidateRect(hWnd, NULL, TRUE);
 		UpdateWindow(hWnd);
 	}
@@ -223,12 +216,19 @@ LRESULT CALLBACK CWinMain::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
 		//不加这条消息屏幕刷新会闪烁
 		break;
 	case WM_PAINT:
-		Paint();
-		break;
+	{
+		PAINTSTRUCT ps;
+		HDC hdc = BeginPaint(hWnd, &ps);
+		// TODO: 在此处添加使用 hdc 的任何绘图代码...
+		EndPaint(hWnd, &ps);
+	}
+	break;
 	case WM_CLOSE:
 	{
 		int res = ::MessageBox(NULL, "[WM_CLOSE] 是否确定退出", "提示", MB_OKCANCEL);
 		if (res == IDOK) { //点击 【确定】按钮
+			WaitForExit();
+			break;
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 		else if (res == IDCANCEL) {//点击【取消】按钮，不调用默认的消息处理 DefWindowProc 
@@ -242,30 +242,21 @@ LRESULT CALLBACK CWinMain::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
 		::MessageBox(NULL, "WM_QUIT", "提示", MB_OK);
 	}
 	break;
+	case WM_USER:
+		DestroyWindow(hWnd);
+		break;
 	case WM_DESTROY:
-		Program_In_Process = false;
-		while (clsMainFilterI.Thread_Exit == false);
-		while (clsAudioFilter.Thread_Exit == false);
 
-		clsGetDataSDR.close_SDR_device();
-		
-		if (clsWinSDR.hWnd) 
-			DestroyWindow(clsWinSDR.hWnd);
-		if (clsWinSpect.hWnd) 
-			DestroyWindow(clsWinSpect.hWnd);
-		if (m_FilterWin->hWnd) 
-			DestroyWindow(m_FilterWin->hWnd);
-		if (m_audioWin->hWnd) 
-			DestroyWindow(m_audioWin->hWnd);
-		if (m_filttedWin->hWnd)
-			DestroyWindow(m_filttedWin->hWnd);
 
-		SaveValue();
+		if (clsWinMsg.hWnd) 
+			DestroyWindow(clsWinMsg.hWnd);
+
 		clsMainFilterI.SaveValue();
-		clsMainFilterQ.SaveValue();
+		//clsMainFilterQ.SaveValue();
 		clsAudioFilter.SaveValue();
 
 		DbgMsg("Main WM_DESTROY\r\n");
+
 		PostQuitMessage(0);
 		break;
 	case WM_KEYDOWN:
@@ -288,580 +279,11 @@ LRESULT CALLBACK CWinMain::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
 	case WM_KEYUP:
 	case WM_VSCROLL:
 	case WM_HSCROLL:
-		KeyAndScroll(message, wParam, lParam);
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
-}
-
-VOID CWinMain::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
-{
-	INT     iMax, iMin, iPos;
-	int		dn = 0, tbdn = 0;
-	RECT    rc;
-
-	switch (message)
-	{
-	case WM_KEYDOWN:
-		/* Translate keyboard messages to scroll commands */
-		switch (wParam)
-		{
-		case VK_UP:
-			PostMessage(hWnd, WM_VSCROLL, SB_LINEUP, 0L);
-			break;
-		case VK_DOWN:
-			PostMessage(hWnd, WM_VSCROLL, SB_LINEDOWN, 0L);
-			break;
-		case VK_PRIOR:
-			PostMessage(hWnd, WM_VSCROLL, SB_PAGEUP, 0L);
-			break;
-		case VK_NEXT:
-			PostMessage(hWnd, WM_VSCROLL, SB_PAGEDOWN, 0L);
-			break;
-		case VK_HOME:
-			PostMessage(hWnd, WM_HSCROLL, SB_PAGEUP, 0L);
-			break;
-		case VK_END:
-			PostMessage(hWnd, WM_HSCROLL, SB_PAGEDOWN, 0L);
-			break;
-		case VK_LEFT:
-			PostMessage(hWnd, WM_HSCROLL, SB_LINEUP, 0L);
-			break;
-		case VK_RIGHT:
-			PostMessage(hWnd, WM_HSCROLL, SB_LINEDOWN, 0L);
-			break;
-		}
-		break;
-	case WM_KEYUP:
-		switch (wParam)
-		{
-		case VK_UP:
-		case VK_DOWN:
-		case VK_PRIOR:
-		case VK_NEXT:
-			PostMessage(hWnd, WM_VSCROLL, SB_ENDSCROLL, 0L);
-			break;
-
-		case VK_HOME:
-		case VK_END:
-		case VK_LEFT:
-		case VK_RIGHT:
-			PostMessage(hWnd, WM_HSCROLL, SB_ENDSCROLL, 0L);
-			break;
-		}
-		break;
-
-	case WM_VSCROLL:
-		//Calculate new vertical scroll position
-		GetScrollRange(hWnd, SB_VERT, &iMin, &iMax);
-		iPos = GetScrollPos(hWnd, SB_VERT);
-		GetClientRect(hWnd, &rc);
-		switch (GET_WM_VSCROLL_CODE(wParam, lParam))
-		{
-		case SB_LINEDOWN:
-			dn = rc.bottom / 16;
-			break;
-		case SB_LINEUP:
-			dn = -rc.bottom / 16;
-			break;
-		case SB_PAGEDOWN:
-			dn = rc.bottom / 2;
-			break;
-		case SB_PAGEUP:
-			dn = -rc.bottom / 2;
-			break;
-		case SB_THUMBTRACK:
-		case SB_THUMBPOSITION:
-			tbdn = GET_WM_VSCROLL_POS(wParam, lParam);
-			break;
-		default:
-			dn = 0;
-			break;
-		}
-
-		if (dn != 0)
-		{
-			DrawInfo.dwVZoomedPos = BOUND(DrawInfo.dwVZoomedPos + dn, 0, DrawInfo.dwVZoomedHeight - WAVE_RECT_HEIGHT);
-			DrawInfo.wVSclPos = DrawInfo.dwVZoomedPos >> DrawInfo.iVFit;
-		}
-		if (tbdn != 0)
-		{
-			DrawInfo.wVSclPos = BOUND(tbdn, 0, DrawInfo.wVSclMax);
-			DrawInfo.dwVZoomedPos = DrawInfo.wVSclPos << DrawInfo.iVFit;
-		}
-		if (dn != 0 || tbdn != 0)
-		{
-			SetScrollPos(hWnd, SB_VERT, DrawInfo.wVSclPos, TRUE);
-			InvalidateRect(hWnd, NULL, TRUE);
-			UpdateWindow(hWnd);
-		}
-		break;
-
-	case WM_HSCROLL:
-		//Calculate new horizontal scroll position
-		GetScrollRange(hWnd, SB_HORZ, &iMin, &iMax);
-		iPos = GetScrollPos(hWnd, SB_HORZ);
-		GetClientRect(hWnd, &rc);
-
-		switch (GET_WM_HSCROLL_CODE(wParam, lParam))
-		{
-		case SB_LINEDOWN:
-			dn = (rc.right - 2 * DIVLONG) / 16 + 1;
-			break;
-		case SB_LINEUP:
-			dn = -(rc.right - 2 * DIVLONG) / 16 + 1;
-			break;
-		case SB_PAGEDOWN:
-			dn = rc.right / 2 + 1;
-			break;
-		case SB_PAGEUP:
-			dn = -rc.right / 2 + 1;
-			break;
-		case SB_THUMBTRACK:
-		case SB_THUMBPOSITION:
-			tbdn = GET_WM_HSCROLL_POS(wParam, lParam);
-			break;
-		default:
-			dn = 0;
-			break;
-		}
-		if (dn != 0)
-		{
-			DrawInfo.dwHZoomedPos = BOUND(DrawInfo.dwHZoomedPos + dn, 0, DrawInfo.dwHZoomedWidth);
-			DrawInfo.wHSclPos = DrawInfo.dwHZoomedPos >> DrawInfo.iHFit;
-		}
-		if (tbdn != 0)
-		{
-			DbgMsg(("scroll tumb"));
-			DrawInfo.wHSclPos = BOUND(tbdn, 0, DrawInfo.wHSclMax);
-			DrawInfo.dwHZoomedPos = DrawInfo.wHSclPos << DrawInfo.iHFit;
-		}
-		if (dn != 0 || tbdn != 0)
-		{
-			SetScrollPos(hWnd, SB_HORZ, DrawInfo.wHSclPos, TRUE);
-			InvalidateRect(hWnd, NULL, TRUE);
-			UpdateWindow(hWnd);
-		}
-		break;
-	}
-}
-
-VOID CWinMain::Paint(void)
-{
-	HDC		hDC;
-	PAINTSTRUCT ps;
-	RECT	rt, r;
-	HPEN	hPen, hPenLighter;
-
-	hDC = BeginPaint(hWnd, &ps);
-
-	GetClientRect(hWnd, &rt);
-	rt.bottom -= RebarRect.bottom;
-
-	HDC		hdc = CreateCompatibleDC(hDC);
-	HBITMAP hbmp = CreateCompatibleBitmap(hDC, rt.right, rt.bottom);
-	SelectObject(hdc, hbmp);
-
-	SelectObject(hdc, CreateFont(FONT_HEIGHT, 0, 0, 0, 0, 0, 0, 0,
-		DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, _T("Arial")));
-
-	FillRect(hdc, &rt, (HBRUSH)GetStockObject(BLACK_BRUSH));
-
-	int	x, y, pos, i;
-	TCHAR	s[1024];
-	int		zoomX, zoomY;
-	zoomX = 1;
-	zoomY = 1;
-	pos = 0;
-	s[0] = 0;
-
-	hPen = CreatePen(PS_DOT, 0, RGB(64, 64, 64));
-	hPenLighter = CreatePen(PS_DOT, 0, RGB(128, 128, 128));
-	SetBkColor(hdc, RGB(0, 0, 0));
-	r.top = WAVE_RECT_BORDER_TOP - DIVLONG - FONT_HEIGHT;
-	r.right = rt.right;
-	r.bottom = rt.bottom;
-	SetTextColor(hdc, RGB(255, 255, 255));
-
-	for (x = WAVE_RECT_BORDER_LEFT, i = 0; x < rt.right - WAVE_RECT_BORDER_RIGHT; x += 8)
-	{
-		SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
-		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP - ((x - WAVE_RECT_BORDER_LEFT) % 32 ? DIVSHORT : DIVLONG), NULL);
-		LineTo(hdc, x, WAVE_RECT_BORDER_TOP);
-
-		if (!((x - WAVE_RECT_BORDER_LEFT) % 32))
-		{
-			if (!(i % 4))
-			{
-				sprintf(s, "%d", i);
-				r.left = x;
-				DrawText(hdc, s, strlen(s), &r, NULL);
-			}
-			SelectObject(hdc, i % 10 ? hPen : hPenLighter);
-			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-			i++;
-		}
-		SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
-		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT, NULL);
-		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT + ((x - WAVE_RECT_BORDER_LEFT) % 32 ? DIVSHORT : DIVLONG));
-	}
-	r.top = WAVE_RECT_BORDER_TOP - FONT_HEIGHT / 2;
-	r.left = rt.right - WAVE_RECT_BORDER_RIGHT + DIVLONG + 2;
-	r.right = rt.right;
-	r.bottom = rt.bottom;
-	for (y = WAVE_RECT_BORDER_TOP, i = 0; y <= WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT; y += 8)
-	{
-		MoveToEx(hdc, WAVE_RECT_BORDER_LEFT - ((y - WAVE_RECT_BORDER_TOP) % 32 ? DIVSHORT : DIVLONG), y, NULL);
-		LineTo(hdc, WAVE_RECT_BORDER_LEFT, y);
-		if (!((y - WAVE_RECT_BORDER_TOP) % 32))
-		{
-			if (i % 2 == 0) {
-				formatKDouble(DrawInfo.FullVotage - DrawInfo.VotagePerDIV * ((DrawInfo.dwVZoomedPos + i * 32) / DrawInfo.dbVZoom),
-					32 / DrawInfo.dbVZoom * DrawInfo.VotagePerDIV, "v", s);
-				DrawText(hdc, s, strlen(s), &r, NULL);
-				r.top += 2 * 32;
-			}
-			SelectObject(hdc, i % 4 ? hPen : hPenLighter);
-			LineTo(hdc, rt.right - WAVE_RECT_BORDER_RIGHT, y);
-			i++;
-		}
-		SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
-		MoveToEx(hdc, rt.right - WAVE_RECT_BORDER_RIGHT, y, NULL);
-		LineTo(hdc, rt.right - WAVE_RECT_BORDER_RIGHT + ((y - WAVE_RECT_BORDER_TOP) % 32 ? DIVSHORT : DIVLONG), y);
-	}
-	DeleteObject(hPen);
-	DeleteObject(hPenLighter);
-
-	//Draw Data Content -----------------------------------------------
-
-	//lb.lbHatch = 0; 
-	//lb.lbStyle = BS_SOLID; 
-	//lb.lbColor = RGB(,0,0); 
-	//hPen = ExtCreatePen(PS_COSMETIC | PS_DOT, 1, &lb, 0, NULL); 
-		// Draw Data
-
-	UINT dwWStep, dwXOffSet, bufStep, dwMark;
-	if (DrawInfo.iHZoom > 0)
-	{
-		dwMark = (0xFFFFFFFF >> (32 - DrawInfo.iHZoom));
-		dwWStep = 1 + dwMark;
-		dwXOffSet = DrawInfo.dwHZoomedPos & dwMark;
-		bufStep = 1;
-
-	}
-	else if (DrawInfo.iHZoom < 0)
-	{
-		dwWStep = 1;
-		dwXOffSet = 0;
-		bufStep = 1 + (0xFFFFFFFF >> (32 + DrawInfo.iHZoom));
-	}
-	else
-	{
-		dwWStep = 1;
-		dwXOffSet = 0;
-		bufStep = 1;
-	}
-
-	UINT h_pos = DrawInfo.iHZoom > 0
-		? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
-		: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom);
-
-	if (DrawInfo.bOrignalSignalShow) {
-		DrawSignal_short(AdcDataI, h_pos, 0, hdc, dwXOffSet, bufStep, dwWStep, &rt);
-		DrawSignal_short(AdcDataQ, h_pos, 1, hdc, dwXOffSet, bufStep, dwWStep, &rt);
-	}
-
-	if (DrawInfo.bFilttedSignalShow) {
-		DrawSignal_float(AdcDataIFiltted, h_pos, 2, hdc, dwXOffSet, bufStep, dwWStep, &rt);
-		DrawSignal_float(AdcDataQFiltted, h_pos, 3, hdc, dwXOffSet, bufStep, dwWStep, &rt);
-	}
-
-	//int InfolastPos;
-	//double vzoom = DrawInfo.dbVZoom;// DrawInfo.iVZoom >= 0 ? (1 << DrawInfo.iVZoom) : (1.0 / (1 << (-DrawInfo.iVZoom)));
-	//HPEN hPenSaved = NULL;
-	//if (DrawInfo.bOrignalSignalShow) {
-	//	//绘制原信号--------------------------------------------------
-	//	hPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
-	//	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
-	//	hPenSaved = (HPEN)SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
-	//	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-	//	PADC_DATA_TYPE pData = (PADC_DATA_TYPE)AdcDataI->Buff +
-	//		(	DrawInfo.iHZoom > 0
-	//			? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
-	//			: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom)	);
-	//	
-	//	y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
-	//	y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-	//	//DbgMsg("zoom:%f, v:%d, zoomv: %d\r\n", vzoom, *pData, y);
-	//	InfolastPos = -1;
-	//	MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
-	//	do
-	//	{
-	//		pData += bufStep;
-	//		x += dwWStep;
-	//		if (pData == &((PADC_DATA_TYPE)AdcDataI->Buff)[AdcDataI->Pos & AdcDataI->Mask])InfolastPos = x;
-	//		y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
-	//		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-	//		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
-	//	} while (x < rt.right - WAVE_RECT_BORDER_RIGHT);
-	//	if (InfolastPos >= 0)
-	//	{
-	//		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
-	//		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-	//	}
-	//	SelectObject(hdc, hPenSaved);
-	//	DeleteObject(hPen);
-	//}
-
-	{
-		//绘制信号MASKS--------------------------------------------------
-		hPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
-		HPEN hPenSaved = (HPEN)SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
-		x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-		char* pData = AdcBuffMarks +
-			(DrawInfo.iHZoom > 0
-				? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
-				: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom));
-		do
-		{
-			x += dwWStep;
-			if (*pData == 1) {
-				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
-				LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT / 4 * 3);
-			}
-			else if(*pData == 2){
-				MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT / 4, NULL);
-				LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-			}
-			pData += bufStep;
-		} while (x < rt.right - WAVE_RECT_BORDER_RIGHT);
-		SelectObject(hdc, hPenSaved);
-		DeleteObject(hPen);
-	}
-
-	//if (DrawInfo.bFilttedSignalShow) {
-	//	//绘制滤波信号--------------------------------------------------
-	//	hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 0));
-	//	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
-	//	SelectObject(hdc, hPen);//(HPEN)GetStockObject(WHITE_PEN));
-	//	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-	//	FILTTED_DATA_TYPE* pFilterData = (FILTTED_DATA_TYPE*)AdcDataIFiltted->Buff +
-	//		(
-	//			DrawInfo.iHZoom > 0
-	//			? DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
-	//			: DrawInfo.dwHZoomedPos << (-DrawInfo.iHZoom)
-	//			);
-	//	y = DrawInfo.dwVZoomedHeight / 2 - (*pFilterData * vzoom) - DrawInfo.dwVZoomedPos;
-	//	y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-	//	MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
-	//	InfolastPos = -1;
-	//	do
-	//	{
-	//		pFilterData += bufStep;
-	//		x += dwWStep;
-	//		y = DrawInfo.dwVZoomedHeight / 2 - (*pFilterData * vzoom) - DrawInfo.dwVZoomedPos;
-	//		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-	//		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
-	//		if (pFilterData == &((FILTTED_DATA_TYPE*)AdcDataIFiltted->Buff)[AdcDataIFiltted->Pos & AdcDataIFiltted->Mask]) {
-	//			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
-	//			LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-	//			MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
-	//			//InfolastPos = x;
-	//		}
-	//	} while (x < rt.right - WAVE_RECT_BORDER_RIGHT);
-	//	
-	//	/*
-	//	if (InfolastPos >= 0)
-	//	{
-	//		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
-	//		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-	//	}
-	//	*/
-	//	DeleteObject(hPen);
-	//}
-
-	//---------------------------------------
-
-	double z = DrawInfo.iVZoom >= 0 ? (1.0 / ((UINT64)1 << DrawInfo.iVZoom)) : ((UINT64)1 << -DrawInfo.iVZoom);
-	char tstr1[100], tstr2[100], tstradcpos[100], tstrfiltpos[100], tstrfiltbuffpos[100], tstrfftpos[100];
-	//AdcDataI->NumPerSec = 38400;
-	double TimePreDiv = 32.0 / AdcDataI->SampleRate * 
-		( DrawInfo.iHZoom >= 0 ? 1.0 / ((UINT64)1 << DrawInfo.iHZoom) : ((UINT64)1 << -DrawInfo.iHZoom));
-	sprintf(s, "32 / DIV    %sV / DIV    %ss / DIV 中文\r\n"\
-		"Pos:%s\r\nFilttedPos:%s\r\nFilttedBuffPos=%s\r\n"\
-		"hBarPos: %d\r\n"\
-		"AdcSampleRate: %d    Real AdcSampleRate: %d\r\n"\
-		"HZoom: %d, %d \t VZoom: %d, %d",
-		formatKKDouble(32.0 * DrawInfo.VotagePerDIV * z, "", tstr1),
-		formatKKDouble(TimePreDiv, "", tstr2),
-		fomatKINT64(AdcDataI->Pos, tstradcpos),
-		fomatKINT64(AdcDataI->ProcessPos, tstrfiltpos),
-		fomatKINT64(AdcDataIFiltted->Pos, tstrfiltbuffpos),
-		DrawInfo.dwHZoomedPos,
-		AdcDataI->SampleRate, AdcDataI->NumPerSec,
-		DrawInfo.iHZoom, DrawInfo.iHZoom >= 0 ? 1 << DrawInfo.iHZoom : -(1 << -DrawInfo.iHZoom),
-		DrawInfo.iVZoom, DrawInfo.iVZoom >= 0 ? 1 << DrawInfo.iVZoom : -(1 << -DrawInfo.iVZoom)
-	);
-
-	r.top		= WAVE_RECT_BORDER_TOP + DIVLONG;
-	r.left		= WAVE_RECT_BORDER_LEFT + DIVLONG;
-	r.right		= rt.right;
-	r.bottom	= rt.bottom;
-	SetBkMode(hdc, TRANSPARENT); 
-//	SetBkMode(hdc, OPAQUE); 
-//	SetBkColor(hdc,RGB(0,0,0));
-	SetTextColor(hdc,RGB(255,255,255));
-
-	DrawText(hdc, s, strlen(s), &r, NULL);
-
-	//sprintf(s,"vzoom %.40f",vzoom);
-	//r.top += FONT_HEIGHT;
-	//DrawText(hdc, s, strlen(s), &r, NULL);
-
-	DeleteObject(SelectObject(hdc, GetStockObject(SYSTEM_FONT)));
-
-	BitBlt(hDC, 
-           0, RebarRect.bottom,
-           rt.right, rt.bottom,
-           hdc, 
-           0, 0, 
-           SRCCOPY);
-	DeleteObject(hdc);
-	DeleteObject(hbmp);
-
-	EndPaint(hWnd, &ps);
-}
-
-VOID CWinMain::GetRealClientRect(PRECT lprc)
-{
-    DWORD dwStyle;
-
-    dwStyle = GetWindowLong (hWnd, GWL_STYLE);
-    GetClientRect (hWnd, lprc);
-
-    if (dwStyle & WS_HSCROLL)
-        lprc->bottom += GetSystemMetrics (SM_CYHSCROLL);
-
-    if (dwStyle & WS_VSCROLL)
-        lprc->right  += GetSystemMetrics (SM_CXVSCROLL);
-}
-
-VOID CWinMain::CaculateHScroll(void)
-{
-	RECT       rc;
-	INT        iRangeH, iRangeV, i, n;
-	static UINT iSem = 0;
-
-	GetRealClientRect(&rc);
-	DrawInfo.dwDataWidth = AdcDataI->Len;//  AdcDataI->Pos;
-	DrawInfo.dwHZoomedWidth = DrawInfo.dwDataWidth;
-	if (DrawInfo.iHZoom > 0)
-	{
-		for (i = 0; i < DrawInfo.iHZoom; i++)
-		{							     
-			if (DrawInfo.dwHZoomedWidth & (AdcDataI->Len << 5)) // 最大放大32倍
-			{
-				DrawInfo.iHZoom = i;
-				break;
-			}
-			else
-			{
-				DrawInfo.dwHZoomedWidth = DrawInfo.dwHZoomedWidth << 1;
-			}
-		}
-		DrawInfo.dbHZoom = 1 << DrawInfo.iHZoom;
-	}
-	else
-	{
-		for (n = 0, i = DrawInfo.iHZoom; i; i++)
-		{
-			if (DrawInfo.dwHZoomedWidth > (rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT))
-			{
-				DrawInfo.dwHZoomedWidth = DrawInfo.dwHZoomedWidth >> 1;
-				n++;
-			}
-			else
-			{
-				DrawInfo.iHZoom = -n;
-				break;
-			}
-		}
-		DrawInfo.dbHZoom = (double)1.0 / (1 << -DrawInfo.iHZoom);
-	}
-
-	if (DrawInfo.fAutoScroll) {
-		DrawInfo.dwHZoomedPos = (DrawInfo.fFollowByOrignal == true ? AdcDataI->Pos : AdcDataIFiltted->Pos) * DrawInfo.dbHZoom -
-			(rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
-		if (DrawInfo.dwHZoomedPos < 0) DrawInfo.dwHZoomedPos = 0;
-	}
-	else {
-		i = DrawInfo.iHOldZoom - DrawInfo.iHZoom;
-		if (i > 0)
-			DrawInfo.dwHZoomedPos = DrawInfo.dwHZoomedPos >> i;
-		else
-			DrawInfo.dwHZoomedPos = DrawInfo.dwHZoomedPos << -i;
-	}
-	DrawInfo.iHOldZoom = DrawInfo.iHZoom;
-
-	// caculate scroll max width
-	UINT64 realHZoomedWidth = DrawInfo.dwHZoomedWidth - (rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
-	for (DrawInfo.iHFit = 0; (realHZoomedWidth >> DrawInfo.iHFit) > 0xFFFF; DrawInfo.iHFit++);
-	DrawInfo.wHSclMax = realHZoomedWidth >> DrawInfo.iHFit;
-	DrawInfo.wHSclPos = DrawInfo.dwHZoomedPos >> DrawInfo.iHFit;
-	DrawInfo.dwHZoomedPos = BOUND(DrawInfo.dwHZoomedPos, 0, realHZoomedWidth);
-	DrawInfo.wHSclPos = BOUND(DrawInfo.wHSclPos, 0, DrawInfo.wHSclMax);
-
-	//iRangeV = DrawInfo.wVSclMax;// - rc.bottom;
-	iRangeH = DrawInfo.wHSclMax;// - rc.right;
-
-	if (iRangeH < 0) iRangeH = 0;
-	//if (iRangeV < 0) iRangeV = 0;
-
-	//SetScrollRange(hWnd, SB_VERT, 0, iRangeV, TRUE);
-	SetScrollRange(hWnd, SB_HORZ, 0, iRangeH, FALSE);
-	//SetScrollPos(hWnd, SB_VERT, DrawInfo.wVSclPos, TRUE);
-	SetScrollPos(hWnd, SB_HORZ, DrawInfo.wHSclPos, TRUE);
-	InvalidateRect(hWnd, NULL, TRUE);
-	UpdateWindow(hWnd);
-}
-
-VOID CWinMain::CaculateVScroll(void)
-{
-	//RECT       rc;
-	INT        iRangeH, iRangeV, i, n;
-	static UINT iSem = 0;
-
-	//GetRealClientRect(hWnd, &rc);
-
-	//DrawInfo.dwDataHeight = (UINT64)1 << ADC_DATA_SAMPLE_BIT;
-	//UINT64	maxDataHeight = (UINT64)1 << (AdcDataI->DataBits + ADC_DATA_MAX_ZOOM_BIT);
-	DrawInfo.dwVZoomedHeight = MoveBits(MoveBits(1, AdcDataI->DataBits), DrawInfo.iVZoom);
-	DrawInfo.dbVZoom = DrawInfo.iVZoom > 0 ? (UINT64)1 << DrawInfo.iVZoom : (double)1.0 / ((UINT64)1 << -DrawInfo.iVZoom);
-
-	i = DrawInfo.iVOldZoom - DrawInfo.iVZoom;
-	if (i > 0) {
-		DrawInfo.dwVZoomedPos = ((DrawInfo.dwVZoomedPos + WAVE_RECT_HEIGHT/2) >> i) - WAVE_RECT_HEIGHT / 2;
-	}
-	else {
-		DrawInfo.dwVZoomedPos = ((DrawInfo.dwVZoomedPos + WAVE_RECT_HEIGHT / 2) << -i) - WAVE_RECT_HEIGHT / 2;
-	}
-	DrawInfo.iVOldZoom = DrawInfo.iVZoom;
-
-	// caculate scroll max height
-	for (DrawInfo.iVFit = 0; ((DrawInfo.dwVZoomedHeight - WAVE_RECT_HEIGHT) >> DrawInfo.iVFit) > 0xFFFF; DrawInfo.iVFit++);
-	DrawInfo.wVSclMax = (DrawInfo.dwVZoomedHeight - WAVE_RECT_HEIGHT) >> DrawInfo.iVFit;
-	DrawInfo.wVSclPos = DrawInfo.dwVZoomedPos >> DrawInfo.iVFit;
-	DrawInfo.dwVZoomedPos = BOUND(DrawInfo.dwVZoomedPos, 0, DrawInfo.dwVZoomedHeight - WAVE_RECT_HEIGHT);
-	DrawInfo.wVSclPos = BOUND(DrawInfo.wVSclPos, 0, DrawInfo.wVSclMax);
-
-	iRangeV = DrawInfo.wVSclMax;
-	if (iRangeV < 0) iRangeV = 0;
-	SetScrollRange(hWnd, SB_VERT, 0, iRangeV, TRUE);
-	SetScrollPos(hWnd, SB_VERT, DrawInfo.wVSclPos, TRUE);
-	InvalidateRect(hWnd, NULL, TRUE);
-	UpdateWindow(hWnd);
 }
 
 BOOL CWinMain::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
@@ -938,10 +360,10 @@ BOOL CWinMain::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 			clsSoundCard.CloseOut();
 			break;
 		case IDM_FROMPOSPLAY:
-			clsSoundCard.OpenOut( DrawInfo.iHZoom > 0 ? 
-							 DrawInfo.dwHZoomedPos >> DrawInfo.iHZoom
+			clsSoundCard.OpenOut( m_signalWin->DrawInfo.iHZoom > 0 ? 
+				m_signalWin->DrawInfo.dwHZoomedPos >> m_signalWin->DrawInfo.iHZoom
 							 :
-							 DrawInfo.dwHZoomedPos << -DrawInfo.iHZoom
+				m_signalWin->DrawInfo.dwHZoomedPos << -m_signalWin->DrawInfo.iHZoom
 							, clsSoundCard.dwPlayStopPosition);
 			break;
 		case IDM_PLAY_STOP_POSITION:
@@ -958,7 +380,6 @@ BOOL CWinMain::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case IDM_STOPRECORD:
 			clsSoundCard.CloseIn();
-			clsWinMain.CaculateHScroll();
 			InvalidateRect(clsWinMain.hWnd,NULL,TRUE);
 		break;
 		case IDM_RECORDFORMAT:
@@ -989,54 +410,59 @@ BOOL CWinMain::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 
 //ZOOM COMMANDS-----------------------
 	case IDM_WAVEHZOOMRESET:
-		DrawInfo.iHZoom = 0;
-		CaculateHScroll();
-		break;
 	case IDM_WAVEHZOOMINCREASE:
-		DrawInfo.iHZoom++;
-		CaculateHScroll();
-		break;
 	case IDM_WAVEHZOOMDECREASE:
-		DrawInfo.iHZoom--;
-		CaculateHScroll();
-		break;
 	case IDM_WAVEVZOOMRESET:
-		DrawInfo.iVZoom = 0;
-		CaculateVScroll();
-		break;
 	case IDM_WAVEVZOOMINCREASE:
-		if (DrawInfo.iVZoom < ADC_DATA_MAX_ZOOM_BIT) {
-			DrawInfo.iVZoom++;
-			CaculateVScroll();
-		}
-		break;
 	case IDM_WAVEVZOOMDECREASE:
-		if (MoveBits(MoveBits(1, ADC_DATA_SAMPLE_BIT), DrawInfo.iVZoom) > WAVE_RECT_HEIGHT) {
-			DrawInfo.iVZoom--;
-			CaculateVScroll();
-		}
+		PostMessage(m_signalWin->hWnd, message, wParam, lParam);
 		break;
 	case IDM_WAVEAUTOSCROLL:
-		DrawInfo.fAutoScroll = !DrawInfo.fAutoScroll;
-		if(DrawInfo.fAutoScroll)
-			DrawInfo.uTimerId = SetTimer(hWnd, 0, TIMEOUT , NULL);
-		else
-			KillTimer(hWnd, 0);//DrawInfo.uTimerId);
-		CheckMenuItem(hMenu, IDM_WAVEAUTOSCROLL, 
-			(DrawInfo.fAutoScroll ? MF_CHECKED : MF_UNCHECKED ) | MF_BYCOMMAND);
+		SendMessage(m_signalWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_WAVEAUTOSCROLL, (m_signalWin->bAutoScroll ? MF_CHECKED : MF_UNCHECKED ) | MF_BYCOMMAND);
 		break;
-	case IDM_WAVE_FOLLOW_ORIGNAL:
-		DrawInfo.fFollowByOrignal = !DrawInfo.fFollowByOrignal;
-		CheckMenuItem(hMenu, IDM_WAVE_FOLLOW_ORIGNAL,
-			(DrawInfo.fFollowByOrignal ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+	case IDM_WAVE_FOLLOW_IDATA:
+		CheckMenuRadioItem(hMenuFollow, 10, 13, 10, MF_BYPOSITION);
+		PostMessage(m_signalWin->hWnd, message, wParam, lParam);
+		break;
+	case IDM_WAVE_FOLLOW_QDATA:
+		CheckMenuRadioItem(hMenuFollow, 10, 13, 11, MF_BYPOSITION);
+		PostMessage(m_signalWin->hWnd, message, wParam, lParam);
+		break;
+	case IDM_WAVE_FOLLOW_FILTTED_IDATA:
+		CheckMenuRadioItem(hMenuFollow, 10, 13, 12, MF_BYPOSITION);
+		PostMessage(m_signalWin->hWnd, message, wParam, lParam);
+		break;
+	case IDM_WAVE_FOLLOW_FILTTED_QDATA:
+		CheckMenuRadioItem(hMenuFollow, 10, 13, 13, MF_BYPOSITION);
+		PostMessage(m_signalWin->hWnd, message, wParam, lParam);
 		break;
 
 //COMMANDS-----------------------
-	case IDM_SPECTRUMWINDOW:
+	case IDM_SPECTRUM_WINDOW:
 		clsWinSpect.OpenWindow();
+		break;
+	case IDM_SPECTRUM_SCAN_WINDOW:
+		clsWinSpectrumScan.OpenWindow();
 		break;
 	case IDM_FILTTEDWINDOW:
 		m_filttedWin->OpenWindow();
+		break;
+	case IDM_FILTER_START_STOP:
+	{
+		TBBUTTONINFO tbInfo = { 0 };
+		tbInfo.cbSize = sizeof(TBBUTTONINFO);
+		tbInfo.dwMask = TBIF_STATE;
+		SendMessage(hWndToolbar, TB_GETBUTTONINFO, (WPARAM)IDM_FILTER_START_STOP, (LPARAM)&tbInfo);
+		if (TBSTATE_CHECKED & tbInfo.fsState) {
+			FilterStart();
+			//DbgMsg("IDM_FILTER_START_STOP TBSTATE_CHECKED\r\n");
+		}
+		else {
+			FilterStop();
+			//DbgMsg("IDM_FILTER_START_STOP\r\n");
+		}
+	}
 		break;
 	case IDM_SDR_WINDOW:
 		clsWinSDR.OpenWindow();
@@ -1047,7 +473,9 @@ BOOL CWinMain::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_FILTERWINDOW:
 		m_FilterWin->OpenWindow();
 		break;
-
+	case IDM_MSG_WINDOW:
+		clsWinMsg.OpenWindow();
+		break;
 //COMMANDS-----------------------
 	case IDM_WAVE_AUTO_FIT:
 		
@@ -1061,17 +489,22 @@ BOOL CWinMain::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_WAVE_SIGNALS_OFFSET:
 
 		break;
-	case IDM_WAVE_ORIGNAL_SIGNAL_SHOW:
-		DrawInfo.bOrignalSignalShow = !DrawInfo.bOrignalSignalShow;
-		CheckMenuItem(hMenu, IDM_WAVE_ORIGNAL_SIGNAL_SHOW,
-			(DrawInfo.bOrignalSignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-
+		
+	case IDM_WAVE_IDATA_SHOW:
+		SendMessage(m_signalWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_WAVE_IDATA_SHOW, (m_signalWin->bDrawDataI ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
-	case IDM_WAVE_FILTTED_SIGNAL_SHOW:
-		DrawInfo.bFilttedSignalShow = !DrawInfo.bFilttedSignalShow;
-		CheckMenuItem(hMenu, IDM_WAVE_FILTTED_SIGNAL_SHOW,
-			(DrawInfo.bFilttedSignalShow ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
-
+	case IDM_WAVE_QDATA_SHOW:
+		SendMessage(m_signalWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_WAVE_QDATA_SHOW, (m_signalWin->bDrawDataQ ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
+	case IDM_WAVE_IDATA_FILTTED_SHOW:
+		SendMessage(m_signalWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_WAVE_IDATA_FILTTED_SHOW, (m_signalWin->bDrawDataI_Filtted ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
+		break;
+	case IDM_WAVE_QDATA_FILTTED_SHOW:
+		SendMessage(m_signalWin->hWnd, message, wParam, lParam);
+		CheckMenuItem(hMenu, IDM_WAVE_QDATA_FILTTED_SHOW, (m_signalWin->bDrawDataQ_Filtted ? MF_CHECKED : MF_UNCHECKED) | MF_BYCOMMAND);
 		break;
 
 //COMMANDS-----------------------
@@ -1087,133 +520,90 @@ BOOL CWinMain::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	return TRUE;
 }
 
-void CWinMain::SaveValue(void)
-{
-	WritePrivateProfileString("WIN_MAIN", "iHZoom", std::to_string(DrawInfo.iHZoom).c_str(), IniFilePath);
-	WritePrivateProfileString("WIN_MAIN", "iVZoom", std::to_string(DrawInfo.iVZoom).c_str(), IniFilePath);
-	WritePrivateProfileString("WIN_MAIN", "iVOldZoom", std::to_string(DrawInfo.iVOldZoom).c_str(), IniFilePath);
-	WritePrivateProfileString("WIN_MAIN", "dwVZoomedPos", std::to_string(DrawInfo.dwVZoomedPos).c_str(), IniFilePath);
-}
-
-void CWinMain::RestoreValue(void)
-{
-#define VALUE_LENGTH	100
-	char value[VALUE_LENGTH];
-	GetPrivateProfileString("WIN_MAIN", "iHZoom", "1", value, VALUE_LENGTH, IniFilePath);
-	DrawInfo.iHZoom = atoi(value);
-	GetPrivateProfileString("WIN_MAIN", "iVZoom", "1", value, VALUE_LENGTH, IniFilePath);
-	DrawInfo.iVZoom = atoi(value);
-	GetPrivateProfileString("WIN_MAIN", "iVOldZoom", "1", value, VALUE_LENGTH, IniFilePath);
-	DrawInfo.iVOldZoom = atoi(value);
-	GetPrivateProfileString("WIN_MAIN", "dwVZoomedPos", "1", value, VALUE_LENGTH, IniFilePath);
-	DrawInfo.dwVZoomedPos = std::strtoll(value, NULL, 10);
-}
-
-static HPEN hPens[4] =
-{
-	CreatePen(PS_SOLID, 1, RGB(0,255,0)),
-	CreatePen(PS_SOLID, 1, RGB(0, 255, 128)),
-	CreatePen(PS_SOLID, 1, RGB(255, 255, 0)),
-	CreatePen(PS_SOLID, 1, RGB(128, 255, 0))
-};
-
-void CWinMain::DrawSignal_short(CData* cData, UINT pos, UINT pen, HDC hdc, UINT dwXOffSet, UINT bufStep, UINT dwWStep, RECT* rt)
-{
-	int InfolastPos = -1;
-	double vzoom = DrawInfo.dbVZoom;
-	HPEN hPenSaved = (HPEN)SelectObject(hdc, hPens[pen]);//(HPEN)GetStockObject(WHITE_PEN));
-	int x, y;
-	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
-	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-	short* buff = (short*)cData->Buff;
-	short* pData = buff + pos;
-	y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
-	y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-	MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
-	do
-	{
-		pData += bufStep;
-		x += dwWStep;
-		if (pData == &buff[cData->Pos & cData->Mask])InfolastPos = x;
-		y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
-		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
-	} while (x < rt->right - WAVE_RECT_BORDER_RIGHT);
-	if (InfolastPos >= 0)
-	{
-		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
-		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-	}
-	SelectObject(hdc, hPenSaved);
-}
-
-void CWinMain::DrawSignal_float(CData* cData, UINT pos, UINT pen, HDC hdc, UINT dwXOffSet, UINT bufStep, UINT dwWStep, RECT* rt)
-{
-	int InfolastPos;
-	double vzoom = DrawInfo.dbVZoom;// DrawInfo.iVZoom >= 0 ? (1 << DrawInfo.iVZoom) : (1.0 / (1 << (-DrawInfo.iVZoom)));
-	HPEN 	hPenSaved = (HPEN)SelectObject(hdc, hPens[pen]);//(HPEN)GetStockObject(WHITE_PEN));
-	int x, y;
-	//SelectObject(hdc, (HPEN)GetStockObject(WHITE_PEN));
-
-	x = WAVE_RECT_BORDER_LEFT - dwXOffSet;
-	float* buff = (float*)cData->Buff;
-	float* pData = (float*)buff + pos;
-	y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
-	y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-	//DbgMsg("zoom:%f, v:%d, zoomv: %d\r\n", vzoom, *pData, y);
-	InfolastPos = -1;
-	MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP + y, NULL);
-	do
-	{
-		pData += bufStep;
-		x += dwWStep;
-		if (pData == &buff[cData->Pos & cData->Mask])InfolastPos = x;
-		y = DrawInfo.dwVZoomedHeight / 2 - (*pData * vzoom) - DrawInfo.dwVZoomedPos;
-		y = BOUND(y, 0, WAVE_RECT_HEIGHT);
-		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + y);
-	} while (x < rt->right - WAVE_RECT_BORDER_RIGHT);
-	if (InfolastPos >= 0)
-	{
-		MoveToEx(hdc, x, WAVE_RECT_BORDER_TOP, NULL);
-		LineTo(hdc, x, WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT);
-	}
-	SelectObject(hdc, hPenSaved);
-}
-
 HWND CWinMain::MakeToolsBar(void)
 {
 	HWND hWndRebar = clsWinTools.CreateRebar(hWnd);
-	static TBBUTTON tbb[8] = {
+	static TBBUTTON tbb[13] = {
 		{ MAKELONG(1, 0), IDM_AUDIO_WINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"Audio" },
 		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, 
-		{ MAKELONG(2, 0), IDM_SPECTRUMWINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE,	{0}, 0, (INT_PTR)L"Spectrum" },
+		{ MAKELONG(2, 0), IDM_SPECTRUM_WINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE,	{0}, 0, (INT_PTR)L"Spectrum" },
+		{ MAKELONG(2, 0), IDM_SPECTRUM_SCAN_WINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE,	{0}, 0, (INT_PTR)L"Spectrum Scan" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL },
 		{ MAKELONG(3, 0), IDM_FILTERWINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"Filter" },
-		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP,	{0}, 0, NULL }, 
+		{ MAKELONG(4, 0), IDM_FILTER_START_STOP, TBSTATE_ENABLED, BTNS_AUTOSIZE | BTNS_CHECK, {0}, 0, (INT_PTR)L"Filter Doing" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP, {0}, 0, NULL },
 		{ MAKELONG(4, 0), IDM_SDR_WINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"SDR" },
 		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP, {0}, 0, NULL }, 
-		{ MAKELONG(0, 0), 0, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN,	{0}, 0, (INT_PTR)L"下拉" }
+		{ MAKELONG(4, 0), IDM_MSG_WINDOW, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"MSG" },
+		{ MAKELONG(0, 0), NULL, 0, TBSTYLE_SEP, {0}, 0, NULL },
+		{ MAKELONG(0, 0), 0, TBSTATE_ENABLED, BTNS_AUTOSIZE | TBSTYLE_DROPDOWN,	{0}, 0, (INT_PTR)L"按钮" }
 	};
-	CWinTools::TOOL_TIPS tips[8] = {
-		{ IDM_STARTPLAY,"打开音频信号窗口." },
-		{ 0, NULL }, // Separator
-		{ IDM_DEMODULATOR_AM,"打开信号频谱窗口." },
-		{ IDM_DEMODULATOR_FM, "打开滤波器设计窗口." },
-		{ 0, NULL }, // Separator
-		{ IDM_DEMODULATOR_FM, "打开SDR设备窗口." },
-		{ 0, NULL }, // Separator
+	CWinTools::TOOL_TIPS tips[13] = {
+		{ IDM_AUDIO_WINDOW,"打开音频信号窗口." },
+		{ 0, NULL },
+		{ IDM_SPECTRUM_WINDOW,"打开信号频谱窗口." },
+		{ IDM_SPECTRUM_SCAN_WINDOW,"打开信号频谱扫描窗口." },
+		{ 0, NULL },
+		{ IDM_FILTERWINDOW, "打开滤波器设计窗口." },
+		{ IDM_FILTER_START_STOP, "打开 / 关闭 滤波器." },
+		{ 0, NULL },
+		{ IDM_SDR_WINDOW, "打开SDR设备窗口." },
+		{ 0, NULL },
+		{ IDM_MSG_WINDOW, "打开调试消息窗口." },
+		{ 0, NULL },
 		{ 0, "TBSTYLE_DROPDOWN" }
 	};
-	HWND hToolBar = clsWinTools.CreateToolbar(hWnd, tbb, 8, tips, 8);
+	hWndToolbar = clsWinTools.CreateToolbar(hWnd, tbb, 13, tips, 13);
 
 	// Add images
 	TBADDBITMAP tbAddBmp = { 0 };
 	tbAddBmp.hInst = HINST_COMMCTRL;
 	tbAddBmp.nID = IDB_STD_SMALL_COLOR;
-	SendMessage(hToolBar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
+	SendMessage(hWndToolbar, TB_ADDBITMAP, 0, (WPARAM)&tbAddBmp);
 
-	clsWinTools.CreateRebarBand(hWndRebar, "窗口", 1, 500, 0, hToolBar);
+	clsWinTools.CreateRebarBand(hWndRebar, "窗口", 1, 500, 0, hWndToolbar);
 
 	//hWndTrack = CreateTrackbar(hWnd, 0, 100, 10);
 	clsWinTools.CreateRebarBand(hWndRebar, "Value", 2, 0, 0, NULL);
 	return hWndRebar;
+}
+
+
+LPTHREAD_START_ROUTINE CWinMain::FilterStopThread(LPVOID lp)
+{
+	clsMainFilterI.doFiltting = false;
+	//clsMainFilterQ.doFiltting = false;
+	while (clsMainFilterI.hThread != NULL);
+	//while (clsMainFilterQ.hThread != NULL);
+	return 0;
+}
+
+void CWinMain::FilterStop(void)
+{
+	clsMainFilterI.doFiltting = false;
+	//clsMainFilterQ.doFiltting = false;
+	//CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CWinMain::FilterStopThread, NULL, 0, NULL);
+}
+
+void CWinMain::FilterStart(void)
+{
+	while (clsMainFilterI.hThread != NULL);
+	//while (clsMainFilterQ.hThread != NULL);
+
+	UINT stepLen = clsMainFilterI.FilterSrcLen >> 2;
+	clsMainFilterI.SrcData->ProcessPos = ((UINT)(clsMainFilterI.SrcData->Pos / stepLen)) * stepLen;
+	clsMainFilterI.SrcData->ProcessPos &= clsMainFilterI.SrcData->Mask;
+	//clsMainFilterQ.SrcData->ProcessPos = clsMainFilterI.SrcData->ProcessPos;
+	
+	//if (
+	//	((clsMainFilterI.TargetData->Pos - clsMainFilterQ.TargetData->Pos) & clsMainFilterI.TargetData->Mask)
+	//	> 
+	//	clsMainFilterI.TargetData->Len / 2
+	//	)
+	//	clsMainFilterI.TargetData->Pos = clsMainFilterQ.TargetData->Pos;
+	//else 
+	//	clsMainFilterQ.TargetData->Pos = clsMainFilterI.TargetData->Pos;
+	
+	clsMainFilterI.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::cuda_filter_thread, &clsMainFilterI, 0, NULL);
+	//clsMainFilterQ.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFilter::cuda_filter_thread, &clsMainFilterQ, 0, NULL);
 }

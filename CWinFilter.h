@@ -28,7 +28,7 @@ namespace WINS {
 		HMENU hMenuFilterCoreItems = NULL;
 
 		int HOriginalWidth = 0;
-		int HScrollPos = 0, HScrollWidth = 0;
+		int HScrollPos = 0, HScrollRange = 0;
 		double HScrollZoom = 1.0;
 
 		CFilter::FILTER_CORE_DATA_TYPE* pCore = NULL;

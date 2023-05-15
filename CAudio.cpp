@@ -36,12 +36,8 @@ CAudio::~CAudio()
 
 void CAudio::Init(void)
 {
-	AudioData = new CData();
-	AudioData->Init(SOUNDCARD_BUFF_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT);
-	//AudioData->Init(DATA_BUFFER_LENGTH, short_type, SOUNDCARD_BUFF_DATA_BIT);
-	AudioDataFiltted = new CData();
-	AudioDataFiltted->Init(SOUNDCARD_BUFF_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT);
-	//AudioDataFiltted->Init(DATA_BUFFER_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT);
+	AudioData		 = new CData(SOUNDCARD_BUFF_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT, (const UCHAR*)"Audio", Pens[0]);
+	AudioDataFiltted = new CData(SOUNDCARD_BUFF_LENGTH, float_type, SOUNDCARD_BUFF_DATA_BIT, (const UCHAR*)"Audio_F", Pens[1]);
 
 	outData = AudioData;
 	outDataFiltted = AudioDataFiltted;
@@ -414,17 +410,29 @@ LPTHREAD_START_ROUTINE CAudio::Thread_Audio_Out(LPVOID lp)
 void CAudio::Thread_Audio_Out_Func(void)
 {
 	Doing = true;
-	short outBuff[SOUNDCARD_STEP_LENGTH];
+#define STEP_LENGTH	16
+	short outBuff[SOUNDCARD_STEP_LENGTH * STEP_LENGTH];
+	short* buff = outBuff;
+	UINT step = 0;
 	CData* out = outDataFiltted;
-	UINT pos = 0;
+	UINT pos = out->Pos;
 	while (Doing && Program_In_Process) {
 		if (((out->Pos - pos) & out->Mask) > SOUNDCARD_STEP_LENGTH) {
 			float* srcBuff = (float*)out->Buff;
 			for (int i = 0; i < SOUNDCARD_STEP_LENGTH; i++) {
-				outBuff[i] = (short)srcBuff[pos++];
+				buff[i] = (short)srcBuff[pos++];
 				pos &= out->Mask;
 			}
-			WriteToOut(outBuff);
+			if (waveHDRUsed == SOUNDCARD_WAVEHDR_DEEP) {
+				DbgMsg("WAVEHDR_DEEP %d\r\n", waveHDRUsed);
+			}
+			while (waveHDRUsed == SOUNDCARD_WAVEHDR_DEEP) { 
+				Sleep(10); 
+			}
+			WriteToOut(buff);
+			step++;
+			if (step == STEP_LENGTH)step = 0;
+			buff = outBuff + step * SOUNDCARD_STEP_LENGTH;
 		}
 	}
 	Doing = false;

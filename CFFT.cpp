@@ -23,11 +23,17 @@ using namespace std;
 using namespace WINS;
 using namespace METHOD;
 
-CFFT::CFFT()
+CFFT::CFFT(const char *flag, FFT_INFO* fftInfo)
 {
 	OPENCONSOLE_SAVED;
+	
 	hMutexBuff = CreateMutex(NULL, false, "CFFThMutexBuff");
 	hMutexDraw = CreateMutex(NULL, false, "CFFThMutexDraw");
+	
+	Flag = flag;
+	FFTInfo = fftInfo;
+
+	RestoreValue();
 }
 
 CFFT::~CFFT()
@@ -37,10 +43,17 @@ CFFT::~CFFT()
 	UnInit();
 }
 
-void CFFT::Init(void)
+void CFFT::Init(UINT fftsize, UINT fftstep, UINT averagedeep)
 {
 	WaitForSingleObject(hMutexBuff, INFINITE);
 	WaitForSingleObject(hMutexDraw, INFINITE);
+
+	FFTInfo->AverageDeep = averagedeep;
+	FFTInfo->FFTSize = fftsize;
+	FFTInfo->HalfFFTSize = fftsize / 2;
+	FFTInfo->FFTStep = fftstep;
+
+	if (FFT_Process_CallBackInit != NULL)FFT_Process_CallBackInit(this);
 
 	cuda_FFT_Init(Data);
 
@@ -237,10 +250,10 @@ void CFFT::NormalFFT(void* Buff, BUFF_DATA_TYPE type, uint32_t pos, UINT mask)
 	if (FFTInfo->FFTSize != (1 << k))
 	{
 		DbgMsg("file: %s. line: %d. func: %s\r\n", __FILE__, __LINE__, __FUNCTION__);
-		exit(0);
+		EXIT(0);
 	}
 	//Complex * src_com=(Complex*)malloc(sizeof(Complex)*size_n);
-	//if(src_com==NULL)exit(0);
+	//if(src_com==NULL)EXIT(0);
 	for (int i = 0; i < FFTInfo->FFTSize; i++) {
 		FFT_src_com[i].real = FFT_src[i];
 		FFT_src_com[i].imagin = 0.0;
@@ -322,6 +335,8 @@ void CFFT::FFT(UINT pos)
 	FFTOutBuff[i] -= subbuf[i];
 	FFTOutLogBuff[i] = log10(FFTOutBuff[i] / FFTMaxValue);
 	
+	if (FFT_Process_CallBack != NULL)FFT_Process_CallBack(this);
+
 	ReleaseMutex(hMutexDraw);
 
 	FFTInfo->FFTCount++;
@@ -343,7 +358,10 @@ void CFFT::FFT(UINT pos)
 LPTHREAD_START_ROUTINE CFFT::FFT_Thread(LPVOID lp)
 {
 	OPENCONSOLE_SAVED;
-	((CFFT*)lp)->FFT_Thread_func();
+
+	CFFT* fft = (CFFT*)lp;
+	fft->FFT_Thread_func();
+
 	//CLOSECONSOLE;
 	return 0;
 }
@@ -354,9 +372,10 @@ void CFFT::FFT_Thread_func(void)
 	UINT fft_between;
 	FFTDoing = true;
 	Thread_Exit = false;
-	while (FFTDoing && Program_In_Process)
-	{
-		if (FFTNext == false) {	Sleep(0); continue;	}
+
+	while (FFTDoing && Program_In_Process) {
+
+		if (FFTNext == false) {	Sleep(10); continue; }
 		fft_pos = Data->Pos;
 		fft_between = (fft_pos - FFTInfo->FFTPos) & Data->Mask;
 		if (fft_between > FFTInfo->FFTStep) {
@@ -365,12 +384,15 @@ void CFFT::FFT_Thread_func(void)
 			FFTNext = false;
 		}
 		else {
-			Sleep(0);
-			continue;
+			Sleep(10);
 		}
+
 	}
 
 	cuda_FFT_UnInit();
+
+	SaveValue();
+
 	Thread_Exit = true;
 	hThread = NULL;
 }
@@ -388,4 +410,30 @@ double CFFT::GetFFTMaxValue(void)
 	double d = sqrt(sumRe * sumRe + sumIm * sumIm);
 	DbgMsg("maxvalue:%d, %lf\n", max, d);
 	return d/16;
+}
+
+
+void CFFT::SaveValue(void)
+{
+	const UINT VALUE_LENGTH = 100;
+	char section[VALUE_LENGTH];
+	sprintf(section, "CFFT_%s", Flag);
+	WritePrivateProfileString(section, "FFTSize", std::to_string(FFTInfo->FFTSize).c_str(), IniFilePath);
+	WritePrivateProfileString(section, "FFTStep", std::to_string(FFTInfo->FFTStep).c_str(), IniFilePath);
+	WritePrivateProfileString(section, "AverageDeep", std::to_string(FFTInfo->AverageDeep).c_str(), IniFilePath);
+}
+
+void CFFT::RestoreValue(void)
+{
+	const UINT VALUE_LENGTH = 100;
+	char section[VALUE_LENGTH];
+	sprintf(section, "CFFT_%s", Flag);
+	char value[VALUE_LENGTH];
+	GetPrivateProfileString(section, "FFTSize", "1024", value, VALUE_LENGTH, IniFilePath);
+	FFTInfo->FFTSize = atoi(value);
+	FFTInfo->HalfFFTSize = FFTInfo->FFTSize / 2;
+	GetPrivateProfileString(section, "FFTStep", "1024", value, VALUE_LENGTH, IniFilePath);
+	FFTInfo->FFTStep = atoi(value);
+	GetPrivateProfileString(section, "AverageDeep", "16", value, VALUE_LENGTH, IniFilePath);
+	FFTInfo->AverageDeep = atoi(value);
 }

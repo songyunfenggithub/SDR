@@ -1,6 +1,4 @@
 
-
-
 #include "stdafx.h"
 #include "windows.h"
 #include "Windowsx.h"
@@ -11,8 +9,10 @@
 
 #include "public.h"
 #include "Debug.h"
+
 #include "CSoundCard.h"
 #include "CData.h"
+#include "CScreenButton.h"
 #include "CFFT.h"
 #include "CFilter.h"
 #include "CWinFFT.h"
@@ -23,7 +23,9 @@
 #include "CAnalyze.h"
 
 using namespace std;
-using namespace WINS; using namespace DEVICES;
+using namespace WINS; 
+using namespace WINS::SPECTRUM;
+using namespace DEVICES;
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
 #define GET_WM_VSCROLL_POS(wp, lp)      HIWORD(wp)
@@ -59,6 +61,9 @@ using namespace WINS; using namespace DEVICES;
 
 #define FFT_ZOOM_MAX		16
 
+#define LEGEND_X 100
+#define LEGEND_Y 100
+
 CWinOneFFT clsWinOneFFT;
 
 CWinOneFFT::CWinOneFFT()
@@ -67,16 +72,20 @@ CWinOneFFT::CWinOneFFT()
 
 	RegisterWindowsClass();
 	int Y = 10;
-	rfButton = new CScreenButton(new CScreenButton::BUTTON{ 10, Y, 100, 100, 13,  NULL, "0,000,000,000", CScreenButton::BUTTON_FONT_SIZE::Button_Font_Size_32, CScreenButton::Button_Mouse_Num1, CScreenButton::Button_Mouse_None,
+	rfButton = new CScreenButton(new CScreenButton::BUTTON{ 10, Y, 100, 100, -1, &ButtonRect, 13,  NULL, "0,000,000,000", RGB(255, 255, 255),
+		CScreenButton::BUTTON_FONT_SIZE::Button_Font_Size_32, CScreenButton::Button_Mouse_Num1, CScreenButton::Button_Mouse_None,
 		true, 0, 0, 0, 2000000000,
-		CScreenButton::Button_Align_Right,  NULL, NULL, NULL});
-	rfStepButton = new CScreenButton(new CScreenButton::BUTTON{ 10, Y += 32, 100, 100, 13, NULL, "0,000,000,000", CScreenButton::BUTTON_FONT_SIZE::Button_Font_Size_16,CScreenButton::Button_Mouse_Num2, CScreenButton::Button_Mouse_None,
-		true, 1, 0, 0, 2000000000,
-		CScreenButton::Button_Align_Right,  NULL, NULL, NULL});
-	averageFilterButton = new CScreenButton(new CScreenButton::BUTTON{ 10, Y += 20, 100, 100, 9, NULL, "AvgFlt:", CScreenButton::BUTTON_FONT_SIZE::Button_Font_Size_16, CScreenButton::Button_Step_Num, CScreenButton::Button_Mouse_None,
+		CScreenButton::Button_Align_Right,  NULL, NULL, CWinOneFFT::rfButtonFunc });
+	rfStepButton = new CScreenButton(new CScreenButton::BUTTON{ 10, Y += 36, 100, 100, -1, &ButtonRect, 13, NULL, "0,000,000,000", RGB(255, 255, 255),
+		CScreenButton::BUTTON_FONT_SIZE::Button_Font_Size_16,CScreenButton::Button_Mouse_Num2, CScreenButton::Button_Mouse_None,
+		true, 0, 0, 0, 2000000000,
+		CScreenButton::Button_Align_Right,  NULL, NULL,  CWinOneFFT::rfStepButtonFunc });
+	averageFilterButton = new CScreenButton(new CScreenButton::BUTTON{ 10, Y += 20, 100, 100, -1, &ButtonRect, 9, NULL, "AvgFlt:", RGB(255, 255, 255),
+		CScreenButton::BUTTON_FONT_SIZE::Button_Font_Size_16, CScreenButton::Button_Step_Num, CScreenButton::Button_Mouse_None,
 		true, 1, 1, 2, FFT_DEEP,
 		CScreenButton::Button_Align_Right,  NULL, NULL, CWinOneFFT::averageFilterButtonFunc });
-	confirmP1RfGoButton = new CScreenButton(new CScreenButton::BUTTON{ 10, Y += 20, 100, 100, 4, NULL, "RfGo", CScreenButton::BUTTON_FONT_SIZE::Button_Font_Size_16, CScreenButton::Button_Confirm, CScreenButton::Button_Mouse_None,
+	confirmP1RfGoButton = new CScreenButton(new CScreenButton::BUTTON{ 10, Y += 20, 100, 100, -1, &ButtonRect, 4, NULL, "RfGo", RGB(255, 255, 255),
+		CScreenButton::BUTTON_FONT_SIZE::Button_Font_Size_16, CScreenButton::Button_Confirm, CScreenButton::Button_Mouse_None,
 		true, 1, 1, 2, FFT_DEEP,
 		CScreenButton::Button_Align_Right,  NULL, NULL, CWinOneFFT::confirmP1RfGoButtonFunc });
 }
@@ -101,6 +110,7 @@ void CWinOneFFT::RegisterWindowsClass(void)
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);//(HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName = (LPCSTR)NULL;
+	wcex.style = CS_DBLCLKS;
 	wcex.lpszClassName = WIN_FFT_ONE_CLASS;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
 
@@ -148,49 +158,165 @@ LRESULT CALLBACK CWinOneFFT::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 		DbgMsg("WinOneFFT WM_CHAR\r\n");
 		PostMessage(clsWinSpect.hWnd, message, wParam, lParam);
 		break;
-	case WM_LBUTTONDOWN:
-		break;
-	case WM_LBUTTONUP:
-	case WM_RBUTTONUP:
+	case WM_LBUTTONDBLCLK:
+	{
+		DbgMsg("WM_LBUTTONDBLCLK\r\n");
 		if (confirmP1RfGoButton->MouseInButton(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) == false
-			&& rfButton->MouseInButton(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) == false) {
-			POINT* P;
-			P = message == WM_LBUTTONUP ? &ScreenP1 : &ScreenP2;
-			P->x = GET_X_LPARAM(lParam);
-			P->y = GET_Y_LPARAM(lParam);
-			if (P->x > WAVE_RECT_BORDER_LEFT && P->x < WinRect.right - WAVE_RECT_BORDER_RIGHT
-				&& P->y > WAVE_RECT_BORDER_TOP && P->y < WinRect.bottom - WAVE_RECT_BORDER_BOTTON) {
-				if (message == WM_LBUTTONUP) P1_Use = true; else P2_Use = true;
-				P->x = (P->x - WAVE_RECT_BORDER_LEFT + clsWinSpect.HScrollPos) / clsWinSpect.HScrollZoom;
-				if (P->x >= FFTInfo_Signal.HalfFFTSize) {
-					if (message == WM_LBUTTONUP) P1_Use = false; else P2_Use = false;
+			&& rfButton->MouseInButton(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) == false
+			&& averageFilterButton->MouseInButton(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) == false
+			&& confirmP1RfGoButton->MouseInButton(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) == false) {
+			INT X = MouseX;
+			if (X < WAVE_RECT_BORDER_LEFT || X >(clsWinSpect.WinRect.right - WAVE_RECT_BORDER_RIGHT)) break;
+			X -= WAVE_RECT_BORDER_LEFT;
+			float old_Zoom = clsWinSpect.HScrollZoom;
+			clsWinSpect.HScrollZoom = 1.0;
+			clsWinSpect.HScrollRange = clsWinSpect.FFTOrignal->FFTInfo->HalfFFTSize * clsWinSpect.HScrollZoom -
+				(clsWinSpect.WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			UP_TO_ZERO(clsWinSpect.HScrollRange);
+			SetScrollRange(clsWinSpect.hWnd, SB_HORZ, 0, clsWinSpect.HScrollRange, TRUE);
+			clsWinSpect.HScrollPos /= old_Zoom;
+			if (old_Zoom < 1.0) clsWinSpect.HScrollPos += (X / old_Zoom - X); else clsWinSpect.HScrollPos -= (X - X / old_Zoom);
+			clsWinSpect.HScrollPos = BOUND(clsWinSpect.HScrollPos, 0, clsWinSpect.HScrollRange);
+			SetScrollPos(clsWinSpect.hWnd, SB_HORZ, clsWinSpect.HScrollPos, TRUE);
+		}
+	}
+	break;
+	case WM_MOUSEWHEEL:
+	{
+		INT fwKeys = GET_KEYSTATE_WPARAM(wParam);
+		INT zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+		INT X = MouseX;
+		if (X < WAVE_RECT_BORDER_LEFT || X > (clsWinSpect.WinRect.right - WAVE_RECT_BORDER_RIGHT)) break;
+		//DbgMsg("WM_MOUSEWHEEL fwKeys£º%d, zDelta:%d, x:%d\r\n", fwKeys, zDelta, X);
+		X -= WAVE_RECT_BORDER_LEFT;
+		zDelta = zDelta / 120;
+		//DbgMsg("WM_MOUSEWHEEL hpos:%d\r\n", clsWinSpect.HScrollPos);
+		if (zDelta > 0) {
+			while (clsWinSpect.HScrollZoom * (1 << zDelta) > FFT_ZOOM_MAX) { zDelta--; }
+			clsWinSpect.HScrollZoom *= (1 << zDelta);
+			clsWinSpect.HScrollRange = clsWinSpect.FFTOrignal->FFTInfo->HalfFFTSize * clsWinSpect.HScrollZoom -
+				(clsWinSpect.WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			UP_TO_ZERO(clsWinSpect.HScrollRange);
+			SetScrollRange(clsWinSpect.hWnd, SB_HORZ, 0, clsWinSpect.HScrollRange, TRUE);
+			clsWinSpect.HScrollPos *= (1 << zDelta);
+			clsWinSpect.HScrollPos += (X * (1 << zDelta) - X);
+			clsWinSpect.HScrollPos = BOUND(clsWinSpect.HScrollPos, 0, clsWinSpect.HScrollRange);
+			SetScrollPos(clsWinSpect.hWnd, SB_HORZ, clsWinSpect.HScrollPos, TRUE);
+		}
+		else {
+			if (
+				clsWinSpect.HScrollZoom * clsWinSpect.FFTOrignal->FFTInfo->HalfFFTSize <
+				clsWinSpect.WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT
+				)break;
+			zDelta = -zDelta;
+			INT deltaSave = zDelta;
+			while (
+				zDelta > 0 &&
+				clsWinSpect.HScrollZoom / (1 << zDelta) * clsWinSpect.FFTOrignal->FFTInfo->HalfFFTSize <
+				clsWinSpect.WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT
+				) { zDelta--; }
+			if (deltaSave != zDelta) zDelta++;
+			clsWinSpect.HScrollZoom /= (1 << zDelta);
+			clsWinSpect.HScrollRange = clsWinSpect.FFTOrignal->FFTInfo->HalfFFTSize * clsWinSpect.HScrollZoom -
+				(clsWinSpect.WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			UP_TO_ZERO(clsWinSpect.HScrollRange);
+			SetScrollRange(clsWinSpect.hWnd, SB_HORZ, 0, clsWinSpect.HScrollRange, TRUE);
+			clsWinSpect.HScrollPos /= (1 << zDelta);
+			clsWinSpect.HScrollPos -= (X - X / (1 << zDelta));
+			clsWinSpect.HScrollPos = BOUND(clsWinSpect.HScrollPos, 0, clsWinSpect.HScrollRange);
+			SetScrollPos(clsWinSpect.hWnd, SB_HORZ, clsWinSpect.HScrollPos, TRUE);
+		}
+		//DbgMsg("WM_MOUSEWHEEL hpos:%d\r\n", clsWinSpect.HScrollPos);
+
+		//HScrollPos = BOUND(HScrollPos - delta, 0, me->VScrollRang);
+		//SetScrollPos(hWnd, SB_VERT, me->VScrollPos, true);
+		InvalidateRect(hWnd, NULL, TRUE);
+		UpdateWindow(hWnd);
+	}
+	break;
+	case WM_LBUTTONDOWN:
+		LeftBottonDown = true;
+		DragMousePoint.x = MouseX;
+		DragMousePoint.y = MouseY;
+		break;
+	case WM_LBUTTONUP: 
+	{
+		LeftBottonDown = false;
+		INT fwKeys = GET_KEYSTATE_WPARAM(wParam);
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+		if (fwKeys == MK_CONTROL) {
+			if (x >= WAVE_RECT_BORDER_LEFT && x <= WinRect.right - WAVE_RECT_BORDER_RIGHT && y >= WAVE_RECT_BORDER_TOP && y <= WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT) {
+				int xf = (x - WAVE_RECT_BORDER_LEFT + clsWinSpect.HScrollPos) / clsWinSpect.HScrollZoom;
+				if (xf < FFTInfo_Signal.HalfFFTSize) {
+					AverageRange.P0.x = xf;
+					AverageRange.P0.y = y;
 				}
 			}
 			else {
-				if (message == WM_LBUTTONUP) P1_Use = false; else P2_Use = false;
+				AverageRange.P0.x = -1;
 			}
-			P2SubP1();
+		}
+	}
+	case WM_RBUTTONUP:
+		if (confirmP1RfGoButton->MouseInButton(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) == false
+			&& rfButton->MouseInButton(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) == false
+			&& averageFilterButton->MouseInButton(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) == false
+			&& confirmP1RfGoButton->MouseInButton(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) == false) {
+			int x = GET_X_LPARAM(lParam);
+			int y = GET_Y_LPARAM(lParam);
+			INT fwKeys = GET_KEYSTATE_WPARAM(wParam);
+			if (fwKeys == MK_CONTROL) {
+				if (message == WM_RBUTTONUP && x >= WAVE_RECT_BORDER_LEFT && x <= WinRect.right - WAVE_RECT_BORDER_RIGHT && y >= WAVE_RECT_BORDER_TOP && y <= WAVE_RECT_BORDER_TOP + WAVE_RECT_HEIGHT) {
+					int xf = (x - WAVE_RECT_BORDER_LEFT + clsWinSpect.HScrollPos) / clsWinSpect.HScrollZoom;
+					if (xf < FFTInfo_Signal.HalfFFTSize) {
+						AverageRange.P1.x = xf;
+						AverageRange.P1.y = y;
+					}
+				}
+			}
+			else {
+				POINT* P;
+				P = message == WM_LBUTTONUP ? &ScreenP1 : &ScreenP2;
+				P->x = x;
+				P->y = y;
+				if (P->x > WAVE_RECT_BORDER_LEFT && P->x < WinRect.right - WAVE_RECT_BORDER_RIGHT
+					&& P->y > WAVE_RECT_BORDER_TOP && P->y < WinRect.bottom - WAVE_RECT_BORDER_BOTTON) {
+					if (message == WM_LBUTTONUP) P1_Use = true; else P2_Use = true;
+					P->x = (P->x - WAVE_RECT_BORDER_LEFT + clsWinSpect.HScrollPos) / clsWinSpect.HScrollZoom;
+					if (P->x >= FFTInfo_Signal.HalfFFTSize) {
+						if (message == WM_LBUTTONUP) P1_Use = false; else P2_Use = false;
+					}
+				}
+				else {
+					if (message == WM_LBUTTONUP) P1_Use = false; else P2_Use = false;
+				}
+				P2SubP1();
+			}
 		}
 	case WM_MOUSEMOVE:
 		if (message == WM_MOUSEMOVE) {
 			MouseX = GET_X_LPARAM(lParam);
 			MouseY = GET_Y_LPARAM(lParam);
 			OnMouse();
+			DragMoveFFT();
 		}
 		rfButton->OnMouseMouseNumButton(hWnd, message, wParam, lParam);
 		rfStepButton->OnMouseMouseNumButton(hWnd, message, wParam, lParam);
 		averageFilterButton->OnMouseButton(hWnd, message, wParam, lParam);
 		confirmP1RfGoButton->OnMouseButton(hWnd, message, wParam, lParam);
 		break;
-	case WM_LBUTTONDBLCLK:
-			DbgMsg("WM_LBUTTONDBLCLK\r\n");
-		break;
 	case WM_SIZE:
 		GetRealClientRect(&WinRect);
-		VScrollWidth = 2 * WAVE_RECT_HEIGHT * VScrollZoom - (WinRect.bottom - WAVE_RECT_BORDER_TOP - WAVE_RECT_BORDER_BOTTON);
-		UP_TO_ZERO(VScrollWidth);
-		SetScrollRange(hWnd, SB_VERT, 0, VScrollWidth, TRUE);
+		VScrollRange = 2 * WAVE_RECT_HEIGHT * VScrollZoom - (WinRect.bottom - WAVE_RECT_BORDER_TOP - WAVE_RECT_BORDER_BOTTON);
+		UP_TO_ZERO(VScrollRange);
+		SetScrollRange(hWnd, SB_VERT, 0, VScrollRange, TRUE);
 		GetClientRect(hWnd, &WinRect);
+		GetClientRect(hWnd, &ButtonRect);
+		ButtonRect.top += WAVE_RECT_BORDER_TOP;
+		ButtonRect.left += WAVE_RECT_BORDER_LEFT;
+		ButtonRect.right -= WAVE_RECT_BORDER_RIGHT;
+		ButtonRect.bottom -= WAVE_RECT_BORDER_BOTTON;
 		break;
 	case WM_COMMAND:
 		return OnCommand(message, wParam, lParam);
@@ -210,6 +336,7 @@ LRESULT CALLBACK CWinOneFFT::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 	case WM_DESTROY:
 		DbgMsg("CWinOneFFT WM_DESTROY\r\n");
 		SaveValue();
+		this->hWnd = NULL;
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -254,6 +381,21 @@ bool CWinOneFFT::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	return TRUE;
 }
 
+void CWinOneFFT::DragMoveFFT(void)
+{
+	if (LeftBottonDown == true && DragMousePoint.x != MouseX) {
+
+		clsWinSpect.HScrollPos = BOUND(clsWinSpect.HScrollPos + (DragMousePoint.x - MouseX), 0, clsWinSpect.HScrollRange);
+		SetScrollPos(clsWinSpect.hWnd, SB_HORZ, clsWinSpect.HScrollPos, true);
+
+		InvalidateRect(hWnd, NULL, TRUE);
+		UpdateWindow(hWnd);
+
+		DragMousePoint.x = MouseX;
+		DragMousePoint.y = MouseY;
+	}
+}
+
 void CWinOneFFT::OnMouse(void)
 {
 	RECT rt;
@@ -265,12 +407,12 @@ void CWinOneFFT::OnMouse(void)
 	X = BOUND(X, 0, (clsWinSpect.HScrollPos + rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / clsWinSpect.HScrollZoom);
 
 	double Hz = (double)X * AdcDataI->SampleRate / FFTInfo_Signal.FFTSize;
-	double Y = X > FFTInfo_Signal.HalfFFTSize? 0 : ((CFFT*)clsWinSpect.FFTOrignal)->FFTOutBuff[X];
+	double Y = X > FFTInfo_Signal.HalfFFTSize? 0 : clsWinSpect.FFTOrignal->FFTOutBuff[X];
 	n += sprintf(strMouse + n, " | ");
 	n += sprintf(strMouse + n, "Hz: %.03f, FFT: %s", Hz, formatKDouble(Y, 0.001, "", t));
 
 	int Ypos = BOUND(MouseY - WAVE_RECT_BORDER_TOP, 0, WAVE_RECT_HEIGHT);
-	double Ylog = 20 * (X > FFTInfo_Filtted.HalfFFTSize ? 0 : ((CFFT*)clsWinSpect.FFTFiltted)->FFTOutLogBuff[X]);
+	double Ylog = 20 * (X > FFTInfo_Filtted.HalfFFTSize ? 0 : clsWinSpect.FFTFiltted->FFTOutLogBuff[X]);
 	n += sprintf(strMouse + n, " | ");
 	n += sprintf(strMouse + n, "Y: %.03fdb, logFFT: %fdb", -(double)Ypos / 64 * 20, Ylog);
 }
@@ -294,7 +436,7 @@ void CWinOneFFT::Paint(void)
 	HBITMAP hbmp = CreateCompatibleBitmap(hDC, rt.right, rt.bottom);
 	SelectObject(hdc, hbmp);
 
-	HFONT hFont_Arial = CreateFont(14, 0, 0, 0, 0, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, _T("Arial"));
+	static HFONT hFont_Arial = CreateFont(14, 0, 0, 0, 0, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, _T("Arial"));
 	SelectObject(hdc, hFont_Arial);
 
 	FillRect(hdc, &rt, (HBRUSH)GetStockObject(BRUSH_BACKGROUND));
@@ -392,210 +534,17 @@ void CWinOneFFT::Paint(void)
 	DeleteObject(hPen);
 	DeleteObject(hPenLighter);
 
-	double Y = 0;
-	int X;
-	//double CoreCenter = 256;
-	int FFTLength = FFTInfo_Signal.HalfFFTSize;
-	int FFTLengthFiltted = FFTInfo_Filtted.HalfFFTSize;
 
-	CFFT* oFFT = (CFFT*)clsWinSpect.FFTOrignal;
-	CFFT* fFFT = (CFFT*)clsWinSpect.FFTFiltted;
+	CFFT* oFFT = clsWinSpect.FFTOrignal;
+	CFFT* fFFT = clsWinSpect.FFTFiltted;
 
 	WaitForSingleObject(oFFT->hMutexDraw, INFINITE);
 	WaitForSingleObject(fFFT->hMutexDraw, INFINITE);
 
+	CommNum = 0;
+	PaintFFT(hdc);
+
 	PaintBriefly(hdc);
-
-	//»æÖÆÂË²¨ FFT ÐÅºÅ--------------------------------------------------
-	double* pOriBuf = oFFT->FFTOutBuff;
-	double* pFilBuf = fFFT->FFTOutBuff;
-	double fftvmax;
-	double fftvmin;
-	if (pOriBuf && pFilBuf) fftvmax = max(pOriBuf[FFTLength], pFilBuf[FFTLengthFiltted]);
-//	double scale = WAVE_RECT_HEIGHT / fftvmax;
-	double scale = WAVE_RECT_HEIGHT / ((CFFT*)clsWinSpect.FFTOrignal)->FFTMaxValue * 100;
-	int Xstep = clsWinSpect.HScrollZoom > 1.0 ? clsWinSpect.HScrollZoom : 1;
-	int istep = clsWinSpect.HScrollZoom < 1.0 ? ((double)1.0 / clsWinSpect.HScrollZoom) : 1;
-	int averagei = 0;
-	if (bFFTOrignalShow && pOriBuf)
-	{
-		averageOrignal = 0.0;
-		minOrignal = DBL_MAX;;
-		maxOrignal = -1.0 * DBL_MAX;
-		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
-		if (i < FFTLength) 
-			Y = WAVE_RECT_HEIGHT - pOriBuf[i] * scale * VScrollZoom - VScrollPos;
-		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-		averageOrignal += Y;
-		minOrignal = min(minOrignal, Y);
-		maxOrignal = max(maxOrignal, Y);
-		averagei++;
-		X = WAVE_RECT_BORDER_LEFT;
-		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT);
-		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-		{
-			X += Xstep;
-			Y = WAVE_RECT_HEIGHT - pOriBuf[i] * scale * VScrollZoom - VScrollPos;
-			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-			averageOrignal += Y;
-			minOrignal = min(minOrignal, Y);
-			maxOrignal = max(maxOrignal, Y);
-			averagei++;
-			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
-		}
-		averageOrignal /= averagei;
-		DeleteObject(hPen);
-	}
-	if (bFFTFilttedShow && pFilBuf)
-	{
-		averagei = 0;
-		averageFiltted = 0.0;
-		minFiltted = DBL_MAX;;
-		maxFiltted = -1.0 * DBL_MAX;
-		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
-		if (i < FFTLengthFiltted)
-			Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
-		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-		averageFiltted += Y;
-		minFiltted = min(minFiltted, Y);
-		maxFiltted = max(maxFiltted, Y);
-		averagei++;
-		X = WAVE_RECT_BORDER_LEFT;
-		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT);
-		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-		{
-			X += Xstep;
-			Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
-			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-			averageFiltted += Y;
-			minFiltted = min(minFiltted, Y);
-			maxFiltted = max(maxFiltted, Y);
-			averagei++;
-			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
-		}
-		averageFiltted /= averagei;
-		DeleteObject(hPen);
-	}
-
-	averageOrignalLog = 0.0;
-	minOrignalLog = DBL_MAX;;
-	maxOrignalLog = -1.0 * DBL_MAX;
-	double* pOriLogBuf = oFFT->FFTOutLogBuff;
-	if (bFFTOrignalLogShow && pOriLogBuf) {
-		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
-		averagei = 0;
-		fftvmax = pOriLogBuf[FFTLength];
-		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
-		if (i < FFTLength)
-			Y = pOriLogBuf[i] * -64 * VScrollZoom - VScrollPos;
-		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-		averageOrignalLog += Y;
-		minOrignalLog = min(minOrignalLog, Y);
-		maxOrignalLog = max(maxOrignalLog, Y);
-		averagei++;
-		X = WAVE_RECT_BORDER_LEFT;
-		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT_LOG);
-		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-		{
-			X += Xstep;
-			Y = pOriLogBuf[i] * -64 * VScrollZoom - VScrollPos;
-			Y = BOUND(Y, 0, 64 * 12);
-			averageOrignalLog += Y;
-			minOrignalLog = min(minOrignalLog, Y);
-			maxOrignalLog = max(maxOrignalLog, Y);
-			averagei++;
-			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
-		}
-		averageOrignalLog /= averagei;
-		MoveToEx(hdc, WAVE_RECT_BORDER_LEFT, WAVE_RECT_BORDER_TOP + averageOrignalLog, NULL);
-		LineTo(hdc, rt.right - WAVE_RECT_BORDER_RIGHT, WAVE_RECT_BORDER_TOP + averageOrignalLog);
-		DeleteObject(hPen);
-	}
-
-	averagei = 0;
-	averageFilttedLog = 0.0;
-	minFilttedLog = DBL_MAX;;
-	maxFilttedLog = -1.0 * DBL_MAX;
-	double* pFilLogBuf = fFFT->FFTOutLogBuff;
-	if (bFFTFilttedLogShow && pFilLogBuf) {
-		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
-		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
-		if (i < FFTLengthFiltted)
-			Y = pFilLogBuf[i] * -64 * VScrollZoom - VScrollPos;
-		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
-		averageFilttedLog += Y;
-		minFilttedLog = min(minFilttedLog, Y);
-		maxFilttedLog = max(maxFilttedLog, Y);
-		averagei++;
-		X = WAVE_RECT_BORDER_LEFT;
-		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT_LOG);
-		SelectObject(hdc, hPen);
-		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
-		{
-			X += Xstep;
-			Y = pFilLogBuf[i] * -64 * VScrollZoom - VScrollPos;
-			Y = BOUND(Y, 0, 64 * 12);
-			averageFilttedLog += Y;
-			minFilttedLog = min(minFilttedLog, Y);
-			maxFilttedLog = max(maxFilttedLog, Y);
-			averagei++;
-			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
-		}
-		averageFilttedLog /= averagei;
-		DeleteObject(hPen);
-	}
-
-	{
-		//»æÖÆÍ¼ÁÐ-------------------------------------------------------
-		r.top = WAVE_RECT_BORDER_TOP + DIVLONG + 80;
-		r.left = rt.right - WAVE_RECT_BORDER_RIGHT - 100;
-		r.right = rt.right;
-		r.bottom = rt.bottom;
-		SetBkMode(hdc, TRANSPARENT);
-
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT);
-		SelectObject(hdc, hPen);
-		MoveToEx(hdc, r.left - 20, r.top + 10, NULL);
-		LineTo(hdc, r.left - 5, r.top + 10);
-		DeleteObject(hPen);
-		SetTextColor(hdc, COLOR_ORIGNAL_FFT);
-		sprintf(s, "orignal fft");
-		DrawText(hdc, s, strlen(s), &r, NULL);
-		r.top += 20;
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT_LOG);
-		SelectObject(hdc, hPen);
-		MoveToEx(hdc, r.left - 20, r.top + 10, NULL);
-		LineTo(hdc, r.left - 5, r.top + 10);
-		DeleteObject(hPen);
-		SetTextColor(hdc, COLOR_ORIGNAL_FFT_LOG);
-		sprintf(s, "orignal fft log");
-		DrawText(hdc, s, strlen(s), &r, NULL);
-		r.top += 20;
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT);
-		SelectObject(hdc, hPen);
-		MoveToEx(hdc, r.left - 20, r.top + 10, NULL);
-		LineTo(hdc, r.left - 5, r.top + 10);
-		DeleteObject(hPen);
-		SetTextColor(hdc, COLOR_FILTTED_FFT);
-		sprintf(s, "filtted fft");
-		DrawText(hdc, s, strlen(s), &r, NULL);
-		r.top += 20;
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT_LOG);
-		SelectObject(hdc, hPen);
-		MoveToEx(hdc, r.left - 20, r.top + 10, NULL);
-		LineTo(hdc, r.left - 5, r.top + 10);
-		DeleteObject(hPen);
-		SetTextColor(hdc, COLOR_FILTTED_FFT_LOG);
-		sprintf(s, "filtted fft log");
-		DrawText(hdc, s, strlen(s), &r, NULL);
-	}
 
 	//---------------------------------------
 	{
@@ -652,20 +601,26 @@ void CWinOneFFT::Paint(void)
 		DrawText(hdc, strPP, strlen(strPP), &r, NULL);
 	}
 
-	DeleteObject(SelectObject(hdc, GetStockObject(SYSTEM_FONT)));
+	//DeleteObject(SelectObject(hdc, GetStockObject(SYSTEM_FONT)));
 
-	buttonRt.top += WAVE_RECT_BORDER_TOP;
-	buttonRt.left += WAVE_RECT_BORDER_LEFT;
-	buttonRt.right -= WAVE_RECT_BORDER_RIGHT;
-	buttonRt.bottom = WAVE_RECT_BORDER_TOP + WAVE_RECT_BORDER_TOP;
+	rfButton->DrawMouseNumButton(hdc);
+	rfStepButton->DrawMouseNumButton(hdc);
+	averageFilterButton->DrawButton(hdc);
+	confirmP1RfGoButton->DrawButton(hdc);
 
-	rfButton->DrawMouseNumButton(hdc, &buttonRt);
-	rfStepButton->DrawMouseNumButton(hdc, &buttonRt);
-	averageFilterButton->DrawButton(hdc, &buttonRt);
-	confirmP1RfGoButton->DrawButton(hdc, &buttonRt);
+	SelectObject(hdc, hFont_Arial);
+	static HPEN hPenP = CreatePen(PS_SOLID, 0, RGB(128, 255, 128));;
+	SelectObject(hdc, (HPEN)hPenP);
 
-	DrawPoint(hdc, &ScreenP1, hFont_Arial);
-	DrawPoint(hdc, &ScreenP2, hFont_Arial);
+	if (P1_Use) DrawPoint(hdc, &ScreenP1, "P1");
+	if (P2_Use) DrawPoint(hdc, &ScreenP2, "P2");
+
+	if(AverageRange.P0.x > 0) {
+		static HPEN hPen = CreatePen(PS_SOLID, 0, RGB(128, 128, 0));
+		SelectObject(hdc, (HPEN)hPen);
+		DrawPoint(hdc, &AverageRange.P0, "avLeft");
+		DrawPoint(hdc, &AverageRange.P1, "avRight");
+	}
 
 	BitBlt(hDC,
 		0, 0,
@@ -682,18 +637,10 @@ void CWinOneFFT::Paint(void)
 	EndPaint(hWnd, &ps);
 }
 
-void CWinOneFFT::DrawPoint(HDC hdc, POINT* P, HFONT hFont)
-{
-	if (P == &ScreenP1 && P1_Use == false)return;
-	if (P == &ScreenP2 && P2_Use == false)return;
-
-	
+void CWinOneFFT::DrawPoint(HDC hdc, POINT* P, char* flag)
+{	
 	int x = P->x * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos + WAVE_RECT_BORDER_LEFT;
 	if (x > WinRect.right - WAVE_RECT_BORDER_RIGHT) return;
-
-	HPEN hPen = CreatePen(PS_SOLID, 0, RGB(128, 255, 128));;
-	HPEN hPen_old = (HPEN)SelectObject(hdc, (HPEN)hPen);
-	HFONT hFont_old = (HFONT)SelectObject(hdc, (HFONT)hFont);
 
 	MoveToEx(hdc, x - POINT_WIDTH, P->y - POINT_WIDTH, NULL);
 	LineTo(hdc, x + POINT_WIDTH, P->y - POINT_WIDTH);
@@ -711,12 +658,7 @@ void CWinOneFFT::DrawPoint(HDC hdc, POINT* P, HFONT hFont)
 	r.left = x + POINT_WIDTH2 + 2;
 	r.right = WinRect.right;
 	r.bottom = WinRect.bottom;
-	DrawText(hdc, P == &ScreenP1 ? "P1" : "P2", 2, &r, NULL);
-
-	SelectObject(hdc, (HPEN)hPen_old);
-	SelectObject(hdc, (HFONT)hFont_old);
-	DeleteObject(hPen);
-
+	DrawText(hdc, flag, strlen(flag), &r, NULL);
 }
 
 void CWinOneFFT::GetRealClientRect(PRECT lprc)
@@ -776,6 +718,163 @@ VOID CWinOneFFT::BrieflyBuff(void* fft)
 	ReleaseMutex(cFFT->hMutexDraw);
 }
 
+void CWinOneFFT::PaintFFT(HDC hdc)
+{
+
+	int i;
+	double Y = 0;
+	int X;
+	int FFTLength = FFTInfo_Signal.HalfFFTSize;
+	int FFTLengthFiltted = FFTInfo_Filtted.HalfFFTSize;
+
+	CFFT* oFFT = clsWinSpect.FFTOrignal;
+	CFFT* fFFT = clsWinSpect.FFTFiltted;
+
+	double* pOriBuf = oFFT->FFTOutBuff;
+	int Xstep = clsWinSpect.HScrollZoom > 1.0 ? clsWinSpect.HScrollZoom : 1;
+	int istep = clsWinSpect.HScrollZoom < 1.0 ? ((double)1.0 / clsWinSpect.HScrollZoom) : 1;
+	double scale = WAVE_RECT_HEIGHT / clsWinSpect.FFTOrignal->FFTMaxValue * 100;
+
+	if (bFFTOrignalShow && pOriBuf)	{
+		SelectObject(hdc, oFFT->hPen);
+		int x, y;
+		x = WinRect.right - WAVE_RECT_BORDER_RIGHT - LEGEND_X;
+		y = WAVE_RECT_BORDER_TOP + LEGEND_Y + CommNum++ * 14;
+		MoveToEx(hdc, x, y + 7, NULL);
+		LineTo(hdc, x + 20, y + 7);
+		RECT r = { x + 30, y, x + 200, y + 50 };
+		DrawText(hdc, (LPCSTR)oFFT->Flag, strlen((char*)oFFT->Flag), &r, NULL);
+
+		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
+		if (i < FFTLength)
+			Y = WAVE_RECT_HEIGHT - pOriBuf[i] * scale * VScrollZoom - VScrollPos;
+		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+		X = WAVE_RECT_BORDER_LEFT;
+		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
+		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+		{
+			X += Xstep;
+			Y = WAVE_RECT_HEIGHT - pOriBuf[i] * scale * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
+		}
+
+		if (clsWinOneSpectrum.bSpectrumBrieflyShow == false && clsWinOneSpectrum.whichSignel == 0) {
+			Y = WAVE_RECT_HEIGHT - AverageValue * scale * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			MoveToEx(hdc, WAVE_RECT_BORDER_LEFT, WAVE_RECT_BORDER_TOP + Y, NULL);
+			LineTo(hdc, WinRect.right - WAVE_RECT_BORDER_RIGHT, WAVE_RECT_BORDER_TOP + Y);
+		}
+
+	}
+
+	double* pFilBuf = fFFT->FFTOutBuff;
+	if (bFFTFilttedShow && pFilBuf)
+	{
+		SelectObject(hdc, fFFT->hPen);
+		int x, y;
+		x = WinRect.right - WAVE_RECT_BORDER_RIGHT - LEGEND_X;
+		y = WAVE_RECT_BORDER_TOP + LEGEND_Y + CommNum++ * 14;
+		MoveToEx(hdc, x, y + 7, NULL);
+		LineTo(hdc, x + 20, y + 7);
+		RECT r = { x + 30, y, x + 200, y + 50 };
+		DrawText(hdc, (LPCSTR)fFFT->Flag, strlen((char*)fFFT->Flag), &r, NULL);
+
+		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
+		if (i < FFTLengthFiltted) Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
+		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+		X = WAVE_RECT_BORDER_LEFT;
+		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
+		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+		{
+			X += Xstep;
+			Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
+		}
+
+		if (clsWinOneSpectrum.bSpectrumBrieflyShow == false && clsWinOneSpectrum.whichSignel == 2) {
+			Y = WAVE_RECT_HEIGHT - AverageValue * scale * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			MoveToEx(hdc, WAVE_RECT_BORDER_LEFT, WAVE_RECT_BORDER_TOP + Y, NULL);
+			LineTo(hdc, WinRect.right - WAVE_RECT_BORDER_RIGHT, WAVE_RECT_BORDER_TOP + Y);
+		}
+
+	}
+
+	double* pOriLogBuf = oFFT->FFTOutLogBuff;
+	if (bFFTOrignalLogShow && pOriLogBuf) {
+		SelectObject(hdc, oFFT->hPenLog);
+		int x, y;
+		x = WinRect.right - WAVE_RECT_BORDER_RIGHT - LEGEND_X;
+		y = WAVE_RECT_BORDER_TOP + LEGEND_Y + CommNum++ * 14;
+		MoveToEx(hdc, x, y + 7, NULL);
+		LineTo(hdc, x + 20, y + 7);
+		RECT r = { x + 30, y, x + 200, y + 50 };
+		char s[100];
+		int n = sprintf(s, "%sLog", oFFT->Flag);
+		DrawText(hdc, (LPCSTR)s, n, &r, NULL);
+
+		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
+		if (i < FFTLength)
+			Y = pOriLogBuf[i] * -64 * VScrollZoom - VScrollPos;
+		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+		X = WAVE_RECT_BORDER_LEFT;
+		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
+		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+		{
+			X += Xstep;
+			Y = pOriLogBuf[i] * -64 * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, 64 * 12);
+			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
+		}
+
+		if (clsWinOneSpectrum.bSpectrumBrieflyShow == false && clsWinOneSpectrum.whichSignel == 1) {
+			Y = AverageValue * -64 * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			MoveToEx(hdc, WAVE_RECT_BORDER_LEFT, WAVE_RECT_BORDER_TOP + Y, NULL);
+			LineTo(hdc, WinRect.right - WAVE_RECT_BORDER_RIGHT, WAVE_RECT_BORDER_TOP + Y);
+		}
+
+	}
+
+	double* pFilLogBuf = fFFT->FFTOutLogBuff;
+	if (bFFTFilttedLogShow && pFilLogBuf) {
+		SelectObject(hdc, fFFT->hPenLog);
+		int x, y;
+		x = WinRect.right - WAVE_RECT_BORDER_RIGHT - LEGEND_X;
+		y = WAVE_RECT_BORDER_TOP + LEGEND_Y + CommNum++ * 14;
+		MoveToEx(hdc, x, y + 7, NULL);
+		LineTo(hdc, x + 20, y + 7);
+		RECT r = { x + 30, y, x + 200, y + 50 };
+		char s[100];
+		int n = sprintf(s, "%sLog", fFFT->Flag);
+		DrawText(hdc, (LPCSTR)s, n, &r, NULL);
+
+		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
+		if (i < FFTLengthFiltted)
+			Y = pFilLogBuf[i] * -64 * VScrollZoom - VScrollPos;
+		Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+		X = WAVE_RECT_BORDER_LEFT;
+		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
+		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
+		{
+			X += Xstep;
+			Y = pFilLogBuf[i] * -64 * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, 64 * 12);
+			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
+		}
+
+		if (clsWinOneSpectrum.bSpectrumBrieflyShow == false && clsWinOneSpectrum.whichSignel == 3) {
+			Y = AverageValue * -64 * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			MoveToEx(hdc, WAVE_RECT_BORDER_LEFT, WAVE_RECT_BORDER_TOP + Y, NULL);
+			LineTo(hdc, WinRect.right - WAVE_RECT_BORDER_RIGHT, WAVE_RECT_BORDER_TOP + Y);
+		}
+	}
+
+}
+
 void CWinOneFFT::PaintBriefly(HDC hdc)
 {
 	HPEN hPen;
@@ -790,60 +889,94 @@ void CWinOneFFT::PaintBriefly(HDC hdc)
 	CFFT* FFTOrignal = (CFFT*)clsWinSpect.FFTOrignal;
 	CFFT* FFTFiltted = (CFFT*)clsWinSpect.FFTFiltted;
 
-	//»æÖÆÂË²¨ FFT ÐÅºÅ--------------------------------------------------
 	double* pOriBuf = FFTOrignal->FFTBrieflyBuff;
-	double* pFilBuf = FFTFiltted->FFTBrieflyBuff;
-	double fftvmax;
-	double fftvmin;
-	if (pOriBuf && pFilBuf) fftvmax = max(pOriBuf[FFTLength], pFilBuf[FFTLengthFiltted]);
+
 	double scale = WAVE_RECT_HEIGHT / FFTOrignal->FFTMaxValue * 100;
 	int Xstep = clsWinSpect.HScrollZoom > 1.0 ? clsWinSpect.HScrollZoom : 1;
 	int istep = clsWinSpect.HScrollZoom < 1.0 ? ((double)1.0 / clsWinSpect.HScrollZoom) : 1;
-	if (bFFTOrignalShow && pOriBuf)
-	{
+
+	if (bFFTOrignalShow && pOriBuf)	{
+		SelectObject(hdc, FFTOrignal->hPen);
+		int x, y;
+		x = WinRect.right - WAVE_RECT_BORDER_RIGHT - LEGEND_X;
+		y = WAVE_RECT_BORDER_TOP + LEGEND_Y + CommNum++ * 14;
+		MoveToEx(hdc, x, y + 7, NULL);
+		LineTo(hdc, x + 20, y + 7);
+		RECT r = { x + 30, y, x + 200, y + 50 };
+		char s[100];
+		int n = sprintf(s, "B_%s", FFTOrignal->Flag);
+		DrawText(hdc, (LPCSTR)s, n, &r, NULL);
+
 		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
 		if (i < FFTLength) Y = WAVE_RECT_HEIGHT - pOriBuf[i] * scale * VScrollZoom - VScrollPos;
 		X = WAVE_RECT_BORDER_LEFT;
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT);
-		SelectObject(hdc, hPen);
 		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
 			Y = WAVE_RECT_HEIGHT - pOriBuf[i] * scale * VScrollZoom - VScrollPos;
 			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
 		}
-		DeleteObject(hPen);
+
+		if (clsWinOneSpectrum.bSpectrumBrieflyShow == true && clsWinOneSpectrum.whichSignel == 0) {
+			Y = WAVE_RECT_HEIGHT - AverageValue * scale * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			MoveToEx(hdc, WAVE_RECT_BORDER_LEFT, WAVE_RECT_BORDER_TOP + Y, NULL);
+			LineTo(hdc, WinRect.right - WAVE_RECT_BORDER_RIGHT, WAVE_RECT_BORDER_TOP + Y);
+		}
 	}
-	if (bFFTFilttedShow && pFilBuf)
-	{
+
+	double* pFilBuf = FFTFiltted->FFTBrieflyBuff;
+	if (bFFTFilttedShow && pFilBuf)	{
+		SelectObject(hdc, FFTFiltted->hPen);
+		int x, y;
+		x = WinRect.right - WAVE_RECT_BORDER_RIGHT - LEGEND_X;
+		y = WAVE_RECT_BORDER_TOP + LEGEND_Y + CommNum++ * 14;
+		MoveToEx(hdc, x, y + 7, NULL);
+		LineTo(hdc, x + 20, y + 7);
+		RECT r = { x + 30, y, x + 200, y + 50 };
+		char s[100];
+		int n = sprintf(s, "B_%s", FFTOrignal->Flag);
+		DrawText(hdc, (LPCSTR)s, n, &r, NULL);
+
 		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
 		if (i < FFTLengthFiltted) Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
 		X = WAVE_RECT_BORDER_LEFT;
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT);
-		SelectObject(hdc, hPen);
 		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
 			Y = WAVE_RECT_HEIGHT - pFilBuf[i] * scale * VScrollZoom - VScrollPos;
 			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
 		}
-		DeleteObject(hPen);
+
+		if (clsWinOneSpectrum.bSpectrumBrieflyShow == true && clsWinOneSpectrum.whichSignel == 2) {
+			Y = WAVE_RECT_HEIGHT - AverageValue * scale * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			MoveToEx(hdc, WAVE_RECT_BORDER_LEFT, WAVE_RECT_BORDER_TOP + Y, NULL);
+			LineTo(hdc, WinRect.right - WAVE_RECT_BORDER_RIGHT, WAVE_RECT_BORDER_TOP + Y);
+		}
 	}
 
 	double* pOriLogBuf = FFTOrignal->FFTBrieflyLogBuff;
 	if (bFFTOrignalLogShow && pOriLogBuf) {
-		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
-		fftvmax = pOriLogBuf[FFTLength];
+		SelectObject(hdc, FFTOrignal->hPenLog);
+		int x, y;
+		x = WinRect.right - WAVE_RECT_BORDER_RIGHT - LEGEND_X;
+		y = WAVE_RECT_BORDER_TOP + LEGEND_Y + CommNum++ * 14;
+		MoveToEx(hdc, x, y + 7, NULL);
+		LineTo(hdc, x + 20, y + 7);
+		RECT r = { x + 30, y, x + 200, y + 50 };
+		char s[100];
+		int n = sprintf(s, "B_%sLog", FFTOrignal->Flag);
+		DrawText(hdc, (LPCSTR)s, n, &r, NULL);
+
 		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
 		if (i < FFTLength)
 			Y = pOriLogBuf[i] * -64 * VScrollZoom - VScrollPos;
 		Y = BOUND(Y, 0, 64 * 12);
 		X = WAVE_RECT_BORDER_LEFT;
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_ORIGNAL_FFT_LOG);
-		SelectObject(hdc, hPen);
 		for (i += istep; i < FFTLength && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
@@ -851,20 +984,34 @@ void CWinOneFFT::PaintBriefly(HDC hdc)
 			Y = BOUND(Y, 0, 64 * 12);
 			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
 		}
-		DeleteObject(hPen);
+
+		if (clsWinOneSpectrum.bSpectrumBrieflyShow == true && clsWinOneSpectrum.whichSignel == 1) {
+			Y = AverageValue * -64 * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			MoveToEx(hdc, WAVE_RECT_BORDER_LEFT, WAVE_RECT_BORDER_TOP + Y, NULL);
+			LineTo(hdc, WinRect.right - WAVE_RECT_BORDER_RIGHT, WAVE_RECT_BORDER_TOP + Y);
+		}
 	}
 
 	double* pFilLogBuf = FFTFiltted->FFTBrieflyLogBuff;
 	if (bFFTFilttedLogShow && pFilLogBuf) {
-		//»æÖÆÂË²¨ FFT Log10 ÐÅºÅ--------------------------------------------------
+		SelectObject(hdc, FFTFiltted->hPenLog);
+		int x, y;
+		x = WinRect.right - WAVE_RECT_BORDER_RIGHT - LEGEND_X;
+		y = WAVE_RECT_BORDER_TOP + LEGEND_Y + CommNum++ * 14;
+		MoveToEx(hdc, x, y + 7, NULL);
+		LineTo(hdc, x + 20, y + 7);
+		RECT r = { x + 30, y, x + 200, y + 50 };
+		char s[100];
+		int n = sprintf(s, "B_%sLog", FFTFiltted->Flag);
+		DrawText(hdc, (LPCSTR)s, n, &r, NULL);
+
 		i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
 		if (i < FFTLengthFiltted)
 			Y = pFilLogBuf[i] * -64 * VScrollZoom - VScrollPos;
 		Y = BOUND(Y, 0, 64 * 12);
 		X = WAVE_RECT_BORDER_LEFT;
 		MoveToEx(hdc, X, WAVE_RECT_BORDER_TOP + Y, NULL);
-		hPen = CreatePen(PS_SOLID, 1, COLOR_FILTTED_FFT_LOG);
-		SelectObject(hdc, hPen);
 		for (i += istep; i < FFTLengthFiltted && (i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= rt.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT); i += istep)
 		{
 			X += Xstep;
@@ -872,7 +1019,13 @@ void CWinOneFFT::PaintBriefly(HDC hdc)
 			Y = BOUND(Y, 0, 64 * 12);
 			LineTo(hdc, X, WAVE_RECT_BORDER_TOP + Y);
 		}
-		DeleteObject(hPen);
+
+		if (clsWinOneSpectrum.bSpectrumBrieflyShow == true && clsWinOneSpectrum.whichSignel == 3) {
+			Y = AverageValue * -64 * VScrollZoom - VScrollPos;
+			Y = BOUND(Y, 0, WAVE_RECT_HEIGHT);
+			MoveToEx(hdc, WAVE_RECT_BORDER_LEFT, WAVE_RECT_BORDER_TOP + Y, NULL);
+			LineTo(hdc, WinRect.right - WAVE_RECT_BORDER_RIGHT, WAVE_RECT_BORDER_TOP + Y);
+		}
 	}
 }
 
@@ -966,18 +1119,18 @@ void CWinOneFFT::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		if (dn != 0)
 		{
-			VScrollPos = BOUND(VScrollPos + dn, 0, VScrollWidth);
+			VScrollPos = BOUND(VScrollPos + dn, 0, VScrollRange);
 		}
 		if (tbdn != 0)
 		{
-			VScrollPos = BOUND(tbdn, 0, VScrollWidth);
+			VScrollPos = BOUND(tbdn, 0, VScrollRange);
 		}
 		if (dn != 0 || tbdn != 0)
 		{
 			SetScrollPos(hWnd, SB_VERT, VScrollPos, TRUE);
 			InvalidateRect(hWnd, NULL, TRUE);
 			UpdateWindow(hWnd);
-			//DbgMsg("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
+			//DbgMsg("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollRange: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollRange);
 		}
 	case WM_HSCROLL:
 		//Calculate new horizontal scroll position
@@ -1017,18 +1170,18 @@ void CWinOneFFT::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		if (dn != 0)
 		{
-			//HScrollPos = BOUND(HScrollPos + dn, 0, HScrollWidth);
+			//HScrollPos = BOUND(HScrollPos + dn, 0, HScrollRange);
 		}
 		if (tbdn != 0)
 		{
-			//HScrollPos = BOUND(tbdn, 0, HScrollWidth);
+			//HScrollPos = BOUND(tbdn, 0, HScrollRange);
 		}
 		if (dn != 0 || tbdn != 0)
 		{
 			//SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			//InvalidateRect(hWnd, NULL, TRUE);
 			//UpdateWindow(hWnd);
-			//DbgMsg("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollWidth: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollWidth);
+			//DbgMsg("clsWinSpect.HScrollPos: %d, clsWinSpect.HScrollRange: %d.\r\n", clsWinSpect.HScrollPos, clsWinSpect.HScrollRange);
 		}
 		break;
 	}
@@ -1066,12 +1219,34 @@ void CWinOneFFT::RestoreValue(void)
 	VScrollZoom = atof(value);
 }
 
+void CWinOneFFT::rfButtonFunc(CScreenButton* button)
+{
+	clsAnalyze.set_SDR_rfHz(button->Button->value);
+}
+
+void CWinOneFFT::rfStepButtonFunc(CScreenButton* button)
+{
+	//clsAnalyze.rfHz_Step = button->Button->value;
+}
+
 void CWinOneFFT::averageFilterButtonFunc(CScreenButton* button)
 {
-	clsWinSpect.FFTOrignal->FFTInfo->AverageDeep = button->Button->value;
-	clsWinSpect.FFTOrignal->Init();
-	clsWinSpect.FFTFiltted->FFTInfo->AverageDeep = button->Button->value;
-	clsWinSpect.FFTFiltted->Init();
+
+	clsWinSpect.FFTOrignal->Init(FFTInfo_Signal.FFTSize, FFTInfo_Signal.FFTStep, button->Button->value);
+
+	//clsWinSpect.FFTOrignal->FFTDoing = false;
+	//while (clsWinSpect.FFTOrignal->Thread_Exit == false);
+	//clsWinSpect.FFTOrignal->FFTInfo->AverageDeep = button->Button->value;
+	//clsWinSpect.FFTOrignal->Init();
+	//clsWinSpect.FFTOrignal->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTOrignal, 0, NULL);
+
+	clsWinSpect.FFTFiltted->Init(FFTInfo_Filtted.FFTSize, FFTInfo_Filtted.FFTStep, button->Button->value);
+
+	//clsWinSpect.FFTFiltted->FFTDoing = false;
+	//while (clsWinSpect.FFTFiltted->Thread_Exit == false);
+	//clsWinSpect.FFTFiltted->FFTInfo->AverageDeep = button->Button->value;
+	//clsWinSpect.FFTFiltted->Init();
+	//clsWinSpect.FFTFiltted->hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CFFT::FFT_Thread, clsWinSpect.FFTFiltted, 0, NULL);
 }
 
 void CWinOneFFT::confirmP1RfGoButtonFunc(CScreenButton* button)

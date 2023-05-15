@@ -25,14 +25,20 @@
     <Filter Include="Source Files\Filter">
       <UniqueIdentifier>{847d9aa2-1123-4210-8df2-7c6c58020af4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\windows">
-      <UniqueIdentifier>{0406f350-5ea3-490e-a1e8-c9a390edb5f0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\devices">
-      <UniqueIdentifier>{e99e4a67-6f15-4b7e-b866-e5e232fcbc0d}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\FFT">
       <UniqueIdentifier>{359ddec8-ce83-4e7c-a8a9-9909c2315721}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Windows">
+      <UniqueIdentifier>{0406f350-5ea3-490e-a1e8-c9a390edb5f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Devices">
+      <UniqueIdentifier>{e99e4a67-6f15-4b7e-b866-e5e232fcbc0d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Windows\SDR_Set">
+      <UniqueIdentifier>{b2c68f15-aa64-4c3a-bba2-9832a08a670d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Windows\Spectrum_Scan">
+      <UniqueIdentifier>{46968a5c-869c-43b3-a431-38d4627720e7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -51,7 +57,7 @@
     <ClCompile Include="CAnalyze.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="public.cpp">
+    <ClCompile Include="Public.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CFile.cpp">
@@ -63,74 +69,71 @@
     <ClCompile Include="CScreenButton.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CDemodulatorAM.cpp">
+    <ClCompile Include="CAM.cpp">
       <Filter>Source Files\Demodulator</Filter>
     </ClCompile>
     <ClCompile Include="CFilter.cpp">
       <Filter>Source Files\Filter</Filter>
     </ClCompile>
     <ClCompile Include="CWinMain.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CWinTools.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CWinSignal.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CWinOneFFT.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CWinOneSpectrum.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CWinSDR.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="CWinSDRScan.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CWinSpectrum.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CWinFilter.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CWinAudio.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CAudio.cpp">
-      <Filter>Source Files\devices</Filter>
+      <Filter>Source Files\Devices</Filter>
     </ClCompile>
     <ClCompile Include="CDataFromSDR.cpp">
-      <Filter>Source Files\devices</Filter>
+      <Filter>Source Files\Devices</Filter>
     </ClCompile>
     <ClCompile Include="CDataFromSoundCard.cpp">
-      <Filter>Source Files\devices</Filter>
+      <Filter>Source Files\Devices</Filter>
     </ClCompile>
     <ClCompile Include="CDataFromTcpIp.cpp">
-      <Filter>Source Files\devices</Filter>
+      <Filter>Source Files\Devices</Filter>
     </ClCompile>
     <ClCompile Include="CDataFromUsart.cpp">
-      <Filter>Source Files\devices</Filter>
+      <Filter>Source Files\Devices</Filter>
     </ClCompile>
     <ClCompile Include="CDataFromUSB.cpp">
-      <Filter>Source Files\devices</Filter>
+      <Filter>Source Files\Devices</Filter>
     </ClCompile>
     <ClCompile Include="CWinFiltted.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CSDR.cpp">
-      <Filter>Source Files\devices</Filter>
+      <Filter>Source Files\Devices</Filter>
     </ClCompile>
     <ClCompile Include="CSoundCard.cpp">
-      <Filter>Source Files\devices</Filter>
+      <Filter>Source Files\Devices</Filter>
     </ClCompile>
     <ClCompile Include="CDevices.cpp">
-      <Filter>Source Files\devices</Filter>
+      <Filter>Source Files\Devices</Filter>
     </ClCompile>
     <ClCompile Include="CWinFFT.cpp">
-      <Filter>Source Files\windows</Filter>
+      <Filter>Source Files\Windows</Filter>
     </ClCompile>
     <ClCompile Include="CFFT.cpp">
       <Filter>Source Files\FFT</Filter>
@@ -138,8 +141,32 @@
     <ClCompile Include="CFFTforFilterAnalyze.cpp">
       <Filter>Source Files\FFT</Filter>
     </ClCompile>
-    <ClCompile Include="CDemodulatorFM.cpp">
+    <ClCompile Include="CFM.cpp">
       <Filter>Source Files\Demodulator</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinMsg.cpp">
+      <Filter>Source Files\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSpectrumScan.cpp">
+      <Filter>Source Files\Windows\Spectrum_Scan</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSDRSet.cpp">
+      <Filter>Source Files\Windows\SDR_Set</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinControls.cpp">
+      <Filter>Source Files\Windows\SDR_Set</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSpectrumScanSet.cpp">
+      <Filter>Source Files\Windows\Spectrum_Scan</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSpectrumScanFFT.cpp">
+      <Filter>Source Files\Windows\Spectrum_Scan</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSpectrumScanShow.cpp">
+      <Filter>Source Files\Windows\Spectrum_Scan</Filter>
+    </ClCompile>
+    <ClCompile Include="CWinSpectrumScanFFTShow.cpp">
+      <Filter>Source Files\Windows\Spectrum_Scan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -161,7 +188,7 @@
     <ClInclude Include="CData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="public.h">
+    <ClInclude Include="Public.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CAnalyze.h">
@@ -221,10 +248,10 @@
     <ClInclude Include="cuda_CFilter.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CWinSDRScan.h">
+    <ClInclude Include="CWinSpectrumScan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CDemodulatorAM.h">
+    <ClInclude Include="CAM.h">
       <Filter>Header Files\Demodulator</Filter>
     </ClInclude>
     <ClInclude Include="cuda_CFilter2.cuh">
@@ -263,7 +290,28 @@
     <ClInclude Include="cuda_CFilter_AM.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CDemodulatorFM.h">
+    <ClInclude Include="CWinSDRSet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CWinMsg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CWinControls.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CFM.h">
+      <Filter>Header Files\Demodulator</Filter>
+    </ClInclude>
+    <ClInclude Include="CWinSpectrumScanSet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CWinSpectrumScanFFT.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CWinSpectrumScanShow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CWinSpectrumScanFFTShow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -142,7 +142,6 @@ void cuda_CFilter::Init(CFilter* f)
 
 void cuda_CFilter::UnInit(void)
 {
-
 	cudaError_t err = cudaSuccess;
 	
 	// Free device global memory
@@ -192,13 +191,13 @@ void cuda_CFilter::Filtting(void)
 	case short_type:
 	{
 		cuda_Filter_short << <threadsPerBlock, blocksPerGrid >> > ((short*)d_SrcData, d_Filter_Core, d_Result, stage,
-			rootFilterInfo->CoreLength, SrcLen, *cFilter->scale);
+			rootFilterInfo->CoreLength, SrcLen, *cFilter->Scale);
 	}
 	break;
 	case float_type:
 	{
 		cuda_Filter_float << <threadsPerBlock, blocksPerGrid >> > ((float*)d_SrcData, d_Filter_Core, d_Result, stage,
-			rootFilterInfo->CoreLength, SrcLen, *cFilter->scale);
+			rootFilterInfo->CoreLength, SrcLen, *cFilter->Scale);
 	}
 	break;
 	}

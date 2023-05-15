@@ -16,7 +16,7 @@
 #include "CWinSpectrum.h"
 #include "CFilter.h"
 #include "CWinFilter.h"
-#include "CDemodulatorAM.h"
+#include "CAM.h"
 
 using namespace std;
 using namespace WINS; 
@@ -272,12 +272,12 @@ LPTHREAD_START_ROUTINE CWinFilter::FilterCoreAnalyse_thread(LPVOID lp)
 	pFilterWin->FilterCoreAnalyse(pFilterWin, pFilterInfo);
 
 	pFilterWin->HOriginalWidth = (pFilterInfo->CoreLength > pFilterWin->CoreAnalyseFFTLength ? pFilterInfo->CoreLength : pFilterWin->CoreAnalyseFFTLength);
-	pFilterWin->HScrollWidth = pFilterWin->HScrollZoom * pFilterWin->HOriginalWidth;
+	pFilterWin->HScrollRange = pFilterWin->HScrollZoom * pFilterWin->HOriginalWidth;
 	RECT rc;
 	pFilterWin->GetRealClientRect(&rc);
-	pFilterWin->HScrollWidth -= rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT;
-	if (pFilterWin->HScrollWidth < 0) pFilterWin->HScrollWidth = 0;
-	SetScrollRange(pFilterWin->hWnd, SB_HORZ, 0, pFilterWin->HScrollWidth, TRUE);
+	pFilterWin->HScrollRange -= rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT;
+	if (pFilterWin->HScrollRange < 0) pFilterWin->HScrollRange = 0;
+	SetScrollRange(pFilterWin->hWnd, SB_HORZ, 0, pFilterWin->HScrollRange, TRUE);
 
 	InvalidateRect(pFilterWin->hWnd, NULL, true);
 	
@@ -340,7 +340,7 @@ bool CWinFilter::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 	case IDM_FILTER_ZOOM_INC:
 		if (HScrollZoom < 16) HScrollZoom *= 2;
 		GetRealClientRect(&rc);
-		SetScrollRange(hWnd, SB_HORZ, 0, (HScrollWidth = HScrollZoom * HOriginalWidth - rc.right) > 0 ? HScrollWidth : 0, TRUE);
+		SetScrollRange(hWnd, SB_HORZ, 0, (HScrollRange = HScrollZoom * HOriginalWidth - rc.right) > 0 ? HScrollRange : 0, TRUE);
 		InvalidateRect(hWnd, NULL, true);
 		break;
 	case IDM_FILTER_ZOOM_DEC:
@@ -349,13 +349,13 @@ bool CWinFilter::OnCommand(UINT message, WPARAM wParam, LPARAM lParam)
 		else {
 			if (HScrollZoom * HOriginalWidth > rc.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_LEFT) HScrollZoom /= 2;
 		}
-		SetScrollRange(hWnd, SB_HORZ, 0, (HScrollWidth = HScrollZoom * HOriginalWidth - rc.right) > 0 ? HScrollWidth : 0, TRUE);
+		SetScrollRange(hWnd, SB_HORZ, 0, (HScrollRange = HScrollZoom * HOriginalWidth - rc.right) > 0 ? HScrollRange : 0, TRUE);
 		InvalidateRect(hWnd, NULL, true);
 		break;
 	case IDM_FILTER_ZOOM_HOME:
 		HScrollZoom = 1.0;
 		GetRealClientRect(&rc);
-		SetScrollRange(hWnd, SB_HORZ, 0, (HScrollWidth = HScrollZoom * HOriginalWidth - rc.right) > 0 ? HScrollWidth : 0, TRUE);
+		SetScrollRange(hWnd, SB_HORZ, 0, (HScrollRange = HScrollZoom * HOriginalWidth - rc.right) > 0 ? HScrollRange : 0, TRUE);
 		InvalidateRect(hWnd, NULL, true);
 		break;
 	case IDM_FILTER_CORE_SHOW:
@@ -752,18 +752,18 @@ void CWinFilter::KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		if (dn != 0)
 		{
-			HScrollPos = BOUND(HScrollPos + dn, 0, HScrollWidth);
+			HScrollPos = BOUND(HScrollPos + dn, 0, HScrollRange);
 		}
 		if (tbdn != 0)
 		{
-			HScrollPos = BOUND(tbdn, 0, HScrollWidth);
+			HScrollPos = BOUND(tbdn, 0, HScrollRange);
 		}
 		if (dn != 0 || tbdn != 0)
 		{
 			SetScrollPos(hWnd, SB_HORZ, HScrollPos, TRUE);
 			InvalidateRect(hWnd, NULL, TRUE);
 			UpdateWindow(hWnd);
-			DbgMsg("HScrollPos: %d, HScrollWidth: %d.\r\n", HScrollPos, HScrollWidth);
+			DbgMsg("HScrollPos: %d, HScrollRange: %d.\r\n", HScrollPos, HScrollRange);
 		}
 		break;
 	}
@@ -809,11 +809,11 @@ LRESULT CALLBACK CWinFilter::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM w
 					me->cFilter->rootFilterInfo1.decimationFactorBit = decimationFactor1;
 					me->cFilter->Cuda_Filter_N_New = decimationFactor1 > 0 ? CFilter::cuda_filter_2 : CFilter::cuda_filter_1;
 					if (me->cFilter == &clsMainFilterI) {
-						int factor;
+						int factor = 0;
 
-						clsMainFilterQ.setFilterCoreDesc(&clsMainFilterQ.rootFilterInfo1, s1);
-						clsMainFilterQ.rootFilterInfo1.decimationFactorBit = decimationFactor1;
-						clsMainFilterQ.Cuda_Filter_N_New = me->cFilter->Cuda_Filter_N_New;
+						//clsMainFilterQ.setFilterCoreDesc(&clsMainFilterQ.rootFilterInfo1, s1);
+						//clsMainFilterQ.rootFilterInfo1.decimationFactorBit = decimationFactor1;
+						//clsMainFilterQ.Cuda_Filter_N_New = me->cFilter->Cuda_Filter_N_New;
 
 						if (me->cFilter->CheckCoreDesc(s2) == true) {
 							me->cFilter->setFilterCoreDesc(&me->cFilter->rootFilterInfo2, s2);
@@ -821,20 +821,17 @@ LRESULT CALLBACK CWinFilter::DlgFilterCoreProc(HWND hDlg, UINT message, WPARAM w
 							factor = (decimationFactor1 + decimationFactor2);
 							me->cFilter->Cuda_Filter_N_New = CFilter::cuda_filter_3;
 							
-							clsMainFilterQ.setFilterCoreDesc(&clsMainFilterQ.rootFilterInfo2, s2);
-							clsMainFilterQ.rootFilterInfo2.decimationFactorBit = decimationFactor2;
-							clsMainFilterQ.Cuda_Filter_N_New = CFilter::cuda_filter_3;
+							//clsMainFilterQ.setFilterCoreDesc(&clsMainFilterQ.rootFilterInfo2, s2);
+							//clsMainFilterQ.rootFilterInfo2.decimationFactorBit = decimationFactor2;
+							//clsMainFilterQ.Cuda_Filter_N_New = CFilter::cuda_filter_3;
 						}
 						else {
 							factor = decimationFactor1;
 						}
-						FFTInfo_Filtted.FFTSize = FFTInfo_Signal.FFTSize >> factor;
-						FFTInfo_Filtted.HalfFFTSize = FFTInfo_Signal.HalfFFTSize >> factor;
-						FFTInfo_Filtted.FFTStep = FFTInfo_Signal.FFTStep >> factor;
-						clsWinSpect.FFTFiltted->Init();
+						clsWinSpect.FFTFiltted->Init(FFTInfo_Signal.FFTSize >> factor, FFTInfo_Signal.FFTStep >> factor, FFTInfo_Signal.AverageDeep);
 					}
 					me->cFilter->ParseCoreDesc();
-					if (me->cFilter == &clsMainFilterI) clsMainFilterQ.ParseCoreDesc();
+					//if (me->cFilter == &clsMainFilterI) clsMainFilterQ.ParseCoreDesc();
 					me->set_CoreAnalyse_root_Filter(me->rootFilterInfo);
 				}
 			}

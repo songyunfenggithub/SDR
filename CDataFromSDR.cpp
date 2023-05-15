@@ -38,8 +38,51 @@ int masterInitialised = 0;
 int slaveUninitialised = 0;
 
 
-void CDataFromSDR::StreamACallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params, unsigned int
-	numSamples, unsigned int reset, void* cbContext)
+void CDataFromSDR::getData(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params, unsigned int numSamples, unsigned int reset, void* cbContext)
+{
+	int m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
+	int m2 = 0;
+	if (m1 > numSamples) {
+		m1 = numSamples;
+		memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+		memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
+		AdcDataI->CharPos += m1;
+	}
+	else {
+		m2 = numSamples - m1;
+		memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+		memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
+		memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
+		memcpy((char*)AdcDataI->Buff, xi + m1, m2);
+		AdcDataI->CharPos = m2;
+	}
+	AdcBuffMarks[(AdcDataI->CharPos >> AdcDataI->MoveBit) & AdcDataI->Mask] = 1;
+
+	m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
+	m2 = 0;
+	if (m1 > numSamples) {
+		m1 = numSamples;
+		memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+		memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xq, m1);
+		AdcDataI->CharPos += m1;
+	}
+	else {
+		m2 = numSamples - m1;
+		memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
+		memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
+		memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xq, m1);
+		memcpy((char*)AdcDataI->Buff, xq + m1, m2);
+		AdcDataI->CharPos = m2;
+	}
+	AdcBuffMarks[(AdcDataI->CharPos >> AdcDataI->MoveBit) & AdcDataI->Mask] = 2;
+
+	if ((AdcDataI->Len << AdcDataI->MoveBit) == AdcDataI->CharPos)AdcDataI->CharPos = 0;
+	AdcDataI->Pos = AdcDataI->CharPos >> AdcDataI->MoveBit;
+
+	AdcDataI->GetNew = true;
+}
+
+void CDataFromSDR::StreamACallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params, unsigned int numSamples, unsigned int reset, void* cbContext)
 {
 	if (reset)
 		DbgMsg("sdrplay_api_StreamACallback: numSamples=%d\n", numSamples);
@@ -60,126 +103,10 @@ void CDataFromSDR::StreamACallback(short* xi, short* xq, sdrplay_api_StreamCbPar
 	);
 	*/
 	
-	int m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
-	int m2 = 0;
-	if (m1 > numSamples) {
-		m1 = numSamples;
-		memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
-		memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
-		AdcDataI->CharPos += m1;
-	}
-	else {
-		m2 = numSamples - m1;
-		memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
-		memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
-		memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
-		memcpy((char*)AdcDataI->Buff, xi + m1, m2);
-		AdcDataI->CharPos = m2;
-	}
-	AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 1;
-
-	m1 = (AdcDataQ->Len << AdcDataQ->MoveBit) - AdcDataQ->CharPos;
-	m2 = 0;
-	if (m1 > numSamples) {
-		m1 = numSamples;
-		//memset(AdcBuffMarks + (AdcDataQ->CharPos >> AdcDataQ->MoveBit), 0, m1 >> AdcDataQ->MoveBit);
-		memcpy((char*)AdcDataQ->Buff + AdcDataQ->CharPos, xq, m1);
-		AdcDataQ->CharPos += m1;
-	}
-	else {
-		m2 = numSamples - m1;
-		//memset(AdcBuffMarks + (AdcDataQ->CharPos >> AdcDataQ->MoveBit), 0, m1 >> AdcDataQ->MoveBit);
-		//memset(AdcBuffMarks, 0, m2 >> AdcDataQ->MoveBit);
-		memcpy((char*)AdcDataQ->Buff + AdcDataQ->CharPos, xq, m1);
-		memcpy((char*)AdcDataQ->Buff, xq + m1, m2);
-		AdcDataQ->CharPos = m2;
-	}
-	//AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 2;
-
-
-	//
-	//int m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
-	//int m2 = 0;
-	//if (m1 > numSamples) {
-	//	m1 = numSamples;
-	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
-	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
-	//	AdcDataI->CharPos += m1;
-	//}
-	//else {
-	//	m2 = numSamples - m1;
-	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
-	//	memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
-	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
-	//	memcpy((char*)AdcDataI->Buff, xi + m1, m2);
-	//	AdcDataI->CharPos = m2;
-	//}
-	//AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 1;
-
-	//m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
-	//m2 = 0;
-	//if (m1 > numSamples) {
-	//	m1 = numSamples;
-	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
-	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xq, m1);
-	//	AdcDataI->CharPos += m1;
-	//}
-	//else {
-	//	m2 = numSamples - m1;
-	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
-	//	memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
-	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xq, m1);
-	//	memcpy((char*)AdcDataI->Buff, xq + m1, m2);
-	//	AdcDataI->CharPos = m2;
-	//}
-	//AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 2;
-	//
-
-	//int m1 = (AdcDataI->Len << AdcDataI->MoveBit) - AdcDataI->CharPos;
-	//int m2 = 0;
-	//if (m1 > numSamples) {
-	//	m1 = numSamples;
-	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
-	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
-	//	short* p = (short*)((char*)AdcDataI->Buff + AdcDataI->CharPos);
-	//	short* pxi = (short*)xi;
-	//	short* pxq = (short*)xq;
-	//	double m[10000];
-
-	//	for(int i = 0; i < m1; i++)	{
-	//		//if (pxi[i] == 0) pxi[i] = 1;
-	//		//m[i] = atan((double)pxq[i] / pxi[i]);
-	//		//p[i] = (pxi[i-1] * pxi[i] - pxq[i-1] * pxq[i]) / (pxi[i] * pxi[i] + pxq[i] * pxq[i]) * 1000;
-	//		p[i] = sqrt(pxi[i] * pxi[i] + pxq[i] * pxq[i]);
-	//	}
-	//	//for (int i = 1; i < m1; i++) {
-	//	//	p[i] = (m[i] - m[i-1])*1000;
-	//	//	//p[i] = (pxi[i-1] * pxi[i] - pxq[i-1] * pxq[i]) / (pxi[i] * pxi[i] + pxq[i] * pxq[i]);
-	//	//}
-	//	//p[0] = p[1];
-	//	AdcDataI->CharPos += m1;
-	//}
-	//else {
-	//	m2 = numSamples - m1;
-	//	memset(AdcBuffMarks + (AdcDataI->CharPos >> AdcDataI->MoveBit), 0, m1 >> AdcDataI->MoveBit);
-	//	memset(AdcBuffMarks, 0, m2 >> AdcDataI->MoveBit);
-	//	memcpy((char*)AdcDataI->Buff + AdcDataI->CharPos, xi, m1);
-	//	memcpy((char*)AdcDataI->Buff, xi + m1, m2);
-	//	AdcDataI->CharPos = m2;
-	//}
-	//AdcBuffMarks[((AdcDataI->CharPos - numSamples) >> AdcDataI->MoveBit) & AdcDataI->Mask] = 1;
+	clsGetDataSDR.getData(xi, xq, params, numSamples, reset, cbContext);
 
 	//StringToHex((char*)(AdcDataI->Buff) + AdcDataI->CharPos, 20);
 	//DbgMsg("%d\n", len);
-
-	if ((AdcDataI->Len << AdcDataI->MoveBit) == AdcDataI->CharPos)AdcDataI->CharPos = 0;
-	AdcDataI->Pos = AdcDataI->CharPos >> AdcDataI->MoveBit;
-
-	if ((AdcDataQ->Len << AdcDataQ->MoveBit) == AdcDataQ->CharPos)AdcDataQ->CharPos = 0;
-	AdcDataQ->Pos = AdcDataQ->CharPos >> AdcDataQ->MoveBit;
-	
-	AdcDataI->GetNew = true;
-	AdcDataQ->GetNew = true;
 
 	return;
 }
@@ -263,7 +190,7 @@ void CDataFromSDR::open_SDR_device(void)
 	{
 		DbgMsg("sdrplay_api_Open failed %s\r\nfile:%s\r\nline:%d\r\n", sdrplay_api_GetErrorString(err), __FILE__, __LINE__);
 		//system("PAUSE");
-		exit(0);
+		EXIT(0);
 	}
 	else
 	{
@@ -422,7 +349,7 @@ void CDataFromSDR::open_SDR_device(void)
 
 		DbgMsg("sdr device open falild.\r\n");
 		//system("PAUSE");
-		exit(0);
+		EXIT(0);
 	}
 }
 

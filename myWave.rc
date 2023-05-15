@@ -106,7 +106,10 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Auto Scroll\tCtrl+7",         IDM_WAVEAUTOSCROLL
         MENUITEM SEPARATOR
-        MENUITEM "Follow by Orignal",           IDM_WAVE_FOLLOW_ORIGNAL
+        MENUITEM "Follow by IData",             IDM_WAVE_FOLLOW_IDATA
+        MENUITEM "Follow by QData",             IDM_WAVE_FOLLOW_QDATA
+        MENUITEM "Follow by Filtted IData",     IDM_WAVE_FOLLOW_FILTTED_IDATA
+        MENUITEM "Follow by Filltted QData",    IDM_WAVE_FOLLOW_FILTTED_QDATA
     END
     POPUP "波形"
     BEGIN
@@ -115,8 +118,10 @@ BEGIN
         MENUITEM "耦合交流信号",                      IDM_WAVE_AC
         MENUITEM SEPARATOR
         MENUITEM "原信号 偏移 滤波信号",                 IDM_WAVE_SIGNALS_OFFSET
-        MENUITEM "显示原信号",                       IDM_WAVE_ORIGNAL_SIGNAL_SHOW
-        MENUITEM "显示滤波信号",                      IDM_WAVE_FILTTED_SIGNAL_SHOW
+        MENUITEM "显示IData信号",                   IDM_WAVE_IDATA_SHOW
+        MENUITEM "显示IData滤波信号",                 IDM_WAVE_IDATA_FILTTED_SHOW
+        MENUITEM "显示QData信号",                   IDM_WAVE_QDATA_SHOW
+        MENUITEM "显示QData滤波信号",                 IDM_WAVE_QDATA_FILTTED_SHOW
     END
     POPUP "视图"
     BEGIN
@@ -124,10 +129,14 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "滤波后信号...",                    IDM_FILTTEDWINDOW
         MENUITEM "滤波器设置...",                    IDM_FILTERWINDOW
+        MENUITEM "使用滤波器",                       IDM_FILTER_START_STOP
         MENUITEM SEPARATOR
-        MENUITEM "频谱...",                       IDM_SPECTRUMWINDOW
+        MENUITEM "频谱...",                       IDM_SPECTRUM_WINDOW
+        MENUITEM "频谱扫描...",                     IDM_SPECTRUM_SCAN_WINDOW
         MENUITEM SEPARATOR
         MENUITEM "SDR...",                      IDM_SDR_WINDOW
+        MENUITEM SEPARATOR
+        MENUITEM "消息窗口...",                     IDM_MSG_WINDOW
     END
 END
 
@@ -192,7 +201,8 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Auto Scroll\tCtrl+7",         IDM_WAVEAUTOSCROLL
         MENUITEM SEPARATOR
-        MENUITEM "Follow by Orignal",           IDM_WAVE_FOLLOW_ORIGNAL
+        MENUITEM "Follow by Audio",             IDM_WAVE_FOLLOW_IDATA
+        MENUITEM "Follow by Filtted Audio",     IDM_WAVE_FOLLOW_FILTTED_IDATA
     END
     POPUP "FFT频谱"
     BEGIN
@@ -204,10 +214,10 @@ BEGIN
         MENUITEM "纵向缩小\tAlt+5",                 IDM_FFT_VERT_ZOOM_DECREASE
         MENUITEM "纵向还原\tAlt+6",                 IDM_FFT_VERT_ZOOM_HOME
         MENUITEM SEPARATOR
-        MENUITEM "显示原信号 FFT",                   IDM_FFT_ORIGNAL_SHOW
-        MENUITEM "显示原信号 FFT LOG",               IDM_FFT_ORIGNAL_LOG_SHOW
-        MENUITEM "显示滤波信号 FFT",                  IDM_FFT_FILTTED_SHOW
-        MENUITEM "显示滤波信号 FFT LOG",              IDM_FFT_FILTTED_LOG_SHOW
+        MENUITEM "显示Audio原信号 FFT",              IDM_FFT_ORIGNAL_SHOW
+        MENUITEM "显示Audio原信号 FFT LOG",          IDM_FFT_ORIGNAL_LOG_SHOW
+        MENUITEM "显示Audio滤波信号 FFT",             IDM_FFT_FILTTED_SHOW
+        MENUITEM "显示Audio滤波信号 FFT LOG",         IDM_FFT_FILTTED_LOG_SHOW
         MENUITEM SEPARATOR
         MENUITEM "定格",                          IDM_FFT_HOLD
         MENUITEM SEPARATOR
@@ -215,10 +225,10 @@ BEGIN
     END
     POPUP "频率谱"
     BEGIN
-        MENUITEM "显示原信号频率谱",                    IDM_SPECTRUM_ORIGNAL_SHOW
-        MENUITEM "显示原信号频率谱Log",                 IDM_SPECTRUM_ORIGNAL_LOG_SHOW
-        MENUITEM "显示滤波后信号频率谱",                  IDM_SPECTRUM_FILTTED_SHOW
-        MENUITEM "显示滤波后信号频率谱Log",               IDM_SPECTRUM_FILTTED_LOG_SHOW
+        MENUITEM "显示Audio原信号频率谱",               IDM_SPECTRUM_ORIGNAL_SHOW
+        MENUITEM "显示Audio原信号频率谱Log",            IDM_SPECTRUM_ORIGNAL_LOG_SHOW
+        MENUITEM "显示Audio滤波后信号频率谱",             IDM_SPECTRUM_FILTTED_SHOW
+        MENUITEM "显示Audio滤波后信号频率谱Log",          IDM_SPECTRUM_FILTTED_LOG_SHOW
         MENUITEM SEPARATOR
         MENUITEM "显示缩放后频率谱",                    IDM_SPECTRUM_ZOOMED_SHOW
     END
@@ -229,8 +239,8 @@ BEGIN
         MENUITEM "耦合交流信号",                      IDM_WAVE_AC
         MENUITEM SEPARATOR
         MENUITEM "原信号 偏移 滤波信号",                 IDM_WAVE_SIGNALS_OFFSET
-        MENUITEM "显示原信号",                       IDM_WAVE_ORIGNAL_SIGNAL_SHOW
-        MENUITEM "显示滤波信号",                      IDM_WAVE_FILTTED_SIGNAL_SHOW
+        MENUITEM "显示Audio信号",                   IDM_WAVE_IDATA_SHOW
+        MENUITEM "显示滤波Audio信号",                 IDM_WAVE_IDATA_FILTTED_SHOW
     END
     POPUP "帮助"
     BEGIN
@@ -251,6 +261,7 @@ BEGIN
         MENUITEM "滤波器设置...",                    IDM_AUDIO_FILTER_SET
         MENUITEM SEPARATOR
         MENUITEM "生成滤波器",                       IDM_AUDIO_BUILD_FILTER
+        MENUITEM "清除滤波器设置点",                    IDM_AUDIO_CLEAR_FILTER_POINTS
     END
 END
 
@@ -327,18 +338,6 @@ END
 
 IDC_MENU_SPECTRUM MENU
 BEGIN
-    POPUP "频谱"
-    BEGIN
-        MENUITEM "水平放大\tCtrl+1",                IDM_SPECTRUM_HORZ_ZOOM_INCREASE
-        MENUITEM "水平缩小\tCtrl+2",                IDM_SPECTRUM_HORZ_ZOOM_DECREASE
-        MENUITEM "水平还原\tCtrl+3",                IDM_SPECTRUM_HORZ_ZOOM_HOME
-        MENUITEM SEPARATOR
-        MENUITEM "纵向放大\tCtrl+4",                IDM_SPECTRUM_VERT_ZOOM_INCREASE
-        MENUITEM "纵向缩小\tCtrl+5",                IDM_SPECTRUM_VERT_ZOOM_DECREASE
-        MENUITEM "纵向还原\tCtrl+6",                IDM_SPECTRUM_VERT_ZOOM_HOME
-        MENUITEM SEPARATOR
-        MENUITEM "跟随运动",                        IDM_SPECTRUM_FOLLOW
-    END
     POPUP "FFT"
     BEGIN
         MENUITEM "水平放大\tAlt+1",                 IDM_FFT_HORZ_ZOOM_INCREASE
@@ -356,7 +355,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "定格",                          IDM_FFT_HOLD
     END
-    POPUP "图谱"
+    POPUP "频率谱"
     BEGIN
         MENUITEM "显示原信号图谱",                     IDM_SPECTRUM_ORIGNAL_SHOW
         MENUITEM "显示原信号图谱Log",                  IDM_SPECTRUM_ORIGNAL_LOG_SHOW
@@ -365,10 +364,11 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "显示缩放后图谱",                     IDM_SPECTRUM_ZOOMED_SHOW
     END
-    POPUP "工具"
+    POPUP "设置工具"
     BEGIN
-        MENUITEM "设置...",                       IDM_FFT_SET
-        MENUITEM "继续/暂停\tCtrl+Pause Break",     IDM_SPECTRUM_PAUSE_BREAK
+        MENUITEM "FFT设置...",                    IDM_FFT_SET
+        MENUITEM SEPARATOR
+        MENUITEM "SDR设置...",                    IDM_SDR_SET
     END
 END
 
@@ -410,8 +410,48 @@ IDC_MENU_POPUP_AM MENU
 BEGIN
     POPUP "AM"
     BEGIN
+        MENUITEM "AM_Move_Frequency",           IDM_AM_MOVE_FREQUENCY
         MENUITEM "AM_IQ",                       IDM_AM_IQ
         MENUITEM "AM_Get_Envelope",             IDM_AM_GET_ENVELOPE
+    END
+END
+
+IDC_MENU_SPECTRUM_SCAN MENU
+BEGIN
+    POPUP "设置"
+    BEGIN
+        MENUITEM "扫描设置...",                     IDM_SPECTRUM_SCAN_SET
+        MENUITEM "扫描FFT...",                    IDM_SPECTRUM_SCAN_FFT
+    END
+END
+
+IDC_MENU_SPECTRUM_SCAN_FFT MENU
+BEGIN
+    POPUP "频谱FFT"
+    BEGIN
+        MENUITEM "水平放大\tAlt+1",                 IDM_FFT_HORZ_ZOOM_INCREASE
+        MENUITEM "水平缩小\tAlt+2",                 IDM_FFT_HORZ_ZOOM_DECREASE
+        MENUITEM "水平还原\tAlt+3",                 IDM_FFT_HORZ_ZOOM_HOME
+        MENUITEM SEPARATOR
+        MENUITEM "纵向放大\tAlt+4",                 IDM_FFT_VERT_ZOOM_INCREASE
+        MENUITEM "纵向缩小\tAlt+5",                 IDM_FFT_VERT_ZOOM_DECREASE
+        MENUITEM "纵向还原\tAlt+6",                 IDM_FFT_VERT_ZOOM_HOME
+        MENUITEM SEPARATOR
+        MENUITEM "显示信号 FFT",                    IDM_FFT_ORIGNAL_SHOW
+        MENUITEM "显示信号 FFT LOG",                IDM_FFT_ORIGNAL_LOG_SHOW
+        MENUITEM "显示信号 FFT Briefly",            IDM_FFT_BRIEFLY_SHOW
+        MENUITEM "显示信号 FFT LOG Briefly",        IDM_FFT_BRIEFLY_LOG_SHOW
+        MENUITEM SEPARATOR
+        MENUITEM "定格",                          IDM_FFT_HOLD
+        MENUITEM SEPARATOR
+        MENUITEM "设置FFTSize...",                IDM_FFT_SET
+    END
+    POPUP "频谱Spectrum"
+    BEGIN
+        MENUITEM "显示信号频率谱",                     IDM_SPECTRUM_ORIGNAL_SHOW
+        MENUITEM "显示信号频率谱 Log",                 IDM_SPECTRUM_ORIGNAL_LOG_SHOW
+        MENUITEM "显示信号频率谱 Briefly",             IDM_SPECTRUM_BRIEFLY_SHOW
+        MENUITEM "显示信号频率谱 Log Briefly",         IDM_SPECTRUM_BRIEFLY_LOG_SHOW
     END
 END
 

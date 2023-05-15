@@ -108,6 +108,15 @@ SDR_ENUM_MAP sdrplay_api_decimationFactor_map =
 	{ "decimationFactor64", decimationFactor64 }
 };
 
+SDR_ENUM_MAP sdrplay_ap_sampleRate_map =
+{
+	{ "sampleRate_2_M", sampleRate_2_M },
+	{ "sampleRate_4_M", sampleRate_4_M },
+	{ "sampleRate_6_M", sampleRate_6_M },
+	{ "sampleRate_8_M", sampleRate_8_M },
+	{ "sampleRate_10_M", sampleRate_10_M },
+};
+
 const char ppmComment[] = 
 "To specify a correction factor used to account for offsets from the nominal in the crystal oscillator.\r\n"\
 "Parts per million offset (e.g. +/- 1 ppm specifies a +/- 24Hz error for a 24MHz crystal).";
@@ -360,70 +369,70 @@ const char adsbModeComment[] =
 
 SDRParams SDR_params[] =
 {
-	{ 0, "SDR RSP1 sdrplay_api_DeviceParamsT", 0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 1, "设备参数 sdrplay_api_DevParamsT* devParams",0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 2, "ppm double",								0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_DOUBLE, NULL, sdrplay_api_Update_Dev_Ppm, ppmComment, NULL },
-	{ 2, "fsFreq sdrplay_api_FsFreqT",				0.0, 0.0, 0.0, 0.0, NULL , SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 3, "fsHz double",								8000000.0, 2000000.0, 2000000.0, 10000000.0, NULL, SDR_PAMRAS_DOUBLE, NULL, sdrplay_api_Update_Dev_Fs, fsFreqComment, CSDR::set_params_SampleRate },
-	{ 3, "syncUpdate unsigned char fsFreq",			0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Dev_Fs, fsFreqComment, NULL },
-	{ 3, "reCal unsigned char",						0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Dev_Fs, fsFreqComment, NULL },
-	{ 2, "syncUpdate sdrplay_api_SyncUpdateT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 3, "sampleNum unsigned int",					0.0, 0.0, 0.0, 1000000.0, NULL, SDR_PAMRAS_UINT, NULL, sdrplay_api_Update_Dev_SyncUpdate, syncUpdateComment, NULL },
-	{ 3, "period unsigned int",						0.0, 0.0, 0.0, 1000000.0, NULL, SDR_PAMRAS_UINT, NULL, sdrplay_api_Update_Dev_SyncUpdate, syncUpdateComment, NULL },
-	{ 2, "resetFlags sdrplay_api_ResetFlagsT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 3, "resetGainUpdate unsigned char",			0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Dev_ResetFlags, resetFlagsComment, NULL },
-	{ 3, "resetRfUpdate unsigned char",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Dev_ResetFlags, resetFlagsComment, NULL },
-	{ 3, "resetFsUpdate unsigned char",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Dev_ResetFlags, resetFlagsComment, NULL },
-	{ 2, "mode sdrplay_api_TransferModeT",			sdrplay_api_ISOCH, 0.0, 0.0, 0.0, &sdrplay_api_TransferModeT_map, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_None, TransferModeComment, NULL },
-	{ 2, "samplesPerPkt unsigned int",				0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_UINT, NULL, sdrplay_api_Update_None, samplesPerPktComment, NULL },
-	{ 2, "rsp1aParams sdrplay_api_Rsp1aParamsT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 2, "rsp2Params sdrplay_api_Rsp2ParamsT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 2, "rspDuoParams sdrplay_api_RspDuoParamsT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 2, "rspDxParams sdrplay_api_RspDxParamsT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 1, "接收通道 A 参数 sdrplay_api_RxChannelParamsT* rxChannelA", 0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 2, "tunerParams sdrplay_api_TunerParamsT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 3, "bwType sdrplay_api_Bw_MHzT",					0.0, sdrplay_api_BW_0_200, 0.0, 0.0, &sdrplay_api_Bw_MHzT_map, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Tuner_BwType, bwTypeComment, NULL },
-	{ 3, "ifType sdrplay_api_If_kHzT",					0.0, sdrplay_api_IF_Zero, 0.0, 0.0, &sdrplay_api_If_kHzT_map, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Tuner_IfType, ifTypeComment, NULL },
-	{ 3, "loMode sdrplay_api_LoModeT",					0.0, sdrplay_api_LO_Auto, 0.0, 0.0, &sdrplay_api_LoModeT_map, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Tuner_LoMode, loModeComment, NULL },
-	{ 3, "gain sdrplay_api_GainT",						0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 4, "gRdB int",								0.0, 50.0, 0.0, 59.0, NULL, SDR_PAMRAS_INT, NULL, sdrplay_api_Update_Tuner_Gr, gain_gRdBComment, NULL },
-	{ 4, "LNAstate unsigned char",					0.0, 0.0, 0.0, 3.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Tuner_Gr, gain_LNAstateComment, NULL },
-	{ 4, "syncUpdate unsigned char gain",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Tuner_Gr, gain_syncUpdateComment, NULL },
-	{ 4, "minGr sdrplay_api_MinGainReductionT",		0.0, sdrplay_api_NORMAL_MIN_GR, 0.0, 0.0, &sdrplay_api_MinGainReductionT_map, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Tuner_GrLimits, gain_minGrComment, NULL },
-	{ 4, "gainVals sdrplay_api_GainValuesT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 5, "curr float",					0.0, 0.0, 0.0, 500.0, NULL, SDR_PAMRAS_FLOAT, NULL, sdrplay_api_Update_None, gain_gainValsComment, NULL },
-	{ 5, "max float",					0.0, 0.0, 0.0, 500.0, NULL, SDR_PAMRAS_FLOAT, NULL, sdrplay_api_Update_None, gain_gainValsComment, NULL },
-	{ 5, "min float",					0.0, 0.0, 0.0, 500.0, NULL, SDR_PAMRAS_FLOAT, NULL, sdrplay_api_Update_None, gain_gainValsComment, NULL },
-	{ 3, "rfFreq sdrplay_api_RfFreqT",					0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 4, "rfHz double",									0.0, 200000000.0, 0.0, 2000000000.0, NULL, SDR_PAMRAS_DOUBLE, NULL, sdrplay_api_Update_Tuner_Frf, rfFreq_rfHzComment, NULL },
-	{ 4, "syncUpdate unsigned char rfFreq",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Tuner_Frf, rfFreq_syncUpdateComment, NULL },
-	{ 3, "dcOffsetTuner sdrplay_api_DcOffsetTunerT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 4, "dcCal unsigned char",					0.0, 3.0, 0.0, 5.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Tuner_DcOffset, dcOffsetTunerComment, NULL },
-	{ 4, "speedUp unsigned char",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Tuner_DcOffset, dcOffsetTunerComment, NULL },
-	{ 4, "trackTime int",						0.0, 1.0, 0.0, 0.0, NULL, SDR_PAMRAS_INT, NULL,	sdrplay_api_Update_Tuner_DcOffset, dcOffsetTunerComment, NULL },
-	{ 4, "refreshRateTime int",					0.0, 2048.0, 0.0, 0.0, NULL, SDR_PAMRAS_INT, NULL, sdrplay_api_Update_Tuner_DcOffset, dcOffsetTunerComment, NULL },
-	{ 2, "ctrlParams sdrplay_api_ControlParamsT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 3, "dcOffset sdrplay_api_DcOffsetT",			0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 4, "DCenable unsigned char",					0.0, 1.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Ctrl_DCoffsetIQimbalance, dcOffsetComment, NULL },
-	{ 4, "IQenable unsigned char",					0.0, 1.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Ctrl_DCoffsetIQimbalance, dcOffsetComment, NULL },
-	{ 3, "decimation sdrplay_api_DecimationT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 4, "enable decimationFactor unsigned char",					0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Ctrl_Decimation, decimationComment, CSDR::set_params_decimationFactorEnable },
-	{ 4, "decimationFactor unsigned char",			0.0, decimationFactor1, 0.0, 0.0, &sdrplay_api_decimationFactor_map, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Ctrl_Decimation, decimationComment, CSDR::set_params_decimationFactor },
-	{ 4, "wideBandSignal unsigned char",			0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Ctrl_Decimation, decimationComment, NULL },
-	{ 3, "agc sdrplay_api_AgcT",					0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 4, "enable sdrplay_api_AgcControlT",			0.0, sdrplay_api_AGC_50HZ, 0.0, 0.0, &sdrplay_api_AgcControlT_map, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
-	{ 4, "setPoint_dBfs int",						0.0, -60.0, 0.0, 0.0, NULL, SDR_PAMRAS_INT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
-	{ 4, "attack_ms unsigned short",				0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_USHORT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
-	{ 4, "decay_ms unsigned short",					0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_USHORT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
-	{ 4, "decay_delay_ms unsigned short",			0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_USHORT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
-	{ 4, "decay_threshold_dB unsigned short",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_USHORT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
-	{ 4, "syncUpdate int agc",						0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_INT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
-	{ 3, "adsbMode sdrplay_api_AdsbModeT",			0.0, sdrplay_api_ADSB_DECIMATION, 0.0, 0.0, &sdrplay_api_AdsbModeT_map, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Ctrl_AdsbMode, adsbModeComment, NULL },
-	{ 2, "rsp1aTunerParams sdrplay_api_Rsp1aTunerParamsT  ",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 2, "rsp2TunerParams sdrplay_api_Rsp2TunerParamsT   ",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 2, "rspDuoTunerParams sdrplay_api_RspDuoTunerParamsT ",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 2, "rspDxTunerParams sdrplay_api_RspDxTunerParamsT  ",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
-	{ 1, "接收通道 B 参数 sdrplay_api_RxChannelParamsT* rxChannelB", 0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, NULL, NULL, NULL, NULL }
+	{ 0, "SDR RSP1 sdrplay_api_DeviceParamsT", 0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 1, "设备参数 sdrplay_api_DevParamsT* devParams",0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 2, "ppm double",								0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_DOUBLE, SDR_PAMRAS_DOUBLE, NULL, sdrplay_api_Update_Dev_Ppm, ppmComment, NULL },
+	{ 2, "fsFreq sdrplay_api_FsFreqT",				0.0, 0.0, 0.0, 0.0, NULL , SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 3, "fsHz double",								8000000.0, sampleRate_8_M, 2000000.0, 10000000.0, &sdrplay_ap_sampleRate_map, SDR_PAMRAS_ENUM, SDR_PAMRAS_DOUBLE, NULL, sdrplay_api_Update_Dev_Fs, fsFreqComment, CSDR::set_params_SampleRate },
+	{ 3, "syncUpdate unsigned char fsFreq",			0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_ENABLE_DISABLE, SDR_PAMRAS_ENABLE_DISABLE, NULL, sdrplay_api_Update_Dev_Fs, fsFreqComment, NULL },
+	{ 3, "reCal unsigned char",						0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Dev_Fs, fsFreqComment, NULL },
+	{ 2, "syncUpdate sdrplay_api_SyncUpdateT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 3, "sampleNum unsigned int",					0.0, 0.0, 0.0, 1000000.0, NULL, SDR_PAMRAS_UINT, SDR_PAMRAS_UINT, NULL, sdrplay_api_Update_Dev_SyncUpdate, syncUpdateComment, NULL },
+	{ 3, "period unsigned int",						0.0, 0.0, 0.0, 1000000.0, NULL, SDR_PAMRAS_UINT, SDR_PAMRAS_UINT, NULL, sdrplay_api_Update_Dev_SyncUpdate, syncUpdateComment, NULL },
+	{ 2, "resetFlags sdrplay_api_ResetFlagsT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 3, "resetGainUpdate unsigned char",			0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_ENABLE_DISABLE, SDR_PAMRAS_ENABLE_DISABLE, NULL, sdrplay_api_Update_Dev_ResetFlags, resetFlagsComment, NULL },
+	{ 3, "resetRfUpdate unsigned char",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_ENABLE_DISABLE, SDR_PAMRAS_ENABLE_DISABLE, NULL, sdrplay_api_Update_Dev_ResetFlags, resetFlagsComment, NULL },
+	{ 3, "resetFsUpdate unsigned char",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_ENABLE_DISABLE, SDR_PAMRAS_ENABLE_DISABLE, NULL, sdrplay_api_Update_Dev_ResetFlags, resetFlagsComment, NULL },
+	{ 2, "mode sdrplay_api_TransferModeT",			sdrplay_api_ISOCH, 0.0, 0.0, 0.0, &sdrplay_api_TransferModeT_map, SDR_PAMRAS_ENUM, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_None, TransferModeComment, NULL },
+	{ 2, "samplesPerPkt unsigned int",				0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_UINT, SDR_PAMRAS_UINT, NULL, sdrplay_api_Update_None, samplesPerPktComment, NULL },
+	{ 2, "rsp1aParams sdrplay_api_Rsp1aParamsT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 2, "rsp2Params sdrplay_api_Rsp2ParamsT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 2, "rspDuoParams sdrplay_api_RspDuoParamsT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 2, "rspDxParams sdrplay_api_RspDxParamsT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 1, "接收通道 A 参数 sdrplay_api_RxChannelParamsT* rxChannelA", 0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 2, "tunerParams sdrplay_api_TunerParamsT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 3, "bwType sdrplay_api_Bw_MHzT",					0.0, sdrplay_api_BW_0_200, 0.0, 0.0, &sdrplay_api_Bw_MHzT_map, SDR_PAMRAS_ENUM, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Tuner_BwType, bwTypeComment, NULL },
+	{ 3, "ifType sdrplay_api_If_kHzT",					0.0, sdrplay_api_IF_Zero, 0.0, 0.0, &sdrplay_api_If_kHzT_map, SDR_PAMRAS_ENUM, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Tuner_IfType, ifTypeComment, NULL },
+	{ 3, "loMode sdrplay_api_LoModeT",					0.0, sdrplay_api_LO_Auto, 0.0, 0.0, &sdrplay_api_LoModeT_map, SDR_PAMRAS_ENUM, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Tuner_LoMode, loModeComment, NULL },
+	{ 3, "gain sdrplay_api_GainT",						0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 4, "gRdB int",								0.0, 50.0, 0.0, 59.0, NULL, SDR_PAMRAS_INT, SDR_PAMRAS_INT, NULL, sdrplay_api_Update_Tuner_Gr, gain_gRdBComment, NULL },
+	{ 4, "LNAstate unsigned char",					0.0, 0.0, 0.0, 3.0, NULL, SDR_PAMRAS_UCHAR, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Tuner_Gr, gain_LNAstateComment, NULL },
+	{ 4, "syncUpdate unsigned char gain",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_ENABLE_DISABLE, SDR_PAMRAS_ENABLE_DISABLE, NULL, sdrplay_api_Update_Tuner_Gr, gain_syncUpdateComment, NULL },
+	{ 4, "minGr sdrplay_api_MinGainReductionT",		0.0, sdrplay_api_NORMAL_MIN_GR, 0.0, 0.0, &sdrplay_api_MinGainReductionT_map, SDR_PAMRAS_ENUM, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Tuner_GrLimits, gain_minGrComment, NULL },
+	{ 4, "gainVals sdrplay_api_GainValuesT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 5, "curr float",					0.0, 0.0, 0.0, 500.0, NULL, SDR_PAMRAS_FLOAT, SDR_PAMRAS_FLOAT, NULL, sdrplay_api_Update_None, gain_gainValsComment, NULL },
+	{ 5, "max float",					0.0, 0.0, 0.0, 500.0, NULL, SDR_PAMRAS_FLOAT, SDR_PAMRAS_FLOAT, NULL, sdrplay_api_Update_None, gain_gainValsComment, NULL },
+	{ 5, "min float",					0.0, 0.0, 0.0, 500.0, NULL, SDR_PAMRAS_FLOAT, SDR_PAMRAS_FLOAT, NULL, sdrplay_api_Update_None, gain_gainValsComment, NULL },
+	{ 3, "rfFreq sdrplay_api_RfFreqT",					0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 4, "rfHz double",									0.0, 200000000.0, 0.0, 2000000000.0, NULL, SDR_PAMRAS_DOUBLE, SDR_PAMRAS_DOUBLE, NULL, sdrplay_api_Update_Tuner_Frf, rfFreq_rfHzComment, NULL },
+	{ 4, "syncUpdate unsigned char rfFreq",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_ENABLE_DISABLE, SDR_PAMRAS_ENABLE_DISABLE, NULL, sdrplay_api_Update_Tuner_Frf, rfFreq_syncUpdateComment, NULL },
+	{ 3, "dcOffsetTuner sdrplay_api_DcOffsetTunerT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 4, "dcCal unsigned char",					0.0, 3.0, 0.0, 5.0, NULL, SDR_PAMRAS_UCHAR, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Tuner_DcOffset, dcOffsetTunerComment, NULL },
+	{ 4, "speedUp unsigned char",				0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Tuner_DcOffset, dcOffsetTunerComment, NULL },
+	{ 4, "trackTime int",						0.0, 1.0, 0.0, 0.0, NULL, SDR_PAMRAS_INT, SDR_PAMRAS_INT, NULL,	sdrplay_api_Update_Tuner_DcOffset, dcOffsetTunerComment, NULL },
+	{ 4, "refreshRateTime int",					0.0, 2048.0, 0.0, 0.0, NULL, SDR_PAMRAS_INT, SDR_PAMRAS_INT, NULL, sdrplay_api_Update_Tuner_DcOffset, dcOffsetTunerComment, NULL },
+	{ 2, "ctrlParams sdrplay_api_ControlParamsT",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 3, "dcOffset sdrplay_api_DcOffsetT",			0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 4, "DCenable unsigned char",					0.0, 1.0, 0.0, 1.0, NULL, SDR_PAMRAS_ENABLE_DISABLE, SDR_PAMRAS_ENABLE_DISABLE, NULL, sdrplay_api_Update_Ctrl_DCoffsetIQimbalance, dcOffsetComment, NULL },
+	{ 4, "IQenable unsigned char",					0.0, 1.0, 0.0, 1.0, NULL, SDR_PAMRAS_ENABLE_DISABLE, SDR_PAMRAS_ENABLE_DISABLE, NULL, sdrplay_api_Update_Ctrl_DCoffsetIQimbalance, dcOffsetComment, NULL },
+	{ 3, "decimation sdrplay_api_DecimationT",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 4, "enable decimationFactor unsigned char",	0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_ENABLE_DISABLE, SDR_PAMRAS_ENABLE_DISABLE, NULL, sdrplay_api_Update_Ctrl_Decimation, decimationComment, CSDR::set_params_decimationFactorEnable },
+	{ 4, "decimationFactor unsigned char",			0.0, decimationFactor1, 0.0, 0.0, &sdrplay_api_decimationFactor_map, SDR_PAMRAS_ENUM, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Ctrl_Decimation, decimationComment, CSDR::set_params_decimationFactor },
+	{ 4, "wideBandSignal unsigned char",			0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_UCHAR, SDR_PAMRAS_UCHAR, NULL, sdrplay_api_Update_Ctrl_Decimation, decimationComment, NULL },
+	{ 3, "agc sdrplay_api_AgcT",					0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 4, "enable sdrplay_api_AgcControlT",			0.0, sdrplay_api_AGC_50HZ, 0.0, 0.0, &sdrplay_api_AgcControlT_map, SDR_PAMRAS_ENUM, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
+	{ 4, "setPoint_dBfs int",						0.0, -60.0, 0.0, 0.0, NULL, SDR_PAMRAS_INT, SDR_PAMRAS_INT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
+	{ 4, "attack_ms unsigned short",				0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_USHORT, SDR_PAMRAS_USHORT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
+	{ 4, "decay_ms unsigned short",					0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_USHORT, SDR_PAMRAS_USHORT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
+	{ 4, "decay_delay_ms unsigned short",			0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_USHORT, SDR_PAMRAS_USHORT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
+	{ 4, "decay_threshold_dB unsigned short",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_USHORT, SDR_PAMRAS_USHORT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
+	{ 4, "syncUpdate int agc",						0.0, 0.0, 0.0, 1.0, NULL, SDR_PAMRAS_INT, SDR_PAMRAS_INT, NULL, sdrplay_api_Update_Ctrl_Agc, agcComment, NULL },
+	{ 3, "adsbMode sdrplay_api_AdsbModeT",			0.0, sdrplay_api_ADSB_DECIMATION, 0.0, 0.0, &sdrplay_api_AdsbModeT_map, SDR_PAMRAS_ENUM, SDR_PAMRAS_ENUM, NULL, sdrplay_api_Update_Ctrl_AdsbMode, adsbModeComment, NULL },
+	{ 2, "rsp1aTunerParams sdrplay_api_Rsp1aTunerParamsT  ",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 2, "rsp2TunerParams sdrplay_api_Rsp2TunerParamsT   ",		0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 2, "rspDuoTunerParams sdrplay_api_RspDuoTunerParamsT ",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 2, "rspDxTunerParams sdrplay_api_RspDxTunerParamsT  ",	0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, sdrplay_api_Update_None, NULL, NULL },
+	{ 1, "接收通道 B 参数 sdrplay_api_RxChannelParamsT* rxChannelB", 0.0, 0.0, 0.0, 0.0, NULL, SDR_PAMRAS_NONE, SDR_PAMRAS_NONE, NULL, NULL, NULL, NULL }
 };
 
 void CSDR::Init_ValueAddr(void)
@@ -539,7 +548,7 @@ void CSDR::Init_ValueAddr(void)
 
 CSDR::CSDR()
 {
-
+	max_index = sizeof(SDR_params) / sizeof(SDRParams);
 }
 
 CSDR::~CSDR()
@@ -585,8 +594,7 @@ void CSDR::buildTreeItems(HWND hWndTreeView, HTREEITEM hItem, int* params_index)
 
 	int level = SDR_params[*params_index].level;
 
-	do
-	{
+	do {
 		tvis.item.mask = TVIF_TEXT | TVIF_PARAM;
 		tvis.hParent = hItem;
 		tvis.item.lParam = (LPARAM)(*params_index);
@@ -928,7 +936,7 @@ void CSDR::edit_check_range(void)
 	{
 		int ItemIndex = SendMessage((HWND)clsWinSDR.hWndCombox, (UINT)CB_GETCURSEL,
 			(WPARAM)0, (LPARAM)0);
-		char  ListItem[256];
+		char  ListItem[256] = { 0 };
 		(TCHAR)SendMessage((HWND)clsWinSDR.hWndCombox, (UINT)CB_GETLBTEXT,
 			(WPARAM)ItemIndex, (LPARAM)ListItem);
 		SDR_ENUM_MAP *pmap = SDR_params[index].pEnumMap;
@@ -938,12 +946,15 @@ void CSDR::edit_check_range(void)
 			if (strcmp(it->first, ListItem) == 0)break;
 		}
 		
-		int dd = (int)it->second;
-		if (*(int*)(SDR_params[index].pValue) != dd)
+		//if (it != pmap->end()) 
 		{
-			*(int*)(SDR_params[index].pValue) = dd;
-			refresh_tree_item(clsWinSDR.hWndTreeView, &clsSDR.sel_tvi, index);
-			SDR_parmas_changed = true;
+			int dd = (int)it->second;
+			if (*(int*)(SDR_params[index].pValue) != dd)
+			{
+				*(int*)(SDR_params[index].pValue) = dd;
+				refresh_tree_item(clsWinSDR.hWndTreeView, &clsSDR.sel_tvi, index);
+				SDR_parmas_changed = true;
+			}
 		}
 	}
 	case SDR_PAMRAS_NONE:
@@ -960,11 +971,11 @@ void CSDR::set_params_SampleRate(int index)
 	clsMainFilterI.SrcData->SampleRate = clsGetDataSDR.chParams->ctrlParams.decimation.enable != 0 ?
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz / clsGetDataSDR.chParams->ctrlParams.decimation.decimationFactor : 
 		clsGetDataSDR.deviceParams->devParams->fsFreq.fsHz;
-	clsMainFilterI.SrcData->SampleRate = clsMainFilterI.SrcData->SampleRate >> 1;
+	//clsMainFilterI.SrcData->SampleRate = clsMainFilterI.SrcData->SampleRate >> 1;
 	clsMainFilterI.ReBuildFilterCore();
 
-	clsMainFilterQ.SrcData->SampleRate = clsMainFilterI.SrcData->SampleRate;
-	clsMainFilterQ.ReBuildFilterCore();
+	//clsMainFilterQ.SrcData->SampleRate = clsMainFilterI.SrcData->SampleRate;
+	//clsMainFilterQ.ReBuildFilterCore();
 
 	DbgMsg("set_params_SampleRate\r\n");
 }

@@ -6,11 +6,21 @@
 #include <string.h>
 #include <sstream>
 
-#include "public.h"
+#include "Public.h"
 #include "Debug.h"
+
+#include "CDataFromSDR.h"
+#include "CAnalyze.h"
+#include "CFilter.h"
+#include "CFFT.h"
 
 #include "CWinSpectrum.h"
 #include "CWinAudio.h"
+#include "CWinSDR.h"
+#include "CWinFilter.h"
+#include "CWinFiltted.h"
+#include "CWinSpectrumScan.h"
+#include "CWinMain.h"
 
 HINSTANCE	hInst;
 
@@ -18,6 +28,7 @@ FFT_INFO FFTInfo_Signal;
 FFT_INFO FFTInfo_Filtted;
 FFT_INFO FFTInfo_Audio;
 FFT_INFO FFTInfo_AudioFiltted;
+FFT_INFO FFTInfo_Spectrum_Scan;
 
 //HANDLE  cuda_FFT_hMutexBuff;
 
@@ -25,6 +36,14 @@ BOOLEAN Program_In_Process = true;
 BOOLEAN isGetDataExited = false;
 
 CHAR IniFilePath[] = "./default.ini";
+
+HPEN Pens[4] =
+{
+	CreatePen(PS_SOLID, 1, RGB(255, 255, 255)),
+	CreatePen(PS_SOLID, 1, RGB(0, 255, 0)),
+	CreatePen(PS_SOLID, 1, RGB(0, 0 , 255)),
+	CreatePen(PS_SOLID, 1, RGB(255, 255, 0))
+};
 
 void* get_WinClass(HWND hWnd)
 {
@@ -338,4 +357,43 @@ void charsToHex(char* str, int len)
 		DbgMsg("%c ", hex[(unsigned char)str[i] & 0xf]);
 	}
 	DbgMsg("\r\n");
+}
+
+
+
+LPTHREAD_START_ROUTINE WaitForExitThread(LPVOID lp)
+{
+	KillTimer(NULL, clsAnalyze.uTimerId);
+
+	Program_In_Process = false;
+	while (clsMainFilterI.Thread_Exit == false);
+	//while (clsMainFilterQ.Thread_Exit == false);
+	while (clsAudioFilter.Thread_Exit == false);
+
+	if (clsWinSDR.hWnd)
+		DestroyWindow(clsWinSDR.hWnd);
+	if (clsWinSpect.hWnd)
+		DestroyWindow(clsWinSpect.hWnd);
+	if (clsWinMain.m_FilterWin->hWnd)
+		DestroyWindow(clsWinMain.m_FilterWin->hWnd);
+	if (clsWinMain.m_audioWin->hWnd)
+		DestroyWindow(clsWinMain.m_audioWin->hWnd);
+	if (clsWinMain.m_filttedWin->hWnd)
+		DestroyWindow(clsWinMain.m_filttedWin->hWnd);
+	if (clsWinSpectrumScan.hWnd)
+		DestroyWindow(clsWinSpectrumScan.hWnd);
+	
+	Sleep(200);
+
+	clsGetDataSDR.close_SDR_device();
+
+	Sleep(100);
+
+	PostMessage(clsWinMain.hWnd, WM_USER, 0, 0);
+	return 0;
+}
+
+void WaitForExit(void)
+{
+	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)WaitForExitThread, NULL, 0, NULL);
 }

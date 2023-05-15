@@ -208,7 +208,7 @@ void CFFTforFilterAnalyze::FFT_for_FilterCore_Analyze(void* buff, void* fw)
 	if (size_n != (1 << k))
 	{
 		DbgMsg("file: %s. line: %d. func: %s\r\n", __FILE__, __LINE__, __FUNCTION__);
-		exit(0);
+		EXIT(0);
 	}
 	for (int i = 0; i < size_n; i++)
 	{

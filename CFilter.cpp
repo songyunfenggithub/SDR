@@ -24,7 +24,7 @@ using namespace WINS;
 using namespace METHOD;
 
 CFilter clsMainFilterI("MainI");
-CFilter clsMainFilterQ("MainQ");
+//CFilter clsMainFilterQ("MainQ");
 CFilter clsAudioFilter("Audio");
 
 CFilter::CFilter(const char* tag)
@@ -429,11 +429,22 @@ LPTHREAD_START_ROUTINE CFilter::cuda_filter_thread(LPVOID lp)
 
 void CFilter::cuda_filter_func(void)
 {
+	switch (Cuda_Filter_N_Doing) {
+	case cuda_filter_1:
+		cudaFilter->Init(this);
+		break;
+	case cuda_filter_2:
+		cudaFilter2->Init(this);
+		break;
+	case cuda_filter_3:
+		cudaFilter3->Init(this);
+		break;
+	}
+
 	doFiltting = true;
 	Thread_Exit = false;
 	UINT stepLen = FilterSrcLen >> 2;
-	SrcData->ProcessPos = ((UINT)(SrcData->Pos / stepLen)) * stepLen;
-	SrcData->ProcessPos &= SrcData->Mask;
+
 	while (doFiltting == true && Program_In_Process == true) {
 		WaitForSingleObject(hCoreMutex, INFINITE);
 		if (Cuda_Filter_N_New != Cuda_Filter_N_Doing) {
@@ -550,16 +561,16 @@ void CFilter::ParseCoreDesc(void)
 	switch (Cuda_Filter_N_New) {
 	case cuda_filter_1:
 		cudaFilter->Init(this);
-		TargetData->Pos = SrcData->ProcessPos;
+		//TargetData->Pos = SrcData->ProcessPos;
 		break;
 	case cuda_filter_2:
 		cudaFilter2->Init(this);
-		TargetData->Pos = SrcData->ProcessPos >> rootFilterInfo1.decimationFactorBit;
+		//TargetData->Pos = SrcData->ProcessPos >> rootFilterInfo1.decimationFactorBit;
 		break;
 	case cuda_filter_3:
 		ParseOneCore(&rootFilterInfo2);
 		cudaFilter3->Init(this);
-		TargetData->Pos = SrcData->ProcessPos >> (rootFilterInfo1.decimationFactorBit + rootFilterInfo2.decimationFactorBit);
+		//TargetData->Pos = SrcData->ProcessPos >> (rootFilterInfo1.decimationFactorBit + rootFilterInfo2.decimationFactorBit);
 		break;
 	}
 	Cuda_Filter_N_Doing = Cuda_Filter_N_New;

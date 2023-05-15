@@ -9,8 +9,8 @@ using namespace DEVICES;
 class CAnalyze
 {
 public:
-	//double rfHz = 10000000.0;
-	double rfHz_Step = 1000.0;
+
+	UINT uTimerId = 0;
 
 public:
 	CAnalyze();

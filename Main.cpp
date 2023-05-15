@@ -25,8 +25,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 	hInst = hInstance;
 
 	// Initialize global strings
-	LoadString(hInstance, IDS_APP_TITLE, clsWinMain.szTitle, MAX_LOADSTRING);
-	//LoadString(hInstance, IDC_MYWAVE, clsWinMain.szWindowClass, MAX_LOADSTRING);
 	clsWinMain.RegisterClass(hInstance);
 
 	// Perform application initialization:
@@ -49,4 +47,3 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 
 	return msg.wParam;
 }
-

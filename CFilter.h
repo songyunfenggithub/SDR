@@ -14,7 +14,7 @@ namespace METHOD {
 #define MAX_FILTER_NUMBER		0x100
 
 #define CUDA_FILTER_ADC_BUFF_SRC_LENGTH			0x20000
-#define CUDA_FILTER_AUDIO_BUFF_SRC_LENGTH		0x1000
+#define CUDA_FILTER_AUDIO_BUFF_SRC_LENGTH		0x8000
 
 	class CFilter
 	{
@@ -30,10 +30,10 @@ namespace METHOD {
 			FilterBandStop = 3
 		} FILTER_TYPE;
 
-		typedef struct FILTER_INFO;
-		typedef FILTER_INFO *PFILTER_INFO;
+		typedef struct FILTER_INFO_STRUCT;
+		typedef FILTER_INFO_STRUCT FILTER_INFO, *PFILTER_INFO;
 
-		struct FILTER_INFO
+		struct FILTER_INFO_STRUCT
 		{
 			char* CoreDescStr = NULL;
 			FILTER_TYPE Type;
@@ -78,7 +78,7 @@ namespace METHOD {
 		CData* TargetData = NULL;
 
 		float fscale = 1.0;
-		float* scale = &fscale;
+		float* Scale = &fscale;
 
 	public:
 		CFilter(const char* tag);
@@ -121,5 +121,5 @@ namespace METHOD {
 }
 
 extern METHOD::CFilter clsMainFilterI;
-extern METHOD::CFilter clsMainFilterQ;
+//extern METHOD::CFilter clsMainFilterQ;
 extern METHOD::CFilter clsAudioFilter;

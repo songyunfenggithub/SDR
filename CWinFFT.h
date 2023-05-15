@@ -23,11 +23,11 @@ namespace WINS {
 	class CWinFFT
 	{
 	public:
-		const char* Tag = NULL;
+		const char* Flag = NULL;
 
 		HWND hWnd = NULL;
-		HMENU hMenu = NULL;
-		HMENU hMenuSpect = NULL;
+		//HMENU hMenu = NULL;
+		//HMENU hMenuSpect = NULL;
 
 		UINT uTimerId;
 
@@ -36,12 +36,12 @@ namespace WINS {
 
 		RECT WinRect;
 
-		char strMouse[1024];
+		char strMouse[1024] = { 0 };
 
 		CMessage msgs;
 
-		int VScrollPos = 0, VScrollHeight = 0;
-		int HScrollPos = 0, HScrollWidth = 0;
+		int VScrollPos = 0, VScrollRange = 0;
+		int HScrollPos = 0, HScrollRange = 0;
 		double HScrollZoom = 1.0;
 		double VScrollZoom = 1.0;
 
@@ -59,6 +59,7 @@ namespace WINS {
 		INT		SpectrumY = -1;
 		HDC		hDCFFT = NULL;
 		HBITMAP hBMPFFT = NULL;
+		UINT CommNum = 0;
 
 		bool isDrawBriefly = true;
 		bool isSpectrumZoomedShow = true;
@@ -71,6 +72,14 @@ namespace WINS {
 			POIINT_SERIAL* next = NULL;
 		};
 		POIINT_SERIAL* FilterPsHead = NULL;
+
+		typedef struct AVERAGE_RANGE_POINTS_STRUCT {
+			POINT P0 = { 0 };
+			POINT P1 = { 0 };
+		}AVERAGE_RANGE_POINTS;
+		AVERAGE_RANGE_POINTS AverageRange;
+
+		double AverageValue = 0.0;
 
 	public:
 		CWinFFT();
@@ -86,15 +95,16 @@ namespace WINS {
 		void GetRealClientRect(PRECT lprc);
 		void KeyAndScroll(UINT message, WPARAM wParam, LPARAM lParam);
 
-		void PaintFFT(HDC hdc, CFFT* fft);
-		void PaintFFTBriefly(HDC hdc, CFFT* fft);
+		void PaintFFT(HDC hdc, RECT* rt, CFFT* fft);
+		void PaintFFTBriefly(HDC hdc, RECT* rt, CFFT* fft);
 
 		void BrieflyBuff(CFFT* fft);
 		void PaintSpectrum(CFFT* fft);
 		void SpectrumToWin(HDC hDC);
 		void InitDrawBuff(void);
 
-		void CWinFFT::DrawPoints(HDC hdc);
+		void DrawPoint(HDC hdc, POINT* P, char* Flag);
+		void DrawPoints(HDC hdc);
 
 		void RestoreValue(void);
 		void SaveValue(void);

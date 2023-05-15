@@ -15,9 +15,11 @@
 
 
 #include "CFile.h"
-#include "CWinMain.h"
 #include "CSoundCard.h"
 #include "Debug.h"
+
+#include "CWinSignal.h"
+#include "CWinMain.h"
 
 #include "CData.h"
 
@@ -51,11 +53,8 @@ CFile::CFile()
 //									 OFN_FILEMUSTEXIST | 
 //									 OFN_PATHMUSTEXIST | 
 //									 OFN_SHOWHELP;//OFN_SHOWHELP | OFN_EXPLORER | OFN_ENABLEHOOK | OFN_ENABLETEMPLATE;
-	SetFilter("Wave Data Files (*.sound)\0*.sound\0All Files (*.*)\0*.*\0\0");
-	*szFile = '\0';
-	*szFileAs = '\0';
-	dwSaveEndPos = dwSaveStartPos = 0;
-	hWndGetPos = NULL;
+	//SetFilter("Wave Data Files (*.sound)\0*.sound\0All Files (*.*)\0*.*\0\0");
+	ofn.lpstrFilter = "Wave Data Files (*.sound)\0*.sound\0All Files (*.*)\0*.*\0\0";
 }
 
 CFile::~CFile()
@@ -66,8 +65,7 @@ CFile::~CFile()
 BOOL CFile::NewFile(VOID)
 {
 	clsSoundCard.outBufLength = 0;
-	SetWindowText(clsWinMain.hWnd, clsWinMain.szTitle);
-	clsWinMain.CaculateHScroll();
+	SetWindowText(clsWinMain.hWnd, "新建文件");
 	InvalidateRect(clsWinMain.hWnd,NULL,TRUE);
 	return TRUE;
 }
@@ -99,10 +97,9 @@ BOOL CFile::OpenWaveFile(VOID)
 			TCHAR sz[1024];
 			int i;
 			for(i = strlen(szFile); szFile[i] != '\\'; i--);
-			sprintf(sz, "%s - %s", clsWinMain.szTitle, szFile + i + 1); 
+			sprintf(sz, "%s - %s", "打开文件", szFile + i + 1);
 			SetWindowText(clsWinMain.hWnd, sz);
 		}
-		clsWinMain.CaculateHScroll();
 		InvalidateRect(clsWinMain.hWnd,NULL,TRUE);
 		return TRUE;
 	}
@@ -119,7 +116,7 @@ BOOL CFile::SaveFileAs(VOID)
 		TCHAR sz[1024];
 		int i;
 		for(i = strlen(szFile); szFile[i] != '\\'; i--);
-		sprintf(sz, "%s - %s", clsWinMain.szTitle, szFile + i + 1); 
+		sprintf(sz, "%s - %s", "文件另存为", szFile + i + 1);
 		SetWindowText(clsWinMain.hWnd, sz);
 	}
 	return f;
@@ -163,9 +160,13 @@ BOOL CFile::SaveBuffToFile(VOID)
 {
 	DWORD  NumberOfBytesWritten;
 
-	if (clsFile.szFile[0] == '\0')if (!clsFile.GetSaveFile(clsWinMain.hWnd, FALSE))return FALSE;
+	if (clsFile.szFile[0] == '\0') {
+		ofn.lpstrFilter = "PCM Data Files(*.pcm)\0*.pcm\0All Files(*.*)\0*.*\0\0";
+		if (!clsFile.GetSaveFile(clsWinMain.hWnd, FALSE))return FALSE;
+	}
 
 	if (clsFile.dwSaveEndPos == 0) clsFile.dwSaveEndPos = 50000000;
+	dwSaveStartPos = 0;
 
 	HANDLE hFile = CreateFile(szFile,
 		GENERIC_WRITE,
@@ -222,10 +223,10 @@ LRESULT CALLBACK CFile::DlgSaveLengthProc(HWND hDlg, UINT message, WPARAM wParam
 				if (HIWORD(wParam) == STN_CLICKED) 
                 {
 					SetDlgItemInt(hDlg,	IDC_EDITSAVESTART, 
-						clsWinMain.DrawInfo.iHZoom > 0 ? 
-						clsWinMain.DrawInfo.dwHZoomedPos >> clsWinMain.DrawInfo.iHZoom
+						clsWinMain.m_signalWin->DrawInfo.iHZoom > 0 ? 
+						clsWinMain.m_signalWin->DrawInfo.dwHZoomedPos >> clsWinMain.m_signalWin->DrawInfo.iHZoom
 						: 
-						clsWinMain.DrawInfo.dwHZoomedPos << -clsWinMain.DrawInfo.iHZoom
+						clsWinMain.m_signalWin->DrawInfo.dwHZoomedPos << -clsWinMain.m_signalWin->DrawInfo.iHZoom
 						, TRUE);
 				}
 				break;
@@ -233,10 +234,10 @@ LRESULT CALLBACK CFile::DlgSaveLengthProc(HWND hDlg, UINT message, WPARAM wParam
 				if (HIWORD(wParam) == STN_CLICKED) 
                 {
 					SetDlgItemInt(hDlg,	IDC_EDITSAVEEND, 
-						clsWinMain.DrawInfo.iHZoom > 0 ? 
-						clsWinMain.DrawInfo.dwHZoomedPos >> clsWinMain.DrawInfo.iHZoom
+						clsWinMain.m_signalWin->DrawInfo.iHZoom > 0 ?
+						clsWinMain.m_signalWin->DrawInfo.dwHZoomedPos >> clsWinMain.m_signalWin->DrawInfo.iHZoom
 						: 
-						clsWinMain.DrawInfo.dwHZoomedPos << -clsWinMain.DrawInfo.iHZoom
+						clsWinMain.m_signalWin->DrawInfo.dwHZoomedPos << -clsWinMain.m_signalWin->DrawInfo.iHZoom
 						, TRUE);
 				}
 				break;
@@ -265,11 +266,6 @@ LRESULT CALLBACK CFile::DlgSaveLengthProc(HWND hDlg, UINT message, WPARAM wParam
 			break;
 	}
     return FALSE;
-}
-
-VOID CFile::SetFilter(LPTSTR szFilter)
-{
-	ofn.lpstrFilter = szFilter;
 }
 
 BOOL CFile::GetOpenFile(HWND hWnd)

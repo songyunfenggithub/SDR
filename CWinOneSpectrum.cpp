@@ -11,13 +11,15 @@
 #include "Debug.h"
 #include "CData.h"
 #include "CFFT.h"
+
 #include "CWinSpectrum.h"
+#include "CWinOneFFT.h"
 #include "CWinOneSpectrum.h"
 
-#include "CWinFFT.h"
 
 using namespace std;
 using namespace WINS; 
+using namespace WINS::SPECTRUM;
 //using namespace DEVICES;
 
 #define GET_WM_VSCROLL_CODE(wp, lp)     LOWORD(wp)
@@ -145,6 +147,7 @@ LRESULT CALLBACK CWinOneSpectrum::WndProc(HWND hWnd, UINT message, WPARAM wParam
 		Paint();
 		break;
 	case WM_DESTROY:
+		this->hWnd = NULL;
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -216,22 +219,20 @@ void CWinOneSpectrum::Paint(void)
 
 #define FFT_MAX_SAMPLING 16
 
-void CWinOneSpectrum::PaintSpectrum(void* fft)
+void CWinOneSpectrum::PaintSpectrum(CFFT* fft)
 {
-	CFFT* FFTOrignal = (CFFT*)clsWinSpect.FFTOrignal;
-	CFFT* FFTFiltted = (CFFT*)clsWinSpect.FFTFiltted;
-	CFFT* cFFT = (CFFT*)fft;
+	CFFT* FFTOrignal = clsWinSpect.FFTOrignal;
+	CFFT* FFTFiltted = clsWinSpect.FFTFiltted;
 
 	if (
-		(cFFT == FFTOrignal && whichSignel > 1)
+		(fft == FFTOrignal && whichSignel > 1)
 		||
-		(cFFT == FFTFiltted && whichSignel < 2)
+		(fft == FFTFiltted && whichSignel < 2)
 		)return;
 
 	WaitForSingleObject(hDrawMutex, INFINITE);
-	WaitForSingleObject(cFFT->hMutexDraw, INFINITE);
+	WaitForSingleObject(fft->hMutexDraw, INFINITE);
 	
-	CFFT* cfft = (CFFT*)fft;
 	double* pBuf;
 	UINT32 halfFFTSize;
 
@@ -277,9 +278,8 @@ void CWinOneSpectrum::PaintSpectrum(void* fft)
 	}
 
 	UINT DrawLen = clsWinOneSpectrum.WinWidth - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT;
-	RECT rt;
 	UINT64 color;
-	UINT8 c;
+	//UINT8 c;
 	BYTE R, G = 0, C;
 	COLORREF cx;
 
@@ -289,8 +289,8 @@ void CWinOneSpectrum::PaintSpectrum(void* fft)
 
 	if (clsWinOneSpectrum.SpectrumY == -1) clsWinOneSpectrum.SpectrumY = clsWinOneSpectrum.WinHeight - 1;
 
-	SelectObject(clsWinOneSpectrum.hDCFFT, CreateFont(14, 0, 0, 0, 0, 0, 0, 0,
-		DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, _T("Arial")));
+	//SelectObject(clsWinOneSpectrum.hDCFFT, CreateFont(14, 0, 0, 0, 0, 0, 0, 0,
+	//	DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, _T("Arial")));
 
 	fftmaxv = pBuf[halfFFTSize];
 	fftminv = pBuf[halfFFTSize + 1];
@@ -321,18 +321,36 @@ void CWinOneSpectrum::PaintSpectrum(void* fft)
 	double minV = DBL_MAX;
 	double maxV = -1.0 * DBL_MAX;
 	UINT averagei = 0;
+	int px0 = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
+	int px1 = (clsWinSpect.HScrollPos + clsWinOneFFT.WinRect.right - WAVE_RECT_BORDER_LEFT) / clsWinSpect.HScrollZoom;
+	if (clsWinOneFFT.AverageRange.P0.x >= 0 && 
+		((clsWinOneFFT.AverageRange.P0.x > px0 && clsWinOneFFT.AverageRange.P0.x < px1) || (clsWinOneFFT.AverageRange.P1.x > px0 && clsWinOneFFT.AverageRange.P1.x < px1))) {
+		UINT left = clsWinOneFFT.AverageRange.P0.x > clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom ? clsWinOneFFT.AverageRange.P0.x : clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
+		UINT right = clsWinOneFFT.AverageRange.P1.x < (clsWinSpect.HScrollPos + clsWinSpect.WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / clsWinSpect.HScrollZoom ?
+			clsWinOneFFT.AverageRange.P1.x : (clsWinSpect.HScrollPos + clsWinSpect.WinRect.right - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT) / clsWinSpect.HScrollZoom;
 
-
-	for (int i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
-		i < halfFFTSize &&
-		(i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= clsWinOneSpectrum.WinWidth - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
-		i += istep) {
-		averageV += pBuf[i];
-		minV = min(minV, pBuf[i]);
-		maxV = max(maxV, pBuf[i]);
-		averagei++;
+		for (int i = left; i < halfFFTSize && i < right; i += istep) {
+			averageV += pBuf[i];
+			minV = min(minV, pBuf[i]);
+			maxV = max(maxV, pBuf[i]);
+			averagei++;
+		}
 	}
+	else {
+		for (int i = clsWinSpect.HScrollPos / clsWinSpect.HScrollZoom;
+			i < halfFFTSize &&
+			(i * clsWinSpect.HScrollZoom - clsWinSpect.HScrollPos <= clsWinOneSpectrum.WinWidth - WAVE_RECT_BORDER_LEFT - WAVE_RECT_BORDER_RIGHT);
+			i += istep) {
+			averageV += pBuf[i];
+			minV = min(minV, pBuf[i]);
+			maxV = max(maxV, pBuf[i]);
+			averagei++;
+		}
+	}
+
 	averageV /= averagei;
+	clsWinOneFFT.AverageValue = averageV;
+
 	double top, botton;
 	double fftmaxdiff = maxV - minV;
 	double topToAverage = 1.0;
@@ -506,9 +524,8 @@ void CWinOneSpectrum::PaintSpectrum(void* fft)
 
 	clsWinOneSpectrum.inPaintSpectrumThread = false;
 
-	ReleaseMutex(cFFT->hMutexDraw);
+	ReleaseMutex(fft->hMutexDraw);
 	ReleaseMutex(hDrawMutex);
-
 }
 
 void CWinOneSpectrum::GetRealClientRect(PRECT lprc)

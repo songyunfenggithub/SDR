@@ -7,52 +7,52 @@
 
 #include "CAudio.h"
 
-#include "CDemodulatorFM.h"
+#include "CFM.h"
 
-//CDemodulatorFM clsDemodulatorAm;
+using namespace DEMODULATOR;
 
-CDemodulatorFM::CDemodulatorFM()
+CFM::CFM()
 {
 	RestoreValue();
 	Init();
 }
 
-CDemodulatorFM::~CDemodulatorFM()
+CFM::~CFM()
 {
 	SaveValue();
 	UnInit();
 }
 
-void CDemodulatorFM::Init(void)
+void CFM::Init(void)
 {
 	m_Audio = &mAudio;
 }
 
-void CDemodulatorFM::UnInit(void)
+void CFM::UnInit(void)
 {
 
 }
 
-void CDemodulatorFM::SaveValue(void)
+void CFM::SaveValue(void)
 {
 	//WritePrivateProfileString("CDemodulatorFM", "AMFilterCoreDesc", pFilterInfo->CoreDescStr, IniFilePath);
 }
 
-void CDemodulatorFM::RestoreValue(void)
+void CFM::RestoreValue(void)
 {
 #define VALUE_LENGTH	100
 	char value[VALUE_LENGTH];
 	//GetPrivateProfileString("CDemodulatorFM", "AMFilterCoreDesc", "1", AMFilterCoreDesc, FILTER_DESC_LENGTH, IniFilePath);
 }
 
-LPTHREAD_START_ROUTINE CDemodulatorFM::Demodulator_Thread(LPVOID lp)
+LPTHREAD_START_ROUTINE CFM::Demodulator_Thread(LPVOID lp)
 {
-	CDemodulatorFM* me = (CDemodulatorFM*)lp;
-	me->Thread_Func_IQ();
+	CFM* me = (CFM*)lp;
+	me->Thread_Func_Calculation_Frequency();
 	return 0;
 }
 
-void CDemodulatorFM::Thread_Func(void)
+void CFM::Thread_Func(void)
 {
 	UINT fm_pos;
 	UINT fm_between;
@@ -92,13 +92,13 @@ void CDemodulatorFM::Thread_Func(void)
 	hThread = NULL;
 }
 
-void CDemodulatorFM::Thread_Func_IQ(void)
+void CFM::Thread_Func_IQ(void)
 {
 	CData* audioData = m_Audio->outData;
 	CData* iData = AdcDataIFiltted;
-	CData* qData = AdcDataQFiltted;
+	//CData* qData = AdcDataQFiltted;
 
-
+	float dt = 1.0 / iData->SampleRate;
 	UINT df = 0;
 	while ((iData->SampleRate >> df) > (1 << 15)) df++;
 	UINT Decimation_Factor = 1 << df;
@@ -107,26 +107,70 @@ void CDemodulatorFM::Thread_Func_IQ(void)
 	m_Audio->SampleRate = &m_Audio->uSampleRate;
 	clsAudioFilter.ParseCoreDesc();
 
-	UINT am_pos = iData->Pos;
+	UINT fm_pos = iData->Pos;
 
 	float* audioBuff = (float*)m_Audio->outData->Buff;
 	float* xi = (float*)iData->Buff;
-	float* xq = (float*)AdcDataQFiltted->Buff;
+	//float* xq = (float*)AdcDataQFiltted->Buff;
 
 	Doing = true;
 
 	while (Doing && Program_In_Process) {
-		if (
-			((iData->Pos - am_pos) & iData->Mask) > Decimation_Factor &&
-			((qData->Pos - am_pos) & iData->Mask) > Decimation_Factor
-			) {
-			UINT pos = am_pos + Decimation_Factor;
-			audioBuff[audioData->Pos] = sqrt(xi[pos] * xi[pos] + xq[pos] * xq[pos]);
-			//audioBuff[audioData->Pos] = xi[pos];
-			am_pos += Decimation_Factor;
-			am_pos &= iData->Mask;
-			audioData->Pos++;
-			audioData->Pos &= audioData->Mask;
+		if (((iData->Pos - fm_pos) & iData->Mask) > Decimation_Factor) {
+			UINT pos = fm_pos;
+
+			//UINT pos_1 = (pos - 1) & iData->Mask;
+			//if (xi[pos] == 0 && xq[pos] == 0) 
+			//	audioBuff[audioData->Pos] = audioBuff[(audioData->Pos - 1) & AudioData->Mask];
+			//else 
+			//	audioBuff[audioData->Pos] = (xi[pos_1] * xq[pos] - xi[pos] * xq[pos_1]) / (xi[pos] * xi[pos] + xq[pos] * xq[pos]);
+
+			//if (xi[pos] == 0)
+			//	audioBuff[audioData->Pos] = audioBuff[(audioData->Pos - 1) & AudioData->Mask];
+			//else
+			//	audioBuff[audioData->Pos] = atan(xq[pos] / xi[pos]) *1000;
+
+
+			//audioBuff[audioData->Pos] = sqrt(xi[pos] * xi[pos] + xq[pos] * xq[pos]);
+ 
+			audioBuff[audioData->Pos] = xi[pos];
+
+			fm_pos = (fm_pos + Decimation_Factor) & iData->Mask;
+			audioData->Pos = ++audioData->Pos & audioData->Mask;
+		}
+		else {
+			Sleep(10);
+		}
+	}
+	hThread = NULL;
+}
+
+void CFM::Thread_Func_Calculation_Frequency(void)
+{
+	CData* oData = m_Audio->outData;
+	CData* iData = AdcDataIFiltted;
+
+	float dt = 1.0 / iData->SampleRate;
+	UINT df = 0;
+	while ((iData->SampleRate >> df) > (1 << 15)) df++;
+	UINT Decimation_Factor = 1 << df;
+
+	m_Audio->outData->SampleRate = m_Audio->outDataFiltted->SampleRate = m_Audio->uSampleRate = iData->SampleRate >> df;
+	m_Audio->SampleRate = &m_Audio->uSampleRate;
+	clsAudioFilter.ParseCoreDesc();
+
+	UINT fm_pos = iData->Pos;
+
+	float* audioBuff = (float*)m_Audio->outData->Buff;
+	float* xi = (float*)iData->Buff;
+
+	Doing = true;
+	while (Doing && Program_In_Process) {
+		if (((iData->Pos - fm_pos) & iData->Mask) > Decimation_Factor) {
+			UINT pos = fm_pos;
+			audioBuff[oData->Pos] = xi[pos];
+			fm_pos = (fm_pos + Decimation_Factor) & iData->Mask;
+			oData->Pos = ++oData->Pos & oData->Mask;
 		}
 		else {
 			Sleep(10);

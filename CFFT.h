@@ -13,6 +13,9 @@ namespace METHOD {
 	class CFFT :public cuda_CFFT
 	{
 	public:
+		
+		typedef void (*FFTProcessCallBack)(CFFT* fft);
+
 		typedef struct Complex_
 		{
 			double real;
@@ -22,11 +25,13 @@ namespace METHOD {
 		HANDLE hMutexBuff = NULL;
 		HANDLE hMutexDraw = NULL;
 
+		const char* Flag = NULL;
+
 		HWND hWnd = NULL;
 		CData* Data;
 
-		COLORREF Color;		
-		COLORREF ColorLog;
+		HPEN hPen = NULL;
+		HPEN hPenLog = NULL;
 
 		double* FFTBuff = NULL;
 		double* FFTLogBuff = NULL;
@@ -45,11 +50,17 @@ namespace METHOD {
 		bool FFTNext = false;
 		bool Thread_Exit = true;
 
+		bool bShow = true;
+		bool bLogShow = true;
+
+		FFTProcessCallBack FFT_Process_CallBack = NULL;
+		FFTProcessCallBack FFT_Process_CallBackInit = NULL;
+
 	public:
-		CFFT();
+		CFFT(const char* flag, FFT_INFO *fftInfo);
 		~CFFT();
 
-		void Init(void);
+		void Init(UINT fftsize, UINT fftstep, UINT averagedeep);
 		void UnInit(void);
 
 		void FFT(UINT pos);
@@ -66,5 +77,8 @@ namespace METHOD {
 
 		static LPTHREAD_START_ROUTINE FFT_Thread(LPVOID lp);
 		void FFT_Thread_func(void);
+
+		void RestoreValue(void);
+		void SaveValue(void);
 	};
 }

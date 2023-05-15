@@ -31,8 +31,9 @@
 #define IDD_DLG_FFT_SET                 143
 #define IDC_MENU_SDR                    149
 #define IDD_DLG_SDR_SET                 150
-#define IDC_MENU_AM                     152
 #define IDC_MENU_POPUP_AM               152
+#define IDC_MENU_SPECTRUM_SCAN          154
+#define IDC_MENU_SPECTRUM_SCAN_FFT      155
 #define IDD_WAVEDEVICE_COMBO_DEVICE     200
 #define IDD_WAVEDEVICE_EDIT_CAPABILITIES 201
 #define IDC_EDITGOTO                    1000
@@ -244,14 +245,51 @@
 #define ID_AM_AM                        32959
 #define IDM_AM_IQ                       32960
 #define IDM_AM_GET_ENVELOPE             32961
+#define ID_32962                        32962
+#define ID_32963                        32963
+#define ID_32964                        32964
+#define IDM_WAVE_FOLLOW_IDATA           32965
+#define IDM_WAVE_FOLLOW_QDATA           32966
+#define IDM_WAVE_FOLLOW_FILLTTED_IDATA  32967
+#define IDM_WAVE_FOLLOW_FILTTED_QDATA   32968
+#define IDM_WAVE_FOLLOW_FILTTED_IDATA   32969
+#define IDM_WAVE_IDATA_SHOW             32970
+#define IDM_WAVE_IDATA_FILTTED_SHOW     32971
+#define ID_32972                        32972
+#define ID_32973                        32973
+#define IDM_WAVE_QDATA_FILTTED_SHOW     32974
+#define IDM_WAVE_QDATA_SHOW             32975
+#define ID_32976                        32976
+#define ID_32987                        32987
+#define ID_32988                        32988
+#define IDM_MSG_WINDOW                  32989
+#define ID_AM_AM32990                   32990
+#define IDM_AM_MOVE_FREQUENCY           32991
+#define ID_32992                        32992
+#define IDM_AUDIO_CLEAR_FILTER_POINTS   32993
+#define ID_32994                        32994
+#define IDM_FILTER_START_STOP           32995
+#define ID_32996                        32996
+#define IDM_SPECTRUM_SCAN_WINDOW        32997
+#define IDM_SPECTRUM_WINDOW             32998
+#define ID_32999                        32999
+#define IDM_SPECTRUM_SCAN_SET           33000
+#define ID_33001                        33001
+#define IDM_SPECTRUM_SCAN_FFT           33002
+#define IDM_FFT_BRIEFLY_SHOW            33003
+#define IDM_FFT_BRIEFLY_LOG_SHOW        33004
+#define IDM_SPECTRUM_BRIEFLY_SHOW       33005
+#define IDM_SPECTRUM_BRIEFLY_LOG_SHOW   33006
+#define ID_33007                        33007
+#define ID_Menu33008                    33008
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        153
-#define _APS_NEXT_COMMAND_VALUE         32962
+#define _APS_NEXT_RESOURCE_VALUE        155
+#define _APS_NEXT_COMMAND_VALUE         33009
 #define _APS_NEXT_CONTROL_VALUE         1025
 #define _APS_NEXT_SYMED_VALUE           110
 #endif

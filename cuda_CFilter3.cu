@@ -10,7 +10,7 @@
 #include "Debug.h"
 #include "CData.h"
 #include "CFilter.h"
-#include "CDemodulatorAM.h"
+#include "CAM.h"
 
 #include "cuda_CFilter3.cuh"
 
@@ -284,7 +284,7 @@ void cuda_CFilter3::Filtting(void)
 		d_Decimation_Cache2, d_Filter_Core2, rootFilterInfo2->decimationFactorBit, rootFilterInfo2->CoreLength,
 		d_Filtted_Result1,
 		d_Filtted_Result2,
-		*cFilter->scale
+		*cFilter->Scale
 		);
 	err = cudaGetLastError();
 	if (err != cudaSuccess) {

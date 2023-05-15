@@ -3,7 +3,8 @@
 #include <windowsx.h>
 #include <wingdi.h>
 
-#include "public.h"
+#include "Public.h"
+#include "Debug.h"
 #include "CAnalyze.h"
 #include "CWinOneFFT.h"
 #include "CWinSpectrum.h"
@@ -104,19 +105,18 @@ void CScreenButton::OnMouseMouseNumButton(HWND hWnd, UINT message, WPARAM wParam
 {
 	UINT MouseX = GET_X_LPARAM(lParam);
 	UINT MouseY = GET_Y_LPARAM(lParam);
-	RECT rt;
+	RECT rt = { 0 };
+	RECT * srcRt = Button->rt;
 
-	GetClientRect(hWnd, &rt);
-	rt.top = WAVE_RECT_BORDER_TOP + Button->Y;
-	rt.left = Button->alginMode == CScreenButton::BUTTON_ALIGN_MODE::Button_Align_Right ?
-		rt.right - WAVE_RECT_BORDER_RIGHT - Button->X - Button->W :
-		WAVE_RECT_BORDER_LEFT + Button->X;
+	rt.top = srcRt->top + Button->Y;
+	rt.left = Button->alginMode == CScreenButton::BUTTON_ALIGN_MODE::Button_Align_Right ? srcRt->right - Button->X - Button->W : srcRt->left + Button->X;
 	rt.right = rt.left + Button->W;
 	rt.bottom = rt.top + Button->H;
-
+	Button->MouseIndex = -1;
 	if (MouseX > rt.left && MouseX < rt.right && MouseY > rt.top && MouseY < rt.bottom) {
 		int W = Button->W / 13;
 		int index = (rt.right - MouseX) / W;
+		Button->MouseIndex = index;
 		if ((index + 1) % 4 == 0) return;
 		int index2;
 		/*
@@ -137,10 +137,12 @@ void CScreenButton::OnMouseMouseNumButton(HWND hWnd, UINT message, WPARAM wParam
 		case WM_LBUTTONUP:
 			Button->value += rfstep;
 			if (Button->value > Button->max) Button->value = Button->max;
+			//DbgMsg("WM_LBUTTONUP\r\n");
 			break;
 		case WM_RBUTTONUP:
 			Button->value -= rfstep;
 			if (Button->value < Button->min) Button->value = Button->min;
+			//DbgMsg("WM_RBUTTONUP\r\n");
 			break;
 		case WM_MOUSEMOVE:
 			break;
@@ -148,17 +150,10 @@ void CScreenButton::OnMouseMouseNumButton(HWND hWnd, UINT message, WPARAM wParam
 			break;
 		}
 		if (savevalue != Button->value) {
-			if (Button->mode == Button_Mouse_Num1) {
-				clsAnalyze.set_SDR_rfHz(Button->value);
-			}
-			else if (Button->mode == Button_Mouse_Num2) {
-				clsAnalyze.rfHz_Step = Button->value;
-			}
-
 			char s[100];
 			char* s1 = fomatKINT64Width(Button->value, 4, s);
 			strcpy(Button->txt, s1 + 2);
-
+			if (Button->buttonFunc != NULL) Button->buttonFunc(this);
 		}
 	}
 }
@@ -167,10 +162,11 @@ bool CScreenButton::MouseInButton(HWND hWnd, UINT x, UINT y)
 {
 	RECT rt;
 	GetClientRect(hWnd, &rt);
-	rt.top = WAVE_RECT_BORDER_TOP + Button->Y;
+	RECT* srcRt = Button->rt;
+	rt.top = srcRt->top + Button->Y;
 	rt.left = Button->alginMode == CScreenButton::BUTTON_ALIGN_MODE::Button_Align_Right ?
-		rt.right - WAVE_RECT_BORDER_RIGHT - Button->X - Button->W :
-		WAVE_RECT_BORDER_LEFT + Button->X;
+		srcRt->right - Button->X - Button->W :
+		srcRt->left + Button->X;
 	rt.right = rt.left + Button->W;
 	rt.bottom = rt.top + Button->H;
 	return (x > rt.left && x < rt.right && y > rt.top && y < rt.bottom);
@@ -212,18 +208,19 @@ void CScreenButton::OnMouseButton(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 	}
 }
 
-void CScreenButton::DrawMouseNumButton(HDC hdc, RECT* srcRt)
+void CScreenButton::DrawMouseNumButton(HDC hdc)
 {
 	HFONT hFont = *CScreenButton::hFonts[Button->fontsize];
 	HFONT hFont_old = (HFONT)SelectObject(hdc, hFont);
 
-	HPEN hPen = (HPEN)GetStockObject(WHITE_PEN);
+	static HPEN hPen = CreatePen(PS_SOLID, 1, RGB(100, 100, 100));	//(HPEN)GetStockObject(WHITE_PEN);
 	HPEN hPen_old = (HPEN)SelectObject(hdc, hPen);
 	SetBkMode(hdc, TRANSPARENT);
 
-	RECT rt;
+	RECT rt = { 0 };
+	RECT* srcRt = Button->rt;
 	rt.top = srcRt->top + Button->Y;
-	rt.left = Button->alginMode == CScreenButton::BUTTON_ALIGN_MODE::Button_Align_Right ?
+	rt.left = Button->alginMode == CScreenButton::BUTTON_ALIGN_MODE::Button_Align_Right ? 
 		srcRt->right - Button->X - Button->W : srcRt->left + Button->X;
 	rt.right = rt.left + Button->W;
 	rt.bottom = rt.top + Button->H;
@@ -234,23 +231,44 @@ void CScreenButton::DrawMouseNumButton(HDC hdc, RECT* srcRt)
 	LineTo(hdc, rt.left, rt.bottom);
 	LineTo(hdc, rt.left, rt.top);
 
+	COLORREF oldColor = SetTextColor(hdc, Button->color);
 	DrawText(hdc, Button->txt, strlen(Button->txt), &rt, NULL);
+	SetTextColor(hdc, oldColor);
+
+	if ((Button->MouseIndex + 1) % 4 != 0) {
+		int W = Button->W / 13;
+		rt.left = Button->alginMode == CScreenButton::BUTTON_ALIGN_MODE::Button_Align_Right ?
+			srcRt->right - Button->X - (Button->MouseIndex + 1) * W : srcRt->left + Button->X + (12 - Button->MouseIndex) * W;
+		rt.right = rt.left + W;
+		static HPEN hPen = CreatePen(PS_DOT, 1, RGB(0, 255, 0));
+		SelectObject(hdc, hPen);
+
+		SetROP2(hdc, R2_NOT);
+		MoveToEx(hdc, rt.left, rt.top, NULL);
+		LineTo(hdc, rt.right, rt.top);
+		LineTo(hdc, rt.right, rt.bottom);
+		LineTo(hdc, rt.left, rt.bottom);
+		LineTo(hdc, rt.left, rt.top);
+		SetROP2(hdc, R2_COPYPEN);
+	}
 
 	SelectObject(hdc, hFont_old);
 	SelectObject(hdc, hPen_old);
 }
 
-void CScreenButton::DrawButton(HDC hdc, RECT* srcRt)
+void CScreenButton::DrawButton(HDC hdc)
 {
 
 	HFONT hFont = *CScreenButton::hFonts[Button->fontsize];
 	HFONT hFont_old = (HFONT)SelectObject(hdc, hFont);
-	HPEN hPen = (HPEN)GetStockObject(WHITE_PEN);
+	//HPEN hPen = (HPEN)GetStockObject(WHITE_PEN);
+	static HPEN hPen = CreatePen(PS_SOLID, 1, RGB(100, 100, 100));	//(HPEN)GetStockObject(WHITE_PEN);
 	HPEN hPen_old = (HPEN)SelectObject(hdc, hPen);
 
 	SetBkMode(hdc, TRANSPARENT);
 
-	RECT rt;
+	RECT rt = { 0 };
+	RECT* srcRt = Button->rt;
 	rt.top = srcRt->top + Button->Y;
 	rt.left = Button->alginMode == CScreenButton::BUTTON_ALIGN_MODE::Button_Align_Right ?
 		srcRt->right - Button->X - Button->W : srcRt->left + Button->X;
